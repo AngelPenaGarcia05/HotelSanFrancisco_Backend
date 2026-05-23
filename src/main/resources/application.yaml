@@ -9,11 +9,11 @@ spring:
     driver-class-name: org.postgresql.Driver
 
     hikari:
-      maximum-pool-size: ${DB_POOL_MAX_SIZE}
-      minimum-idle: ${DB_POOL_MIN_IDLE}
-      connection-timeout: ${DB_POOL_CONNECTION_TIMEOUT}
-      idle-timeout: ${DB_POOL_IDLE_TIMEOUT}
-      max-lifetime: ${DB_POOL_MAX_LIFETIME}
+      maximum-pool-size: 25
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
       pool-name: HotelHikariPool
 
   jpa:
@@ -64,6 +64,10 @@ spring:
     user:
       name: ${SECURITY_USERNAME}
       password: ${SECURITY_PASSWORD}
+    jwt:
+      secret-key: ${JWT_SECRET_KEY:default_super_secret_key_that_is_long_enough_for_hmac_sha256_at_least_256_bits_for_security_hotel_san_francisco_2026}
+      access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:900000} # 15 min (en ms)
+      refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:604800000} # 7 días (en ms)
 
 server:
   port: ${SERVER_PORT}

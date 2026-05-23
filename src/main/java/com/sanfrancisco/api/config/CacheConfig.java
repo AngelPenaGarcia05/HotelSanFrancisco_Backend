@@ -22,9 +22,14 @@ public class CacheConfig {
     public CaffeineCacheManager cacheManager() {
         CaffeineCacheManager manager = new CaffeineCacheManager();
         manager.setCaffeine(Caffeine.newBuilder()
-                .maximumSize(500)
-                .expireAfterWrite(Duration.ofMinutes(10))
+                .maximumSize(1000)
+                .expireAfterWrite(Duration.ofMinutes(15))
                 .recordStats());
+        manager.setCacheNames(java.util.List.of(
+                "tiposHabitacion", "habitaciones", "canales", "tiposDocumento",
+                "metodosPago", "tiposServicio", "categoriasProducto", "horarios",
+                "proveedores", "jwtBlacklist", "bruteForce"
+        ));
         manager.setAsyncCacheMode(false);
         return manager;
     }
