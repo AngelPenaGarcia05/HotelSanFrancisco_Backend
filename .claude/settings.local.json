@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/USUARIO/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/fbbdddef-79c8-4195-9fef-f5f8e877e74a/aa5c02e4-4a70-4f5a-aae6-efc09a7af660/skills/xlsx/**)",
+      "Bash(python -c ' *)",
+      "Bash(python3 -c \"import pandas as pd; xl = pd.read_excel\\(r'C:\\\\Users\\\\USUARIO\\\\Documents\\\\UTP\\\\Integrador II -Sistemas\\\\diccionario_datos_hotel.xlsx', sheet_name=None\\); [print\\(f'=== SHEET: {n} ===\\\\n', df.to_string\\(\\), '\\\\n'\\) for n, df in xl.items\\(\\)]\")"
+    ]
+  }
+}
