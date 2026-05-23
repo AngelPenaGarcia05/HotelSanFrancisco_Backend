@@ -3,30 +3,35 @@ spring:
     name: hotel-san-francisco-api
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/hotel_sf
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 5
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
+      maximum-pool-size: ${DB_POOL_MAX_SIZE}
+      minimum-idle: ${DB_POOL_MIN_IDLE}
+      connection-timeout: ${DB_POOL_CONNECTION_TIMEOUT}
+      idle-timeout: ${DB_POOL_IDLE_TIMEOUT}
+      max-lifetime: ${DB_POOL_MAX_LIFETIME}
       pool-name: HotelHikariPool
 
   jpa:
     hibernate:
       ddl-auto: validate
+
     show-sql: false
     open-in-view: false
+
     properties:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
         default_schema: public
+
         jdbc:
-          time_zone: America/Lima
+          time_zone: ${APP_TIMEZONE}
+
         order_inserts: true
         order_updates: true
         batch_size: 25
@@ -39,15 +44,28 @@ spring:
     out-of-order: false
 
   cache:
-    type: simple
+    type: caffeine
+
+    cache-names:
+      - tiposHabitacion
+      - habitaciones
+      - canales
+      - tiposDocumento
+      - metodosPago
+      - tiposServicio
+      - categoriasProducto
+
+    caffeine:
+      spec: maximumSize=${CACHE_MAX_SIZE},expireAfterWrite=${CACHE_EXPIRE_AFTER_WRITE},recordStats
 
   security:
     user:
-      name: admin
-      password: ${SECURITY_PASSWORD:changeme}
+      name: ${SECURITY_USERNAME}
+      password: ${SECURITY_PASSWORD}
 
 server:
-  port: 8080
+  port: ${SERVER_PORT}
+
   servlet:
     encoding:
       charset: UTF-8
@@ -55,10 +73,11 @@ server:
 
 logging:
   level:
-    org.hibernate.SQL: DEBUG
-    org.hibernate.orm.jdbc.bind: TRACE
-    com.sanfrancisco.api: DEBUG
-    org.springframework.security: INFO
-    org.flywaydb: INFO
+    org.hibernate.SQL: ${LOG_LEVEL_SQL}
+    org.hibernate.orm.jdbc.bind: ${LOG_LEVEL_BIND}
+    com.sanfrancisco.api: ${LOG_LEVEL_APP}
+    org.springframework.security: ${LOG_LEVEL_SECURITY}
+    org.flywaydb: ${LOG_LEVEL_FLYWAY}
+
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

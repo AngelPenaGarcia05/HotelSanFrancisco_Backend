@@ -1,0 +1,5 @@
+ALTER TABLE compras
+ADD COLUMN fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW();
+
+ALTER TABLE compras
+ADD COLUMN fecha_modificacion TIMESTAMP;

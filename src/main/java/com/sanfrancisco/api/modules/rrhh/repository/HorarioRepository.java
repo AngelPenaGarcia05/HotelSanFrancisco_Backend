@@ -13,4 +13,6 @@ public interface HorarioRepository extends JpaRepository<Horario, Integer>,
         JpaSpecificationExecutor<Horario> {
 
     List<Horario> findByEstado(EstadoActivo estado);
+
+    boolean existsByNombreTurnoIgnoreCase(String nombreTurno);
 }
