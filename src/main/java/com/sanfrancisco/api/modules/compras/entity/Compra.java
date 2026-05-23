@@ -9,6 +9,8 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+import com.sanfrancisco.api.shared.entity.AuditedEntity;
+
 @Entity
 @Table(name = "compras")
 @Getter
@@ -16,7 +18,7 @@ import java.time.LocalDate;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Compra {
+public class Compra extends AuditedEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
