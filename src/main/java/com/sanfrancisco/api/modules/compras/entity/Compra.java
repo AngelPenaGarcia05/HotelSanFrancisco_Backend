@@ -1,5 +1,7 @@
 package com.sanfrancisco.api.modules.compras.entity;
 
+import com.sanfrancisco.api.modules.compras.enums.EstadoCompra;
+import com.sanfrancisco.api.shared.entity.AuditedEntity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -8,8 +10,6 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-
-import com.sanfrancisco.api.shared.entity.AuditedEntity;
 
 @Entity
 @Table(name = "compras")
@@ -52,6 +52,11 @@ public class Compra extends AuditedEntity {
     @PositiveOrZero
     @Column(name = "monto_total", nullable = false, precision = 12, scale = 2)
     private BigDecimal montoTotal;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado", nullable = false, length = 20)
+    private EstadoCompra estado;
 
     @Override
     public boolean equals(Object o) {

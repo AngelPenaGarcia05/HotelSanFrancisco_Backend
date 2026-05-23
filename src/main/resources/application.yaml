@@ -54,6 +54,8 @@ spring:
       - metodosPago
       - tiposServicio
       - categoriasProducto
+      - horarios
+      - proveedores
 
     caffeine:
       spec: maximumSize=${CACHE_MAX_SIZE},expireAfterWrite=${CACHE_EXPIRE_AFTER_WRITE},recordStats

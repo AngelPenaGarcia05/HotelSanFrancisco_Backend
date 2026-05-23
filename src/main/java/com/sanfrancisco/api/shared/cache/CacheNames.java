@@ -17,4 +17,5 @@ public final class CacheNames {
     public static final String TIPOS_SERVICIO = "tiposServicio";
     public static final String CATEGORIAS_PRODUCTO = "categoriasProducto";
     public static final String HORARIOS = "horarios";
+    public static final String PROVEEDORES = "proveedores";
 }

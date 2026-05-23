@@ -16,4 +16,8 @@ public final class WebSocketChannels {
     public static final String TOPIC_NOTIFICACIONES = "/topic/notificaciones";
     public static final String TOPIC_ASISTENCIA = "/topic/asistencia";
     public static final String TOPIC_NOMINA = "/topic/nomina";
+    public static final String TOPIC_COMPRAS = "/topic/compras";
+    public static final String TOPIC_VENTAS = "/topic/ventas";
+    public static final String TOPIC_INVENTARIO = "/topic/inventario";
+    public static final String TOPIC_SERVICIOS = "/topic/servicios";
 }
