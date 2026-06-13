@@ -14,7 +14,10 @@ import com.sanfrancisco.api.modules.operaciones.repository.IncidenciaRepository;
 import com.sanfrancisco.api.modules.operaciones.service.interfaces.IncidenciaService;
 import com.sanfrancisco.api.modules.operaciones.specification.IncidenciaSpecification;
 import com.sanfrancisco.api.modules.operaciones.websocket.IncidenciaEventPublisher;
+import com.sanfrancisco.api.modules.recepcion.entity.Habitacion;
 import com.sanfrancisco.api.modules.recepcion.entity.ReservaHabitacion;
+import com.sanfrancisco.api.modules.recepcion.enums.EstadoHabitacion;
+import com.sanfrancisco.api.modules.recepcion.repository.HabitacionRepository;
 import com.sanfrancisco.api.modules.recepcion.repository.ReservaHabitacionRepository;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
 import com.sanfrancisco.api.modules.seguridad.repository.UsuarioRepository;
@@ -44,17 +47,20 @@ public class IncidenciaServiceImpl implements IncidenciaService {
     private final IncidenciaRepository incidenciaRepository;
     private final UsuarioRepository usuarioRepository;
     private final ReservaHabitacionRepository reservaHabitacionRepository;
+    private final HabitacionRepository habitacionRepository;
     private final IncidenciaMapper incidenciaMapper;
     private final IncidenciaEventPublisher eventPublisher;
 
     public IncidenciaServiceImpl(IncidenciaRepository incidenciaRepository,
                                  UsuarioRepository usuarioRepository,
                                  ReservaHabitacionRepository reservaHabitacionRepository,
+                                 HabitacionRepository habitacionRepository,
                                  IncidenciaMapper incidenciaMapper,
                                  IncidenciaEventPublisher eventPublisher) {
         this.incidenciaRepository = incidenciaRepository;
         this.usuarioRepository = usuarioRepository;
         this.reservaHabitacionRepository = reservaHabitacionRepository;
+        this.habitacionRepository = habitacionRepository;
         this.incidenciaMapper = incidenciaMapper;
         this.eventPublisher = eventPublisher;
     }
@@ -71,6 +77,17 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         }
 
         Incidencia saved = incidenciaRepository.save(incidenciaMapper.toEntity(request, usuario, reservaHabitacion));
+
+        // Incidencia ALTA con habitación asociada → bloquear habitación para mantenimiento
+        if (request.prioridad() == com.sanfrancisco.api.modules.operaciones.enums.PrioridadIncidencia.ALTA
+                && reservaHabitacion != null) {
+            Habitacion hab = reservaHabitacion.getHabitacion();
+            if (hab.getEstado() != EstadoHabitacion.MANTENIMIENTO) {
+                hab.setEstado(EstadoHabitacion.MANTENIMIENTO);
+                habitacionRepository.save(hab);
+            }
+        }
+
         eventPublisher.publishCreated(saved);
         return incidenciaMapper.toResponse(saved);
     }

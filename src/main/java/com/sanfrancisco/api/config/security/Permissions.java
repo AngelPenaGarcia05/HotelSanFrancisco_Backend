@@ -33,6 +33,18 @@ public final class Permissions {
     public static final String RESERVA_CHANGE_STATUS = "reserva:change-status";
 
     // =========================================================================
+    // HABITACIÓN (unidad física)
+    // =========================================================================
+    public static final String HABITACION_READ          = "habitacion:read";
+    public static final String HABITACION_CREATE        = "habitacion:create";
+    public static final String HABITACION_UPDATE        = "habitacion:update";
+    public static final String HABITACION_DELETE        = "habitacion:delete";
+    public static final String HABITACION_CHANGE_STATUS = "habitacion:change-status";
+    public static final String HABITACION_CHECKIN       = "habitacion:checkin";
+    public static final String HABITACION_CHECKOUT      = "habitacion:checkout";
+    public static final String HABITACION_LIMPIEZA      = "habitacion:limpieza";
+
+    // =========================================================================
     // TIPO HABITACIÓN
     // =========================================================================
     public static final String TIPO_HABITACION_READ   = "tipo-habitacion:read";

@@ -20,6 +20,8 @@ public final class EndpointPaths {
     // =========================================================================
     public static final String AUTH_BASE            = "/auth";
     public static final String AUTH_LOGIN           = AUTH_BASE + "/login";
+    public static final String AUTH_REGISTER        = AUTH_BASE + "/register";
+    public static final String AUTH_DOCUMENT_TYPES  = AUTH_BASE + "/document-types";
     public static final String AUTH_REFRESH         = AUTH_BASE + "/refresh";
     public static final String AUTH_LOGOUT          = AUTH_BASE + "/logout";
     public static final String AUTH_LOGOUT_ALL      = AUTH_BASE + "/logout-all";
@@ -35,6 +37,7 @@ public final class EndpointPaths {
     // RECEPCIÓN — Reservas, Habitaciones, Huéspedes
     // =========================================================================
     public static final String RESERVA_BASE          = "/api/v1/reservas";
+    public static final String HABITACION_BASE       = "/api/v1/habitaciones";
     public static final String TIPO_HABITACION_BASE  = "/api/v1/tipos-habitacion";
 
     // =========================================================================
