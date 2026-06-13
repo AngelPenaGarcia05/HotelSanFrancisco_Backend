@@ -6,10 +6,6 @@ import com.sanfrancisco.api.modules.seguridad.security.HttpAccessDeniedHandler;
 import com.sanfrancisco.api.modules.seguridad.security.HttpAuthenticationEntryPoint;
 import com.sanfrancisco.api.modules.seguridad.security.JwtAuthenticationFilter;
 import com.sanfrancisco.api.modules.seguridad.security.RateLimitingFilter;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -17,21 +13,17 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.csrf.CsrfToken;
-import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
 import java.util.List;
 
 @Configuration
@@ -57,11 +49,12 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf(csrf -> csrf
-                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                .ignoringRequestMatchers(EndpointPaths.AUTH_LOGIN, EndpointPaths.AUTH_REFRESH, EndpointPaths.WS_BASE + "/**")
-            )
+            // CSRF deshabilitado: la API es stateless con JWT en cookies HttpOnly + SameSite=Lax.
+            // El JWT en cookie HttpOnly no es accesible por JavaScript de terceros y SameSite=Lax
+            // bloquea los POST cross-site, lo que provee la protección equivalente a CSRF.
+            // Mantener double-submit (XSRF-TOKEN) obligaría al SPA a leer la cookie y reenviarla
+            // como header en cada request, lo cual es redundante cuando ya hay JWT autenticando.
+            .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .exceptionHandling(exceptions -> exceptions
@@ -79,6 +72,8 @@ public class SecurityConfig {
                 // =============================================================
                 .requestMatchers(
                     EndpointPaths.AUTH_LOGIN,
+                    EndpointPaths.AUTH_REGISTER,
+                    EndpointPaths.AUTH_DOCUMENT_TYPES,
                     EndpointPaths.AUTH_REFRESH,
                     EndpointPaths.AUTH_LOGOUT
                 ).permitAll()
@@ -104,6 +99,26 @@ public class SecurityConfig {
                     .hasAuthority(Permissions.RESERVA_CHANGE_STATUS)
                 .requestMatchers(HttpMethod.DELETE, EndpointPaths.RESERVA_BASE + "/**")
                     .hasAuthority(Permissions.RESERVA_DELETE)
+
+                // =============================================================
+                // HABITACIONES (unidades físicas)
+                // =============================================================
+                .requestMatchers(HttpMethod.GET,   EndpointPaths.HABITACION_BASE + "/**")
+                    .hasAuthority(Permissions.HABITACION_READ)
+                .requestMatchers(HttpMethod.POST,  EndpointPaths.HABITACION_BASE + "/checkin")
+                    .hasAuthority(Permissions.HABITACION_CHECKIN)
+                .requestMatchers(HttpMethod.POST,  EndpointPaths.HABITACION_BASE + "/checkout")
+                    .hasAuthority(Permissions.HABITACION_CHECKOUT)
+                .requestMatchers(HttpMethod.PATCH, EndpointPaths.HABITACION_BASE + "/*/limpieza-completada")
+                    .hasAuthority(Permissions.HABITACION_LIMPIEZA)
+                .requestMatchers(HttpMethod.POST,  EndpointPaths.HABITACION_BASE)
+                    .hasAuthority(Permissions.HABITACION_CREATE)
+                .requestMatchers(HttpMethod.PUT,   EndpointPaths.HABITACION_BASE + "/**")
+                    .hasAuthority(Permissions.HABITACION_UPDATE)
+                .requestMatchers(HttpMethod.PATCH, EndpointPaths.HABITACION_BASE + "/**")
+                    .hasAuthority(Permissions.HABITACION_CHANGE_STATUS)
+                .requestMatchers(HttpMethod.DELETE, EndpointPaths.HABITACION_BASE + "/**")
+                    .hasAuthority(Permissions.HABITACION_DELETE)
 
                 // =============================================================
                 // TIPO HABITACIÓN
@@ -344,8 +359,7 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterAfter(new CsrfCookieFilter(), UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -374,15 +388,4 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
-    private static class CsrfCookieFilter extends OncePerRequestFilter {
-        @Override
-        protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-                throws ServletException, IOException {
-            CsrfToken csrfToken = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
-            if (csrfToken != null) {
-                csrfToken.getToken();
-            }
-            filterChain.doFilter(request, response);
-        }
-    }
 }

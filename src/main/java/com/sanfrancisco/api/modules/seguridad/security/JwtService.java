@@ -38,6 +38,9 @@ public class JwtService {
     @Value("${spring.security.jwt.refresh-token-expiration}")
     private long refreshTokenExpiration;
 
+    @Value("${app.cookie.secure:false}")
+    private boolean secureCookie;
+
     private final CacheManager cacheManager;
     private SecretKey key;
 
@@ -117,7 +120,7 @@ public class JwtService {
     public void setTokenCookies(HttpServletResponse response, String accessToken, String refreshToken) {
         ResponseCookie accessCookie = ResponseCookie.from(ACCESS_TOKEN_COOKIE, accessToken)
                 .httpOnly(true)
-                .secure(true)
+                .secure(secureCookie)
                 .path("/")
                 .maxAge(accessTokenExpiration / 1000)
                 .sameSite("Lax")
@@ -125,7 +128,7 @@ public class JwtService {
 
         ResponseCookie refreshCookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE, refreshToken)
                 .httpOnly(true)
-                .secure(true)
+                .secure(secureCookie)
                 .path("/")
                 .maxAge(refreshTokenExpiration / 1000)
                 .sameSite("Lax")
@@ -138,7 +141,7 @@ public class JwtService {
     public void clearTokenCookies(HttpServletResponse response) {
         ResponseCookie accessCookie = ResponseCookie.from(ACCESS_TOKEN_COOKIE, "")
                 .httpOnly(true)
-                .secure(true)
+                .secure(secureCookie)
                 .path("/")
                 .maxAge(0)
                 .sameSite("Lax")
@@ -146,7 +149,7 @@ public class JwtService {
 
         ResponseCookie refreshCookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE, "")
                 .httpOnly(true)
-                .secure(true)
+                .secure(secureCookie)
                 .path("/")
                 .maxAge(0)
                 .sameSite("Lax")

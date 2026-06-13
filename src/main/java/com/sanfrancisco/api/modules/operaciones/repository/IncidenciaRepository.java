@@ -20,4 +20,8 @@ public interface IncidenciaRepository extends JpaRepository<Incidencia, Integer>
     List<Incidencia> findByUsuarioUsuarioId(Integer usuarioId);
 
     List<Incidencia> findByReservaHabitacionReservaHabitacionId(Integer reservaHabitacionId);
+
+    List<Incidencia> findByReservaHabitacionHabitacionHabitacionId(Integer habitacionId);
+
+    List<Incidencia> findByEstadoAndPrioridad(EstadoIncidencia estado, PrioridadIncidencia prioridad);
 }

@@ -65,9 +65,13 @@ spring:
       name: ${SECURITY_USERNAME}
       password: ${SECURITY_PASSWORD}
     jwt:
-      secret-key: ${JWT_SECRET_KEY:default_super_secret_key_that_is_long_enough_for_hmac_sha256_at_least_256_bits_for_security_hotel_san_francisco_2026}
+      secret-key: ${JWT_SECRET_KEY:default_key}
       access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:900000} # 15 min (en ms)
       refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:604800000} # 7 días (en ms)
+
+app:
+  cookie:
+    secure: ${APP_COOKIE_SECURE:false}
 
 server:
   port: ${SERVER_PORT}

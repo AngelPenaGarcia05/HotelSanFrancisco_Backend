@@ -2,19 +2,29 @@ package com.sanfrancisco.api.modules.seguridad.service.impl;
 
 import com.sanfrancisco.api.exception.BusinessException;
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
+import com.sanfrancisco.api.modules.recepcion.entity.Huesped;
+import com.sanfrancisco.api.modules.recepcion.repository.HuespedRepository;
 import com.sanfrancisco.api.modules.seguridad.dto.request.ChangePasswordRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.LoginRequest;
+import com.sanfrancisco.api.modules.seguridad.dto.request.RegisterRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.response.AuthUserResponse;
 import com.sanfrancisco.api.modules.seguridad.dto.response.LoginResponse;
+import com.sanfrancisco.api.modules.seguridad.dto.response.PublicTipoDocumentoResponse;
+import com.sanfrancisco.api.modules.seguridad.entity.Rol;
 import com.sanfrancisco.api.modules.seguridad.entity.Sesion;
+import com.sanfrancisco.api.modules.seguridad.entity.TipoDocumento;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
 import com.sanfrancisco.api.modules.seguridad.enums.EstadoSesion;
 import com.sanfrancisco.api.modules.seguridad.enums.EstadoUsuario;
 import com.sanfrancisco.api.modules.seguridad.exception.SesionExpiradaException;
 import com.sanfrancisco.api.modules.seguridad.exception.UsuarioInactivoException;
+import com.sanfrancisco.api.modules.seguridad.repository.DetalleRolRepository;
+import com.sanfrancisco.api.modules.seguridad.repository.RolRepository;
 import com.sanfrancisco.api.modules.seguridad.repository.SesionRepository;
+import com.sanfrancisco.api.modules.seguridad.repository.TipoDocumentoRepository;
 import com.sanfrancisco.api.modules.seguridad.repository.UsuarioRepository;
 import com.sanfrancisco.api.modules.seguridad.security.BruteForceProtectionService;
+import com.sanfrancisco.api.shared.enums.EstadoActivo;
 import com.sanfrancisco.api.modules.seguridad.security.CustomUserDetails;
 import com.sanfrancisco.api.modules.seguridad.security.CustomUserDetailsService;
 import com.sanfrancisco.api.modules.seguridad.security.JwtService;
@@ -47,25 +57,39 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthenticationServiceImpl.class);
 
+    private static final String CLIENTE_ROL = "CLIENTE";
+
     private final CustomUserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final SesionRepository sesionRepository;
     private final UsuarioRepository usuarioRepository;
     private final BruteForceProtectionService bruteForceProtectionService;
+    private final RolRepository rolRepository;
+    private final TipoDocumentoRepository tipoDocumentoRepository;
+    private final HuespedRepository huespedRepository;
+    private final DetalleRolRepository detalleRolRepository;
 
     public AuthenticationServiceImpl(CustomUserDetailsService userDetailsService,
                                      PasswordEncoder passwordEncoder,
                                      JwtService jwtService,
                                      SesionRepository sesionRepository,
                                      UsuarioRepository usuarioRepository,
-                                     BruteForceProtectionService bruteForceProtectionService) {
+                                     BruteForceProtectionService bruteForceProtectionService,
+                                     RolRepository rolRepository,
+                                     TipoDocumentoRepository tipoDocumentoRepository,
+                                     HuespedRepository huespedRepository,
+                                     DetalleRolRepository detalleRolRepository) {
         this.userDetailsService = userDetailsService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.sesionRepository = sesionRepository;
         this.usuarioRepository = usuarioRepository;
         this.bruteForceProtectionService = bruteForceProtectionService;
+        this.rolRepository = rolRepository;
+        this.tipoDocumentoRepository = tipoDocumentoRepository;
+        this.huespedRepository = huespedRepository;
+        this.detalleRolRepository = detalleRolRepository;
     }
 
     @Override
@@ -149,6 +173,121 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         );
 
         return new LoginResponse(true, "Inicio de sesión exitoso", authUser, Instant.now());
+    }
+
+    @Override
+    public LoginResponse register(RegisterRequest request, HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
+        String email = request.correo().trim().toLowerCase();
+        String documento = request.numeroDocumento().trim();
+
+        if (usuarioRepository.existsByCorreo(email)) {
+            throw new BusinessException("Ya existe una cuenta registrada con este correo.");
+        }
+        if (usuarioRepository.existsByNumeroDocumento(documento)) {
+            throw new BusinessException("Ya existe una cuenta registrada con este número de documento.");
+        }
+
+        TipoDocumento tipoDocumento = tipoDocumentoRepository.findById(request.tipoDocumentoId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Tipo de documento no encontrado: " + request.tipoDocumentoId()));
+
+        if (tipoDocumento.getEstado() != EstadoActivo.ACTIVO) {
+            throw new BusinessException("El tipo de documento seleccionado no está disponible.");
+        }
+
+        Rol rolCliente = rolRepository.findByNombre(CLIENTE_ROL)
+                .orElseThrow(() -> new BusinessException(
+                        "El rol CLIENTE no está configurado en el sistema. Contacte al administrador."));
+
+        String apellidoMaterno = request.apellidoMaterno() == null || request.apellidoMaterno().isBlank()
+                ? null : request.apellidoMaterno().trim();
+
+        String telefono = request.telefono() == null || request.telefono().isBlank()
+                ? null : request.telefono().trim();
+
+        Usuario usuario = Usuario.builder()
+                .nombre(request.nombre().trim())
+                .apellidoPaterno(request.apellidoPaterno().trim())
+                .apellidoMaterno(apellidoMaterno)
+                .numeroDocumento(documento)
+                .correo(email)
+                .telefono(telefono)
+                .fechaNacimiento(request.fechaNacimiento())
+                .contrasenaHash(passwordEncoder.encode(request.contrasena()))
+                .estado(EstadoUsuario.ACTIVO)
+                .rol(rolCliente)
+                .tipoDocumento(tipoDocumento)
+                .build();
+        usuarioRepository.save(usuario);
+
+        Huesped huesped = Huesped.builder()
+                .nombre(usuario.getNombre())
+                .apellidoPaterno(usuario.getApellidoPaterno())
+                .apellidoMaterno(usuario.getApellidoMaterno())
+                .numeroDocumento(usuario.getNumeroDocumento())
+                .correo(usuario.getCorreo())
+                .telefono(usuario.getTelefono())
+                .nacionalidad(request.nacionalidad() == null || request.nacionalidad().isBlank()
+                        ? null : request.nacionalidad().trim())
+                .estado(EstadoActivo.ACTIVO)
+                .usuario(usuario)
+                .build();
+        huespedRepository.save(huesped);
+
+        log.info("Registro público completado para correo={} (usuarioId={})", email, usuario.getUsuarioId());
+
+        // Auto login — emite tokens y persiste sesión
+        List<String> permissions = detalleRolRepository.findByRolRolId(rolCliente.getRolId()).stream()
+                .map(dr -> dr.getPermiso() != null ? dr.getPermiso().getCodigo() : null)
+                .filter(c -> c != null)
+                .toList();
+
+        String fullName = buildFullName(usuario);
+        String accessToken = jwtService.generateAccessToken(
+                email, usuario.getUsuarioId(), rolCliente.getNombre(), permissions, fullName);
+        String refreshToken = jwtService.generateRefreshToken(email);
+
+        Sesion sesion = Sesion.builder()
+                .tokenHash(hashSha256(refreshToken))
+                .ipOrigen(getClientIp(httpRequest))
+                .userAgent(httpRequest.getHeader("User-Agent"))
+                .fechaInicio(LocalDateTime.now())
+                .fechaExpiracion(LocalDateTime.now().plusNanos(jwtService.getRefreshTokenExpirationMs() * 1_000_000L))
+                .estado(EstadoSesion.ACTIVA)
+                .usuario(usuario)
+                .build();
+        sesionRepository.save(sesion);
+
+        jwtService.setTokenCookies(httpResponse, accessToken, refreshToken);
+
+        AuthUserResponse authUser = new AuthUserResponse(
+                usuario.getUsuarioId(),
+                usuario.getNombre(),
+                usuario.getApellidoPaterno(),
+                usuario.getApellidoMaterno(),
+                fullName,
+                usuario.getCorreo(),
+                rolCliente.getNombre(),
+                permissions
+        );
+
+        return new LoginResponse(true, "Registro completado. Sesión iniciada.", authUser, Instant.now());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PublicTipoDocumentoResponse> getActiveDocumentTypes() {
+        return tipoDocumentoRepository.findByEstado(EstadoActivo.ACTIVO).stream()
+                .map(td -> new PublicTipoDocumentoResponse(td.getTipoDocumentoId(), td.getAcronimo(), td.getNombre()))
+                .toList();
+    }
+
+    private static String buildFullName(Usuario usuario) {
+        StringBuilder sb = new StringBuilder(usuario.getNombre()).append(' ').append(usuario.getApellidoPaterno());
+        if (usuario.getApellidoMaterno() != null && !usuario.getApellidoMaterno().isBlank()) {
+            sb.append(' ').append(usuario.getApellidoMaterno());
+        }
+        return sb.toString();
     }
 
     @Override

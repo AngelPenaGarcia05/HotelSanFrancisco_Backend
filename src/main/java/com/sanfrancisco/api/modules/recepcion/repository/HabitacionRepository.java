@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,7 +16,15 @@ public interface HabitacionRepository extends JpaRepository<Habitacion, Integer>
 
     Optional<Habitacion> findByNumero(String numero);
 
+    boolean existsByNumero(String numero);
+
     List<Habitacion> findByEstado(EstadoHabitacion estado);
 
+    List<Habitacion> findByEstadoIn(Collection<EstadoHabitacion> estados);
+
     List<Habitacion> findByPiso(Integer piso);
+
+    List<Habitacion> findByPisoAndEstado(Integer piso, EstadoHabitacion estado);
+
+    List<Habitacion> findAllByOrderByPisoAscNumeroAsc();
 }
