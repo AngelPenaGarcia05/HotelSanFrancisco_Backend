@@ -3,9 +3,9 @@ spring:
     name: hotel-san-francisco-api
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: jdbc:postgresql://localhost:5432/hotel_sf
+    username: postgres
+    password: 1234
     driver-class-name: org.postgresql.Driver
 
     hikari:
@@ -62,8 +62,8 @@ spring:
 
   security:
     user:
-      name: ${SECURITY_USERNAME}
-      password: ${SECURITY_PASSWORD}
+     name: ${SECURITY_USERNAME:admin}
+    password: ${SECURITY_PASSWORD:admin123}
     jwt:
       secret-key: ${JWT_SECRET_KEY:default_key}
       access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:900000} # 15 min (en ms)
@@ -74,7 +74,7 @@ app:
     secure: ${APP_COOKIE_SECURE:false}
 
 server:
-  port: ${SERVER_PORT}
+  port:  8080
 
   servlet:
     encoding:
@@ -83,11 +83,11 @@ server:
 
 logging:
   level:
-    org.hibernate.SQL: ${LOG_LEVEL_SQL}
-    org.hibernate.orm.jdbc.bind: ${LOG_LEVEL_BIND}
-    com.sanfrancisco.api: ${LOG_LEVEL_APP}
-    org.springframework.security: ${LOG_LEVEL_SECURITY}
-    org.flywaydb: ${LOG_LEVEL_FLYWAY}
+    org.hibernate.SQL: ${LOG_LEVEL_SQL:DEBUG}
+    org.hibernate.orm.jdbc.bind: ${LOG_LEVEL_BIND:TRACE}
+    com.sanfrancisco.api: ${LOG_LEVEL_APP:INFO}
+    org.springframework.security: ${LOG_LEVEL_SECURITY:INFO}
+    org.flywaydb: ${LOG_LEVEL_FLYWAY:INFO}
 
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
