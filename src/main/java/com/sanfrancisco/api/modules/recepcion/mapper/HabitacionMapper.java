@@ -4,6 +4,7 @@ import com.sanfrancisco.api.modules.recepcion.dto.request.CreateHabitacionReques
 import com.sanfrancisco.api.modules.recepcion.dto.request.UpdateHabitacionRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.response.HabitacionResponse;
 import com.sanfrancisco.api.modules.recepcion.entity.Habitacion;
+import com.sanfrancisco.api.modules.recepcion.entity.TipoHabitacion;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -33,6 +34,7 @@ public class HabitacionMapper {
     }
 
     public HabitacionResponse toResponse(Habitacion entity) {
+        TipoHabitacion tipo = entity.getTipoHabitacion();
         return new HabitacionResponse(
                 entity.getHabitacionId(),
                 entity.getNumero(),
@@ -40,6 +42,10 @@ public class HabitacionMapper {
                 entity.getEstado(),
                 entity.getDescripcion(),
                 entity.getObservaciones(),
+                tipo != null ? tipo.getTipoHabitacionId() : null,
+                tipo != null ? tipo.getNombre() : null,
+                tipo != null ? tipo.getPrecioBase() : null,
+                tipo != null ? tipo.getCapacidadMaxima() : null,
                 entity.getFechaCreacion(),
                 entity.getFechaModificacion()
         );
