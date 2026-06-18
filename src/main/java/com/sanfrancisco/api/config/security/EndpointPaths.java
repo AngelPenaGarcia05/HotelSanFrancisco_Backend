@@ -84,6 +84,11 @@ public final class EndpointPaths {
     public static final String ASIGNACION_HORARIO_BASE  = "/api/v1/asignaciones-horario";
 
     // =========================================================================
+    // BOOKING — Flujo público de reservas web
+    // =========================================================================
+    public static final String BOOKING_BASE = "/api/v1/booking";
+
+    // =========================================================================
     // SEGURIDAD — Usuarios, Roles, Permisos, Tipos de Documento
     // =========================================================================
     public static final String USUARIO_BASE        = "/api/v1/usuarios";
