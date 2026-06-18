@@ -45,6 +45,8 @@ public final class EndpointPaths {
     // =========================================================================
     public static final String PAGO_BASE        = "/api/v1/pagos";
     public static final String METODO_PAGO_BASE = "/api/v1/metodos-pago";
+    public static final String NOTIFICACIONES_BASE = "/api/v1/notificaciones";
+    public static final String REPORTES_BASE     = "/api/v1/reportes";
 
     // =========================================================================
     // VENTAS

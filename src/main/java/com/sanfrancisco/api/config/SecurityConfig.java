@@ -157,6 +157,15 @@ public class SecurityConfig {
                     .hasAuthority(Permissions.METODO_PAGO_DELETE)
 
                 // =============================================================
+                // NOTIFICACIONES Y REPORTES
+                // Solo requieren sesión autenticada (sin permiso granular específico
+                // todavía); cualquier usuario logueado del panel administrativo puede
+                // consultarlos y operarlos.
+                // =============================================================
+                .requestMatchers(EndpointPaths.NOTIFICACIONES_BASE + "/**").authenticated()
+                .requestMatchers(EndpointPaths.REPORTES_BASE + "/**").authenticated()
+
+                // =============================================================
                 // VENTAS
                 // =============================================================
                 .requestMatchers(HttpMethod.GET, EndpointPaths.VENTA_BASE + "/**")
