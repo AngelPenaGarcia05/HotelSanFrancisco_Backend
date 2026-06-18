@@ -16,6 +16,12 @@ public final class EndpointPaths {
     }
 
     // =========================================================================
+    // PÚBLICO — Endpoints sin autenticación (reserva online, disponibilidad)
+    // =========================================================================
+    public static final String PUBLIC_BASE         = "/api/v1/public";
+    public static final String RESERVA_ONLINE_BASE = PUBLIC_BASE + "/reservas";
+
+    // =========================================================================
     // AUTH — Endpoints públicos de autenticación
     // =========================================================================
     public static final String AUTH_BASE            = "/auth";
@@ -32,6 +38,11 @@ public final class EndpointPaths {
     // WEBSOCKET
     // =========================================================================
     public static final String WS_BASE = "/ws";
+
+    // =========================================================================
+    // CLIENTES — Huéspedes / Clientes del hotel
+    // =========================================================================
+    public static final String CLIENTE_BASE = "/api/v1/clientes";
 
     // =========================================================================
     // RECEPCIÓN — Reservas, Habitaciones, Huéspedes

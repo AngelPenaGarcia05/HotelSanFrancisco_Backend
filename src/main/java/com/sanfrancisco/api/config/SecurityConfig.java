@@ -79,12 +79,32 @@ public class SecurityConfig {
                 ).permitAll()
                 .requestMatchers(EndpointPaths.WS_BASE + "/**").permitAll()
 
+                // =============================================================
+                // PÚBLICO — Reserva online y consulta de disponibilidad
+                // =============================================================
+                .requestMatchers(EndpointPaths.PUBLIC_BASE + "/**").permitAll()
+                .requestMatchers(HttpMethod.GET, EndpointPaths.RESERVA_BASE + "/disponibilidad").permitAll()
+
                 // Auth endpoints que requieren sesión activa
                 .requestMatchers(
                     EndpointPaths.AUTH_ME,
                     EndpointPaths.AUTH_LOGOUT_ALL,
                     EndpointPaths.AUTH_CHANGE_PASSWORD
                 ).authenticated()
+
+                // =============================================================
+                // CLIENTES
+                // =============================================================
+                .requestMatchers(HttpMethod.GET, EndpointPaths.CLIENTE_BASE + "/**")
+                    .hasAuthority(Permissions.CLIENTE_READ)
+                .requestMatchers(HttpMethod.POST, EndpointPaths.CLIENTE_BASE)
+                    .hasAuthority(Permissions.CLIENTE_CREATE)
+                .requestMatchers(HttpMethod.PUT, EndpointPaths.CLIENTE_BASE + "/**")
+                    .hasAuthority(Permissions.CLIENTE_UPDATE)
+                .requestMatchers(HttpMethod.PATCH, EndpointPaths.CLIENTE_BASE + "/**")
+                    .hasAuthority(Permissions.CLIENTE_CHANGE_STATUS)
+                .requestMatchers(HttpMethod.DELETE, EndpointPaths.CLIENTE_BASE + "/**")
+                    .hasAuthority(Permissions.CLIENTE_DELETE)
 
                 // =============================================================
                 // RESERVAS

@@ -24,6 +24,15 @@ public final class Permissions {
     }
 
     // =========================================================================
+    // CLIENTES (Huéspedes)
+    // =========================================================================
+    public static final String CLIENTE_READ          = "cliente:read";
+    public static final String CLIENTE_CREATE        = "cliente:create";
+    public static final String CLIENTE_UPDATE        = "cliente:update";
+    public static final String CLIENTE_DELETE        = "cliente:delete";
+    public static final String CLIENTE_CHANGE_STATUS = "cliente:change-status";
+
+    // =========================================================================
     // RESERVAS
     // =========================================================================
     public static final String RESERVA_READ          = "reserva:read";

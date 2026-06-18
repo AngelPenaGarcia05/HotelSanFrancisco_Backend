@@ -73,6 +73,11 @@ app:
   cookie:
     secure: ${APP_COOKIE_SECURE:false}
 
+  reserva:
+    online:
+      usuario-sistema-id: ${RESERVA_ONLINE_USUARIO_ID:1}
+      canal-nombre: ${RESERVA_ONLINE_CANAL_NOMBRE:ONLINE}
+
 server:
   port: ${SERVER_PORT}
 
