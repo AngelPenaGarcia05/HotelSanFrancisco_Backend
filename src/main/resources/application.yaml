@@ -72,6 +72,8 @@ spring:
 app:
   cookie:
     secure: ${APP_COOKIE_SECURE:false}
+  notificaciones:
+    smtp-cipher-key: ${SMTP_CIPHER_KEY:default_smtp_cipher_key}
 
 server:
   port:  8080
