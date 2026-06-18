@@ -14,6 +14,7 @@ public record ReservaFilterRequest(
         EstadoReserva estado,
         Integer usuarioId,
         Integer canalId,
+        Integer huespedId,
         LocalDate fechaInicioDesde,
         LocalDate fechaInicioHasta,
         LocalDate fechaFinDesde,

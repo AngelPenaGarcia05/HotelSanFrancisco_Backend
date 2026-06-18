@@ -18,4 +18,6 @@ public interface DetalleHuespedRepository extends JpaRepository<DetalleHuesped, 
     List<DetalleHuesped> findByIdHuespedId(Integer huespedId);
 
     Optional<DetalleHuesped> findByIdReservaIdAndEsPrincipalTrue(Integer reservaId);
+
+    void deleteByIdReservaId(Integer reservaId);
 }

@@ -1,9 +1,11 @@
 package com.sanfrancisco.api.modules.recepcion.dto.request;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 public record CreateReservaRequest(
 
@@ -28,10 +30,7 @@ public record CreateReservaRequest(
         @Min(value = 0, message = "El número de niños no puede ser negativo")
         Integer nroNinos,
 
-        @NotNull(message = "El subtotal es obligatorio")
-        @PositiveOrZero(message = "El subtotal no puede ser negativo")
-        BigDecimal subtotal,
-
+        // descuento, adelanto e impuesto los provee el cliente; subtotal se calcula del lado servidor
         @NotNull(message = "El descuento es obligatorio")
         @PositiveOrZero(message = "El descuento no puede ser negativo")
         BigDecimal descuento,
@@ -50,6 +49,17 @@ public record CreateReservaRequest(
         @NotNull(message = "El usuario es obligatorio")
         Integer usuarioId,
 
-        Integer canalId
+        Integer canalId,
+
+        @NotEmpty(message = "La reserva debe incluir al menos una habitación")
+        @Valid
+        List<ReservaHabitacionRequest> habitaciones,
+
+        @NotEmpty(message = "La reserva debe incluir al menos un huésped")
+        @Valid
+        List<HuespedReservaRequest> huespedes,
+
+        // Si es true, ignora la advertencia de posible duplicado y crea la reserva igualmente
+        Boolean forzar
 ) {
 }
