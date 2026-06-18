@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.recepcion.entity;
 
+import com.sanfrancisco.api.modules.recepcion.entity.TipoHabitacion;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoHabitacion;
 import com.sanfrancisco.api.shared.entity.AuditedEntity;
 import jakarta.persistence.*;
@@ -43,6 +44,10 @@ public class Habitacion extends AuditedEntity {
 
     @Column(name = "observaciones", columnDefinition = "TEXT")
     private String observaciones;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tipo_habitacion_id")
+    private TipoHabitacion tipoHabitacion;
 
     @Override
     public boolean equals(Object o) {

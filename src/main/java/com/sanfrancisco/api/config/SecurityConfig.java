@@ -78,7 +78,14 @@ public class SecurityConfig {
                     EndpointPaths.AUTH_LOGOUT
                 ).permitAll()
                 .requestMatchers(EndpointPaths.WS_BASE + "/**").permitAll()
-
+                
+                // =============================================================
+                // BOOKING — Flujo público de reservas (sin autenticación)
+                // =============================================================
+                .requestMatchers(HttpMethod.GET,  EndpointPaths.BOOKING_BASE + "/disponibles").permitAll()
+                .requestMatchers(HttpMethod.GET,  EndpointPaths.BOOKING_BASE + "/metodos-pago").permitAll()
+                .requestMatchers(HttpMethod.POST, EndpointPaths.BOOKING_BASE).permitAll()
+                
                 // =============================================================
                 // PÚBLICO — Reserva online y consulta de disponibilidad
                 // =============================================================
