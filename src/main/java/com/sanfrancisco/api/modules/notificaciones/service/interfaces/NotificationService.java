@@ -36,6 +36,9 @@ public interface NotificationService {
 
     int runReminderJobNow();
 
+    // Auth — recuperación de contraseña
+    void sendPasswordReset(String destinatario, String nombreUsuario, String linkReset);
+
     // Log
     Page<EmailLogResponse> searchLog(EmailLogFilterRequest filter, Pageable pageable);
 

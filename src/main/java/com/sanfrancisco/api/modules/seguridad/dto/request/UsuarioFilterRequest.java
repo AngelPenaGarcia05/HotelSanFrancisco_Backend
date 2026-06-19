@@ -7,6 +7,11 @@ public record UsuarioFilterRequest(
         String correo,
         EstadoUsuario estado,
         Integer rolId,
-        Integer tipoDocumentoId
+        Integer tipoDocumentoId,
+        // ── Filtros laborales ──
+        String cargo,
+        String departamento,
+        /** true → solo usuarios con rol staff (≠ CLIENTE); false → solo CLIENTE; null → todos */
+        Boolean esEmpleado
 ) {
 }

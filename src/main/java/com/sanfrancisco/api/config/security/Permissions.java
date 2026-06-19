@@ -148,10 +148,11 @@ public final class Permissions {
     // =========================================================================
     // USUARIOS
     // =========================================================================
-    public static final String USUARIO_READ   = "usuario:read";
-    public static final String USUARIO_CREATE = "usuario:create";
-    public static final String USUARIO_UPDATE = "usuario:update";
-    public static final String USUARIO_DELETE = "usuario:delete";
+    public static final String USUARIO_READ          = "usuario:read";
+    public static final String USUARIO_CREATE        = "usuario:create";
+    public static final String USUARIO_UPDATE        = "usuario:update";
+    public static final String USUARIO_DELETE        = "usuario:delete";
+    public static final String USUARIO_CHANGE_STATUS = "usuario:change-status";
 
     // =========================================================================
     // ROLES
@@ -213,4 +214,9 @@ public final class Permissions {
     public static final String ASIGNACION_HORARIO_CREATE = "asignacion-horario:create";
     public static final String ASIGNACION_HORARIO_UPDATE = "asignacion-horario:update";
     public static final String ASIGNACION_HORARIO_DELETE = "asignacion-horario:delete";
+
+    // =========================================================================
+    // AUDITORÍA
+    // =========================================================================
+    public static final String AUDITORIA_READ = "auditoria:read";
 }

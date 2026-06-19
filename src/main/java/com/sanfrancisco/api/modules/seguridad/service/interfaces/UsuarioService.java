@@ -1,5 +1,7 @@
 package com.sanfrancisco.api.modules.seguridad.service.interfaces;
 
+import com.sanfrancisco.api.modules.seguridad.dto.request.CambiarEstadoUsuarioRequest;
+import com.sanfrancisco.api.modules.seguridad.dto.request.CambiarRolUsuarioRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.CreateUsuarioRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.UpdateUsuarioRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.UsuarioFilterRequest;
@@ -21,6 +23,10 @@ public interface UsuarioService {
     Page<UsuarioResponse> search(UsuarioFilterRequest filter, Pageable pageable);
 
     List<UsuarioResponse> findByEstado(EstadoUsuario estado);
+
+    UsuarioResponse changeEstado(Integer id, CambiarEstadoUsuarioRequest request);
+
+    UsuarioResponse changeRol(Integer id, CambiarRolUsuarioRequest request);
 
     void deleteById(Integer id);
 }

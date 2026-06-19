@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
@@ -74,6 +75,27 @@ public class Usuario extends AuditedEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tipo_documento_id", nullable = false)
     private TipoDocumento tipoDocumento;
+
+    // ── Campos laborales (opcionales — solo relevantes para roles de staff) ──
+
+    @Size(max = 80)
+    @Column(name = "cargo", length = 80)
+    private String cargo;
+
+    @Size(max = 80)
+    @Column(name = "departamento", length = 80)
+    private String departamento;
+
+    @Size(max = 30)
+    @Column(name = "codigo_empleado", length = 30, unique = true)
+    private String codigoEmpleado;
+
+    @Column(name = "fecha_ingreso")
+    private LocalDate fechaIngreso;
+
+    @PositiveOrZero
+    @Column(name = "salario", precision = 12, scale = 2)
+    private BigDecimal salario;
 
     @Override
     public boolean equals(Object o) {

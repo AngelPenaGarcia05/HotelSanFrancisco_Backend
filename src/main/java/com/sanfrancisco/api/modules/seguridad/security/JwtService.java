@@ -41,6 +41,9 @@ public class JwtService {
     @Value("${app.cookie.secure:false}")
     private boolean secureCookie;
 
+    @Value("${app.cookie.same-site:Lax}")
+    private String sameSite;
+
     private final CacheManager cacheManager;
     private SecretKey key;
 
@@ -123,7 +126,7 @@ public class JwtService {
                 .secure(secureCookie)
                 .path("/")
                 .maxAge(accessTokenExpiration / 1000)
-                .sameSite("Lax")
+                .sameSite(sameSite)
                 .build();
 
         ResponseCookie refreshCookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE, refreshToken)
@@ -131,7 +134,7 @@ public class JwtService {
                 .secure(secureCookie)
                 .path("/")
                 .maxAge(refreshTokenExpiration / 1000)
-                .sameSite("Lax")
+                .sameSite(sameSite)
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());
@@ -144,7 +147,7 @@ public class JwtService {
                 .secure(secureCookie)
                 .path("/")
                 .maxAge(0)
-                .sameSite("Lax")
+                .sameSite(sameSite)
                 .build();
 
         ResponseCookie refreshCookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE, "")
@@ -152,7 +155,7 @@ public class JwtService {
                 .secure(secureCookie)
                 .path("/")
                 .maxAge(0)
-                .sameSite("Lax")
+                .sameSite(sameSite)
                 .build();
 
         response.addHeader(HttpHeaders.SET_COOKIE, accessCookie.toString());

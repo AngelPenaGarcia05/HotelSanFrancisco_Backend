@@ -28,7 +28,7 @@ public class CacheConfig {
         manager.setCacheNames(java.util.List.of(
                 "tiposHabitacion", "habitaciones", "canales", "tiposDocumento",
                 "metodosPago", "tiposServicio", "categoriasProducto", "horarios",
-                "proveedores", "jwtBlacklist", "bruteForce"
+                "proveedores", "jwtBlacklist", "bruteForce", "reniecDni"
         ));
         manager.setAsyncCacheMode(false);
         return manager;
