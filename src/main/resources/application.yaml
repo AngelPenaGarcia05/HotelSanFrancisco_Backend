@@ -75,6 +75,11 @@ app:
   notificaciones:
     smtp-cipher-key: ${SMTP_CIPHER_KEY:default_smtp_cipher_key}
 
+  reserva:
+    online:
+      usuario-sistema-id: ${RESERVA_ONLINE_USUARIO_ID:1}
+      canal-nombre: ${RESERVA_ONLINE_CANAL_NOMBRE:ONLINE}
+
 server:
   port:  8080
 

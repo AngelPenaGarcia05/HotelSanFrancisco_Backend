@@ -16,6 +16,12 @@ public final class EndpointPaths {
     }
 
     // =========================================================================
+    // PÚBLICO — Endpoints sin autenticación (reserva online, disponibilidad)
+    // =========================================================================
+    public static final String PUBLIC_BASE         = "/api/v1/public";
+    public static final String RESERVA_ONLINE_BASE = PUBLIC_BASE + "/reservas";
+
+    // =========================================================================
     // AUTH — Endpoints públicos de autenticación
     // =========================================================================
     public static final String AUTH_BASE            = "/auth";
@@ -32,6 +38,11 @@ public final class EndpointPaths {
     // WEBSOCKET
     // =========================================================================
     public static final String WS_BASE = "/ws";
+
+    // =========================================================================
+    // CLIENTES — Huéspedes / Clientes del hotel
+    // =========================================================================
+    public static final String CLIENTE_BASE = "/api/v1/clientes";
 
     // =========================================================================
     // RECEPCIÓN — Reservas, Habitaciones, Huéspedes
@@ -84,6 +95,11 @@ public final class EndpointPaths {
     public static final String PAGO_NOMINA_BASE         = "/api/v1/pagos-nomina";
     public static final String BONO_BASE                = "/api/v1/bonos";
     public static final String ASIGNACION_HORARIO_BASE  = "/api/v1/asignaciones-horario";
+
+    // =========================================================================
+    // BOOKING — Flujo público de reservas web
+    // =========================================================================
+    public static final String BOOKING_BASE = "/api/v1/booking";
 
     // =========================================================================
     // SEGURIDAD — Usuarios, Roles, Permisos, Tipos de Documento

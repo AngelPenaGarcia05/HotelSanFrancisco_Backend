@@ -16,8 +16,10 @@ import com.sanfrancisco.api.modules.recepcion.enums.EstadoHabitacion;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReservaHabitacion;
 import com.sanfrancisco.api.modules.recepcion.mapper.HabitacionMapper;
+import com.sanfrancisco.api.modules.recepcion.mapper.HistorialReservaMapper;
 import com.sanfrancisco.api.modules.recepcion.repository.EstanciaRepository;
 import com.sanfrancisco.api.modules.recepcion.repository.HabitacionRepository;
+import com.sanfrancisco.api.modules.recepcion.repository.HistorialReservaRepository;
 import com.sanfrancisco.api.modules.recepcion.repository.ReservaHabitacionRepository;
 import com.sanfrancisco.api.modules.recepcion.repository.ReservaRepository;
 import com.sanfrancisco.api.modules.recepcion.service.interfaces.HabitacionService;
@@ -45,6 +47,8 @@ public class HabitacionServiceImpl implements HabitacionService {
     private final UsuarioRepository usuarioRepository;
     private final HabitacionMapper mapper;
     private final WebSocketPublisher wsPublisher;
+    private final HistorialReservaRepository historialReservaRepository;
+    private final HistorialReservaMapper historialReservaMapper;
 
     public HabitacionServiceImpl(HabitacionRepository habitacionRepository,
                                  ReservaRepository reservaRepository,
@@ -52,7 +56,9 @@ public class HabitacionServiceImpl implements HabitacionService {
                                  EstanciaRepository estanciaRepository,
                                  UsuarioRepository usuarioRepository,
                                  HabitacionMapper mapper,
-                                 WebSocketPublisher wsPublisher) {
+                                 WebSocketPublisher wsPublisher,
+                                 HistorialReservaRepository historialReservaRepository,
+                                 HistorialReservaMapper historialReservaMapper) {
         this.habitacionRepository = habitacionRepository;
         this.reservaRepository = reservaRepository;
         this.reservaHabitacionRepository = reservaHabitacionRepository;
@@ -60,6 +66,8 @@ public class HabitacionServiceImpl implements HabitacionService {
         this.usuarioRepository = usuarioRepository;
         this.mapper = mapper;
         this.wsPublisher = wsPublisher;
+        this.historialReservaRepository = historialReservaRepository;
+        this.historialReservaMapper = historialReservaMapper;
     }
 
     // =========================================================================
@@ -175,13 +183,18 @@ public class HabitacionServiceImpl implements HabitacionService {
             throw new BusinessException("La reserva no tiene habitaciones asignadas.");
         }
 
-        // Validar que todas las habitaciones estén DISPONIBLE antes de proceder
+        // Validar que todas las habitaciones estén DISPONIBLE y en estado RESERVADA antes de proceder
         asignaciones.forEach(rh -> {
             EstadoHabitacion estadoActual = rh.getHabitacion().getEstado();
             if (estadoActual != EstadoHabitacion.DISPONIBLE) {
                 throw new BusinessException(
                         "La habitación " + rh.getHabitacion().getNumero()
                         + " no está disponible (estado actual: " + estadoActual + ").");
+            }
+            if (rh.getEstado() != EstadoReservaHabitacion.RESERVADA) {
+                throw new BusinessException(
+                        "La asignación de la habitación " + rh.getHabitacion().getNumero()
+                        + " no está en estado RESERVADA (estado actual: " + rh.getEstado() + ").");
             }
         });
 
@@ -208,9 +221,11 @@ public class HabitacionServiceImpl implements HabitacionService {
                 .reserva(reserva)
                 .build());
 
-        Habitacion primeraHabitacion = asignaciones.get(0).getHabitacion();
-        broadcast("CHECKIN_REALIZADO", primeraHabitacion);
-        return mapper.toResponse(primeraHabitacion);
+        registrarHistorial(reserva, EstadoReserva.CONFIRMADA, EstadoReserva.CHECK_IN, request.observaciones());
+
+        // Notificar todas las habitaciones del check-in
+        asignaciones.forEach(rh -> broadcast("CHECKIN_REALIZADO", rh.getHabitacion()));
+        return mapper.toResponse(asignaciones.get(0).getHabitacion());
     }
 
     // =========================================================================
@@ -236,6 +251,15 @@ public class HabitacionServiceImpl implements HabitacionService {
 
         List<ReservaHabitacion> asignaciones = reservaHabitacionRepository.findByReservaReservaId(reserva.getReservaId());
 
+        // Validar que todas las asignaciones estén OCUPADA antes de liberar
+        asignaciones.forEach(rh -> {
+            if (rh.getEstado() != EstadoReservaHabitacion.OCUPADA) {
+                throw new BusinessException(
+                        "La asignación de la habitación " + rh.getHabitacion().getNumero()
+                        + " no está en estado OCUPADA (estado actual: " + rh.getEstado() + ").");
+            }
+        });
+
         // Liberar habitaciones — estado LIMPIEZA para activar flujo de housekeeping
         asignaciones.forEach(rh -> {
             rh.setEstado(EstadoReservaHabitacion.LIBERADA);
@@ -259,15 +283,16 @@ public class HabitacionServiceImpl implements HabitacionService {
         reserva.setMontoTotal(montoFinal);
         reservaRepository.save(reserva);
 
-        // Registrar fecha y personal de checkout en la estancia
+        // Registrar fecha y personal de checkout en la estancia (debe existir desde el check-in)
         LocalDateTime ahora = LocalDateTime.now();
         Estancia estancia = estanciaRepository.findByReservaReservaId(reserva.getReservaId())
-                .orElse(null);
-        if (estancia != null) {
-            estancia.setFechaCheckout(ahora);
-            estancia.setUsuarioCheckout(usuario);
-            estanciaRepository.save(estancia);
-        }
+                .orElseThrow(() -> new BusinessException(
+                        "No se encontró el registro de estancia para la reserva: " + reserva.getCodReserva()));
+        estancia.setFechaCheckout(ahora);
+        estancia.setUsuarioCheckout(usuario);
+        estanciaRepository.save(estancia);
+
+        registrarHistorial(reserva, EstadoReserva.CHECK_IN, EstadoReserva.CHECK_OUT, request.observaciones());
 
         // Calcular noches de estancia
         long noches = ChronoUnit.DAYS.between(reserva.getFechaInicio(), reserva.getFechaFin());
@@ -285,7 +310,7 @@ public class HabitacionServiceImpl implements HabitacionService {
                 montoFinal,
                 reserva.getAdelanto(),
                 montoFinal.subtract(reserva.getAdelanto()),
-                estancia != null ? estancia.getFechaCheckin() : null,
+                estancia.getFechaCheckin(),
                 ahora,
                 (int) noches
         );
@@ -317,6 +342,10 @@ public class HabitacionServiceImpl implements HabitacionService {
     private Habitacion obtenerOFallar(Integer habitacionId) {
         return habitacionRepository.findById(habitacionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Habitación no encontrada: " + habitacionId));
+    }
+
+    private void registrarHistorial(Reserva reserva, EstadoReserva anterior, EstadoReserva nuevo, String motivo) {
+        historialReservaRepository.save(historialReservaMapper.toEntity(reserva, anterior, nuevo, motivo));
     }
 
     private void broadcast(String tipo, Habitacion h) {
