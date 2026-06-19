@@ -2,17 +2,21 @@ package com.sanfrancisco.api.modules.seguridad.service.impl;
 
 import com.sanfrancisco.api.exception.BusinessException;
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
+import com.sanfrancisco.api.modules.notificaciones.service.interfaces.NotificationService;
 import com.sanfrancisco.api.modules.recepcion.entity.Huesped;
 import com.sanfrancisco.api.modules.recepcion.repository.HuespedRepository;
 import com.sanfrancisco.api.modules.seguridad.dto.request.ChangePasswordRequest;
+import com.sanfrancisco.api.modules.seguridad.dto.request.ForgotPasswordRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.LoginRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.RegisterRequest;
+import com.sanfrancisco.api.modules.seguridad.dto.request.ResetPasswordRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.response.AuthUserResponse;
 import com.sanfrancisco.api.modules.seguridad.dto.response.LoginResponse;
 import com.sanfrancisco.api.modules.seguridad.dto.response.PublicTipoDocumentoResponse;
 import com.sanfrancisco.api.modules.seguridad.entity.Rol;
 import com.sanfrancisco.api.modules.seguridad.entity.Sesion;
 import com.sanfrancisco.api.modules.seguridad.entity.TipoDocumento;
+import com.sanfrancisco.api.modules.seguridad.entity.TokenRecuperacion;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
 import com.sanfrancisco.api.modules.seguridad.enums.EstadoSesion;
 import com.sanfrancisco.api.modules.seguridad.enums.EstadoUsuario;
@@ -22,6 +26,9 @@ import com.sanfrancisco.api.modules.seguridad.repository.DetalleRolRepository;
 import com.sanfrancisco.api.modules.seguridad.repository.RolRepository;
 import com.sanfrancisco.api.modules.seguridad.repository.SesionRepository;
 import com.sanfrancisco.api.modules.seguridad.repository.TipoDocumentoRepository;
+import com.sanfrancisco.api.modules.seguridad.dto.response.ReniecConsultaResponse;
+import com.sanfrancisco.api.modules.seguridad.reniec.ReniecService;
+import com.sanfrancisco.api.modules.seguridad.repository.TokenRecuperacionRepository;
 import com.sanfrancisco.api.modules.seguridad.repository.UsuarioRepository;
 import com.sanfrancisco.api.modules.seguridad.security.BruteForceProtectionService;
 import com.sanfrancisco.api.shared.enums.EstadoActivo;
@@ -34,6 +41,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.Authentication;
@@ -50,6 +58,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @Transactional
@@ -58,6 +67,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private static final Logger log = LoggerFactory.getLogger(AuthenticationServiceImpl.class);
 
     private static final String CLIENTE_ROL = "CLIENTE";
+    private static final int RESET_TOKEN_EXPIRY_MINUTES = 30;
+
+    @Value("${app.frontend-url:http://localhost:4200}")
+    private String frontendUrl;
 
     private final CustomUserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
@@ -69,6 +82,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final TipoDocumentoRepository tipoDocumentoRepository;
     private final HuespedRepository huespedRepository;
     private final DetalleRolRepository detalleRolRepository;
+    private final TokenRecuperacionRepository tokenRecuperacionRepository;
+    private final NotificationService notificationService;
+    private final ReniecService reniecService;
 
     public AuthenticationServiceImpl(CustomUserDetailsService userDetailsService,
                                      PasswordEncoder passwordEncoder,
@@ -79,7 +95,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                                      RolRepository rolRepository,
                                      TipoDocumentoRepository tipoDocumentoRepository,
                                      HuespedRepository huespedRepository,
-                                     DetalleRolRepository detalleRolRepository) {
+                                     DetalleRolRepository detalleRolRepository,
+                                     TokenRecuperacionRepository tokenRecuperacionRepository,
+                                     NotificationService notificationService,
+                                     ReniecService reniecService) {
         this.userDetailsService = userDetailsService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -90,6 +109,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         this.tipoDocumentoRepository = tipoDocumentoRepository;
         this.huespedRepository = huespedRepository;
         this.detalleRolRepository = detalleRolRepository;
+        this.tokenRecuperacionRepository = tokenRecuperacionRepository;
+        this.notificationService = notificationService;
+        this.reniecService = reniecService;
     }
 
     @Override
@@ -201,6 +223,16 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         String apellidoMaterno = request.apellidoMaterno() == null || request.apellidoMaterno().isBlank()
                 ? null : request.apellidoMaterno().trim();
+
+        // Enriquecimiento opcional con RENIEC: si el documento es DNI y el usuario
+        // no informó apellido materno, intentamos completarlo. Degrada silenciosamente.
+        if (apellidoMaterno == null && "DNI".equalsIgnoreCase(tipoDocumento.getAcronimo())) {
+            ReniecConsultaResponse datosReniec = reniecService.consultarDniSilencioso(documento).orElse(null);
+            if (datosReniec != null && datosReniec.apellidoMaterno() != null
+                    && !datosReniec.apellidoMaterno().isBlank()) {
+                apellidoMaterno = datosReniec.apellidoMaterno();
+            }
+        }
 
         String telefono = request.telefono() == null || request.telefono().isBlank()
                 ? null : request.telefono().trim();
@@ -482,6 +514,80 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         }
 
         log.info("Contraseña cambiada exitosamente para usuario: {}. Todas las sesiones cerradas.", usuario.getCorreo());
+    }
+
+    @Override
+    public void forgotPassword(ForgotPasswordRequest request) {
+        String email = request.correo().trim().toLowerCase();
+
+        // Buscar usuario — respuesta siempre 200 para no revelar si el correo existe
+        usuarioRepository.findByCorreo(email).ifPresent(usuario -> {
+            if (usuario.getEstado() == EstadoUsuario.INACTIVO || usuario.getEstado() == EstadoUsuario.BLOQUEADO) {
+                log.info("Solicitud de recuperación ignorada para usuario inactivo/bloqueado: {}", email);
+                return;
+            }
+
+            // Eliminar tokens anteriores del mismo usuario
+            tokenRecuperacionRepository.deleteByUsuarioId(usuario.getUsuarioId());
+
+            // Generar token seguro
+            String rawToken = UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
+            String tokenHash = hashSha256(rawToken);
+
+            TokenRecuperacion tokenRecuperacion = TokenRecuperacion.builder()
+                    .usuario(usuario)
+                    .tokenHash(tokenHash)
+                    .fechaExpiracion(LocalDateTime.now().plusMinutes(RESET_TOKEN_EXPIRY_MINUTES))
+                    .usado(false)
+                    .fechaCreacion(LocalDateTime.now())
+                    .build();
+            tokenRecuperacionRepository.save(tokenRecuperacion);
+
+            String linkReset = frontendUrl + "/reset-password?token=" + rawToken;
+            String nombreUsuario = usuario.getNombre() + " " + usuario.getApellidoPaterno();
+            notificationService.sendPasswordReset(email, nombreUsuario, linkReset);
+
+            log.info("Solicitud de recuperación de contraseña procesada para: {}", email);
+        });
+    }
+
+    @Override
+    public void resetPassword(ResetPasswordRequest request) {
+        String tokenHash = hashSha256(request.token().trim());
+
+        TokenRecuperacion tokenRecuperacion = tokenRecuperacionRepository.findByTokenHash(tokenHash)
+                .orElseThrow(() -> new BusinessException("El enlace de recuperación no es válido o ya fue utilizado."));
+
+        if (tokenRecuperacion.isUsado()) {
+            throw new BusinessException("Este enlace de recuperación ya fue utilizado.");
+        }
+        if (tokenRecuperacion.getFechaExpiracion().isBefore(LocalDateTime.now())) {
+            throw new BusinessException("El enlace de recuperación ha expirado. Solicita uno nuevo.");
+        }
+
+        Usuario usuario = tokenRecuperacion.getUsuario();
+        if (usuario.getEstado() != EstadoUsuario.ACTIVO) {
+            throw new BusinessException("La cuenta asociada no está activa. Contacta al administrador.");
+        }
+
+        // Actualizar contraseña
+        usuario.setContrasenaHash(passwordEncoder.encode(request.nuevaContrasena()));
+        usuarioRepository.save(usuario);
+
+        // Marcar token como usado
+        tokenRecuperacion.setUsado(true);
+        tokenRecuperacionRepository.save(tokenRecuperacion);
+
+        // Revocar todas las sesiones activas
+        List<Sesion> activeSessions = sesionRepository.findByUsuarioUsuarioIdAndEstado(
+                usuario.getUsuarioId(), EstadoSesion.ACTIVA);
+        for (Sesion s : activeSessions) {
+            s.setEstado(EstadoSesion.CERRADA);
+            s.setFechaCierre(LocalDateTime.now());
+            sesionRepository.save(s);
+        }
+
+        log.info("Contraseña restablecida exitosamente para usuario: {}. Sesiones revocadas.", usuario.getCorreo());
     }
 
     private void revokeAllSessionsForUserByEmail(String email) {

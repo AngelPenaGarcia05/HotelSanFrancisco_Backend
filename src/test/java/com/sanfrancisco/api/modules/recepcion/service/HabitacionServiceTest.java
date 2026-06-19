@@ -14,8 +14,10 @@ import com.sanfrancisco.api.modules.recepcion.enums.EstadoHabitacion;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReservaHabitacion;
 import com.sanfrancisco.api.modules.recepcion.mapper.HabitacionMapper;
+import com.sanfrancisco.api.modules.recepcion.mapper.HistorialReservaMapper;
 import com.sanfrancisco.api.modules.recepcion.repository.EstanciaRepository;
 import com.sanfrancisco.api.modules.recepcion.repository.HabitacionRepository;
+import com.sanfrancisco.api.modules.recepcion.repository.HistorialReservaRepository;
 import com.sanfrancisco.api.modules.recepcion.repository.ReservaHabitacionRepository;
 import com.sanfrancisco.api.modules.recepcion.repository.ReservaRepository;
 import com.sanfrancisco.api.modules.recepcion.service.impl.HabitacionServiceImpl;
@@ -52,6 +54,8 @@ class HabitacionServiceTest {
     @Mock UsuarioRepository usuarioRepository;
     @Mock HabitacionMapper mapper;
     @Mock WebSocketPublisher wsPublisher;
+    @Mock HistorialReservaRepository historialReservaRepository;
+    @Mock HistorialReservaMapper historialReservaMapper;
 
     @InjectMocks
     HabitacionServiceImpl service;
@@ -98,7 +102,8 @@ class HabitacionServiceTest {
                 .subtotal(new BigDecimal("200.00"))
                 .build();
 
-        responseDto = new HabitacionResponse(1, "101", 1, EstadoHabitacion.OCUPADA, null, null, null, null);
+        responseDto = new HabitacionResponse(
+                1, "101", 1, EstadoHabitacion.OCUPADA, null, null, null, null, null, null, null, null);
     }
 
     // =========================================================================
@@ -134,7 +139,6 @@ class HabitacionServiceTest {
         void checkIn_reservaNoConfirmada_lanzaExcepcion() {
             reserva.setEstado(EstadoReserva.PENDIENTE);
             when(reservaRepository.findById(5)).thenReturn(Optional.of(reserva));
-            when(usuarioRepository.findById(10)).thenReturn(Optional.of(usuario));
 
             assertThatThrownBy(() -> service.checkIn(new CheckInRequest(5, 10, null)))
                     .isInstanceOf(BusinessException.class)
@@ -213,7 +217,6 @@ class HabitacionServiceTest {
         void checkOut_reservaNoEnCheckIn_lanzaExcepcion() {
             reserva.setEstado(EstadoReserva.CONFIRMADA);
             when(reservaRepository.findById(5)).thenReturn(Optional.of(reserva));
-            when(usuarioRepository.findById(10)).thenReturn(Optional.of(usuario));
 
             assertThatThrownBy(() -> service.checkOut(new CheckOutRequest(5, 10, null, null)))
                     .isInstanceOf(BusinessException.class)
@@ -233,7 +236,7 @@ class HabitacionServiceTest {
         void limpiezaCompletada_exitoso() {
             habitacion.setEstado(EstadoHabitacion.LIMPIEZA);
             HabitacionResponse disponibleDto = new HabitacionResponse(
-                    1, "101", 1, EstadoHabitacion.DISPONIBLE, null, null, null, null);
+                    1, "101", 1, EstadoHabitacion.DISPONIBLE, null, null, null, null, null, null, null, null);
 
             when(habitacionRepository.findById(1)).thenReturn(Optional.of(habitacion));
             when(habitacionRepository.save(any())).thenReturn(habitacion);
