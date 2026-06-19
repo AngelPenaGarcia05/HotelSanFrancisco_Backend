@@ -32,6 +32,11 @@ public class UsuarioMapper {
                 .estado(request.estado())
                 .rol(rol)
                 .tipoDocumento(tipoDocumento)
+                .cargo(request.cargo())
+                .departamento(request.departamento())
+                .codigoEmpleado(request.codigoEmpleado())
+                .fechaIngreso(request.fechaIngreso())
+                .salario(request.salario())
                 .build();
     }
 
@@ -50,6 +55,11 @@ public class UsuarioMapper {
         if (request.estado() != null) target.setEstado(request.estado());
         if (rol != null) target.setRol(rol);
         if (tipoDocumento != null) target.setTipoDocumento(tipoDocumento);
+        if (request.cargo() != null) target.setCargo(request.cargo());
+        if (request.departamento() != null) target.setDepartamento(request.departamento());
+        if (request.codigoEmpleado() != null) target.setCodigoEmpleado(request.codigoEmpleado());
+        if (request.fechaIngreso() != null) target.setFechaIngreso(request.fechaIngreso());
+        if (request.salario() != null) target.setSalario(request.salario());
     }
 
     public UsuarioResponse toResponse(Usuario entity) {
@@ -76,7 +86,12 @@ public class UsuarioMapper {
                 td != null ? td.getTipoDocumentoId() : null,
                 td != null ? td.getAcronimo() : null,
                 entity.getFechaCreacion(),
-                entity.getFechaModificacion()
+                entity.getFechaModificacion(),
+                entity.getCargo(),
+                entity.getDepartamento(),
+                entity.getCodigoEmpleado(),
+                entity.getFechaIngreso(),
+                entity.getSalario()
         );
     }
 }

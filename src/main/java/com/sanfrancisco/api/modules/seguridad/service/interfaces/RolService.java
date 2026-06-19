@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.seguridad.service.interfaces;
 
+import com.sanfrancisco.api.modules.seguridad.dto.request.AsignarPermisosRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.CreateRolRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.RolFilterRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.UpdateRolRequest;
@@ -21,6 +22,10 @@ public interface RolService {
     Page<RolResponse> search(RolFilterRequest filter, Pageable pageable);
 
     List<RolResponse> findByEstado(EstadoActivo estado);
+
+    RolResponse addPermisos(Integer rolId, AsignarPermisosRequest request);
+
+    RolResponse removePermiso(Integer rolId, Integer permisoId);
 
     void deleteById(Integer id);
 }

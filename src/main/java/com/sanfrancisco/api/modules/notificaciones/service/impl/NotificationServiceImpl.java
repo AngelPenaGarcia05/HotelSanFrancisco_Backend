@@ -221,6 +221,23 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     // =====================================================================
+    // Auth — recuperación de contraseña
+    // =====================================================================
+
+    @Override
+    public void sendPasswordReset(String destinatario, String nombreUsuario, String linkReset) {
+        Map<String, String> variables = Map.of(
+                "nombreUsuario", nombreUsuario,
+                "linkReset", linkReset
+        );
+        try {
+            enviarPorPlantilla(EmailTemplateKey.PASSWORD_RESET, destinatario, variables, null, null);
+        } catch (Exception e) {
+            log.warn("Fallo al enviar correo de recuperación a {}: {}", destinatario, e.getMessage());
+        }
+    }
+
+    // =====================================================================
     // Recordatorios automáticos
     // =====================================================================
 

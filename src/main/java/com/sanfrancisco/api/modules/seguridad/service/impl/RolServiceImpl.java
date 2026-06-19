@@ -1,6 +1,7 @@
 package com.sanfrancisco.api.modules.seguridad.service.impl;
 
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
+import com.sanfrancisco.api.modules.seguridad.dto.request.AsignarPermisosRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.CreateRolRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.RolFilterRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.UpdateRolRequest;
@@ -139,6 +140,46 @@ public class RolServiceImpl implements RolService {
         return rolRepository.findByEstado(estado).stream()
                 .map(rol -> rolMapper.toResponse(rol, findPermisosByRolId(rol.getRolId())))
                 .toList();
+    }
+
+    @Override
+    public RolResponse addPermisos(Integer rolId, AsignarPermisosRequest request) {
+        Rol rol = rolRepository.findById(rolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Rol no encontrado: " + rolId));
+
+        for (Integer permisoId : request.permisoIds()) {
+            // Idempotente: si ya está asignado, lo omitimos
+            if (detalleRolRepository.existsById(new DetalleRolPK(permisoId, rolId))) {
+                continue;
+            }
+            Permiso permiso = permisoRepository.findById(permisoId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Permiso no encontrado: " + permisoId));
+            DetalleRol detalle = DetalleRol.builder()
+                    .id(new DetalleRolPK(permisoId, rolId))
+                    .permiso(permiso)
+                    .rol(rol)
+                    .build();
+            detalleRolRepository.save(detalle);
+        }
+
+        eventPublisher.publishUpdated(rol);
+        return rolMapper.toResponse(rol, findPermisosByRolId(rolId));
+    }
+
+    @Override
+    public RolResponse removePermiso(Integer rolId, Integer permisoId) {
+        Rol rol = rolRepository.findById(rolId)
+                .orElseThrow(() -> new ResourceNotFoundException("Rol no encontrado: " + rolId));
+
+        DetalleRolPK pk = new DetalleRolPK(permisoId, rolId);
+        if (!detalleRolRepository.existsById(pk)) {
+            throw new ResourceNotFoundException(
+                    "El permiso " + permisoId + " no está asignado al rol " + rolId);
+        }
+        detalleRolRepository.deleteById(pk);
+
+        eventPublisher.publishUpdated(rol);
+        return rolMapper.toResponse(rol, findPermisosByRolId(rolId));
     }
 
     @Override

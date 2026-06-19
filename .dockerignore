@@ -1,0 +1,29 @@
+# Build artifacts
+target/
+!**/target/*.jar
+
+# IDE / editor
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs / local
+*.md
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
