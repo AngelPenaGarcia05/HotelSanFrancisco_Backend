@@ -3,9 +3,9 @@ spring:
     name: hotel-san-francisco-api
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/hotel_sf
-    username: postgres
-    password: 1234
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/hotel_sf}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:1234}
     driver-class-name: org.postgresql.Driver
 
     hikari:
@@ -30,7 +30,7 @@ spring:
         default_schema: public
 
         jdbc:
-          time_zone: ${APP_TIMEZONE}
+          time_zone: ${APP_TIMEZONE:America/Lima}
 
         order_inserts: true
         order_updates: true
@@ -56,9 +56,10 @@ spring:
       - categoriasProducto
       - horarios
       - proveedores
+      - reniecDni
 
     caffeine:
-      spec: maximumSize=${CACHE_MAX_SIZE},expireAfterWrite=${CACHE_EXPIRE_AFTER_WRITE},recordStats
+      spec: maximumSize=${CACHE_MAX_SIZE:1000},expireAfterWrite=${CACHE_EXPIRE_AFTER_WRITE:15m},recordStats
 
   security:
     user:
@@ -72,8 +73,20 @@ spring:
 app:
   cookie:
     secure: ${APP_COOKIE_SECURE:false}
+    # Lax para mismo sitio (dev). En producción con frontend en otro dominio,
+    # usar None (requiere secure=true) para que las cookies viajen cross-site.
+    same-site: ${APP_COOKIE_SAMESITE:Lax}
+  frontend-url: ${APP_FRONTEND_URL:http://localhost:4200}
+  cors:
+    # Orígenes permitidos separados por coma. En producción: dominio del frontend.
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200,http://127.0.0.1:4200}
   notificaciones:
     smtp-cipher-key: ${SMTP_CIPHER_KEY:default_smtp_cipher_key}
+
+  reniec:
+    api-url: ${RENIEC_API_URL:https://dniruc.apisperu.com/api/v1/dni}
+    token: ${RENIEC_TOKEN:}
+    enabled: ${RENIEC_ENABLED:true}
 
   reserva:
     online:
@@ -81,12 +94,34 @@ app:
       canal-nombre: ${RESERVA_ONLINE_CANAL_NOMBRE:ONLINE}
 
 server:
-  port:  8080
+  # Railway (y otros PaaS) inyectan el puerto a usar vía la variable PORT.
+  port: ${PORT:8080}
 
   servlet:
     encoding:
       charset: UTF-8
       force: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: ${SWAGGER_ENABLED:true}
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: ${SWAGGER_ENABLED:true}
+    operations-sorter: method
+    tags-sorter: alpha
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: ${ACTUATOR_EXPOSE:health}
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
 
 logging:
   level:

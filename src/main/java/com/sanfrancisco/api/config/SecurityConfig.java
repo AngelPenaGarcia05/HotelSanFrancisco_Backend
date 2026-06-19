@@ -6,6 +6,7 @@ import com.sanfrancisco.api.modules.seguridad.security.HttpAccessDeniedHandler;
 import com.sanfrancisco.api.modules.seguridad.security.HttpAuthenticationEntryPoint;
 import com.sanfrancisco.api.modules.seguridad.security.JwtAuthenticationFilter;
 import com.sanfrancisco.api.modules.seguridad.security.RateLimitingFilter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -24,6 +25,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -34,6 +36,9 @@ public class SecurityConfig {
     private final RateLimitingFilter rateLimitingFilter;
     private final HttpAuthenticationEntryPoint authenticationEntryPoint;
     private final HttpAccessDeniedHandler accessDeniedHandler;
+
+    @Value("${app.cors.allowed-origins:http://localhost:4200,http://127.0.0.1:4200}")
+    private String allowedOrigins;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
                           RateLimitingFilter rateLimitingFilter,
@@ -75,9 +80,23 @@ public class SecurityConfig {
                     EndpointPaths.AUTH_REGISTER,
                     EndpointPaths.AUTH_DOCUMENT_TYPES,
                     EndpointPaths.AUTH_REFRESH,
-                    EndpointPaths.AUTH_LOGOUT
+                    EndpointPaths.AUTH_LOGOUT,
+                    EndpointPaths.AUTH_FORGOT_PASSWORD,
+                    EndpointPaths.AUTH_RESET_PASSWORD
                 ).permitAll()
+                .requestMatchers(HttpMethod.GET, EndpointPaths.AUTH_RENIEC_BASE + "/**").permitAll()
                 .requestMatchers(EndpointPaths.WS_BASE + "/**").permitAll()
+
+                // Healthcheck público (Railway / monitoreo)
+                .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+
+                // Documentación OpenAPI / Swagger UI
+                .requestMatchers(
+                    "/swagger-ui.html",
+                    "/swagger-ui/**",
+                    "/v3/api-docs",
+                    "/v3/api-docs/**"
+                ).permitAll()
                 
                 // =============================================================
                 // BOOKING — Flujo público de reservas (sin autenticación)
@@ -357,6 +376,19 @@ public class SecurityConfig {
                     .hasAuthority(Permissions.ASIGNACION_HORARIO_DELETE)
 
                 // =============================================================
+                // DASHBOARD — Cualquier usuario autenticado; el contenido se
+                // filtra internamente según los permisos granulares del usuario.
+                // =============================================================
+                .requestMatchers(HttpMethod.GET, EndpointPaths.DASHBOARD_BASE + "/**")
+                    .authenticated()
+
+                // =============================================================
+                // AUDITORÍA — Solo lectura (ADMIN vía permiso auditoria:read)
+                // =============================================================
+                .requestMatchers(HttpMethod.GET, EndpointPaths.AUDITORIA_BASE + "/**")
+                    .hasAuthority(Permissions.AUDITORIA_READ)
+
+                // =============================================================
                 // SEGURIDAD — Usuarios, Roles, Permisos, Tipos de Documento
                 // =============================================================
                 .requestMatchers(HttpMethod.GET, EndpointPaths.USUARIO_BASE + "/**")
@@ -365,11 +397,22 @@ public class SecurityConfig {
                     .hasAuthority(Permissions.USUARIO_CREATE)
                 .requestMatchers(HttpMethod.PUT, EndpointPaths.USUARIO_BASE + "/**")
                     .hasAuthority(Permissions.USUARIO_UPDATE)
+                // Asignación de rol — requiere usuario:update (debe ir antes del PATCH genérico)
+                .requestMatchers(HttpMethod.PATCH, EndpointPaths.USUARIO_BASE + "/*/rol")
+                    .hasAuthority(Permissions.USUARIO_UPDATE)
+                .requestMatchers(HttpMethod.PATCH, EndpointPaths.USUARIO_BASE + "/**")
+                    .hasAuthority(Permissions.USUARIO_CHANGE_STATUS)
                 .requestMatchers(HttpMethod.DELETE, EndpointPaths.USUARIO_BASE + "/**")
                     .hasAuthority(Permissions.USUARIO_DELETE)
 
                 .requestMatchers(HttpMethod.GET, EndpointPaths.ROL_BASE + "/**")
                     .hasAuthority(Permissions.ROL_READ)
+                // Gestión granular de permisos del rol — requiere rol:update
+                // (debe ir antes de las reglas POST/DELETE genéricas de roles)
+                .requestMatchers(HttpMethod.POST, EndpointPaths.ROL_BASE + "/*/permisos")
+                    .hasAuthority(Permissions.ROL_UPDATE)
+                .requestMatchers(HttpMethod.DELETE, EndpointPaths.ROL_BASE + "/*/permisos/**")
+                    .hasAuthority(Permissions.ROL_UPDATE)
                 .requestMatchers(HttpMethod.POST, EndpointPaths.ROL_BASE)
                     .hasAuthority(Permissions.ROL_CREATE)
                 .requestMatchers(HttpMethod.PUT, EndpointPaths.ROL_BASE + "/**")
@@ -403,7 +446,11 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("http://localhost:4200", "http://127.0.0.1:4200"));
+        List<String> origins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(o -> !o.isEmpty())
+                .toList();
+        config.setAllowedOrigins(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-XSRF-TOKEN", "Cache-Control"));
         config.setExposedHeaders(List.of("Set-Cookie"));

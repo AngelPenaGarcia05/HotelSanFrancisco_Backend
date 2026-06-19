@@ -32,7 +32,10 @@ public final class EndpointPaths {
     public static final String AUTH_LOGOUT          = AUTH_BASE + "/logout";
     public static final String AUTH_LOGOUT_ALL      = AUTH_BASE + "/logout-all";
     public static final String AUTH_ME              = AUTH_BASE + "/me";
-    public static final String AUTH_CHANGE_PASSWORD = AUTH_BASE + "/change-password";
+    public static final String AUTH_CHANGE_PASSWORD  = AUTH_BASE + "/change-password";
+    public static final String AUTH_FORGOT_PASSWORD  = AUTH_BASE + "/forgot-password";
+    public static final String AUTH_RESET_PASSWORD   = AUTH_BASE + "/reset-password";
+    public static final String AUTH_RENIEC_BASE      = AUTH_BASE + "/reniec";
 
     // =========================================================================
     // WEBSOCKET
@@ -100,6 +103,16 @@ public final class EndpointPaths {
     // BOOKING — Flujo público de reservas web
     // =========================================================================
     public static final String BOOKING_BASE = "/api/v1/booking";
+
+    // =========================================================================
+    // DASHBOARD
+    // =========================================================================
+    public static final String DASHBOARD_BASE = "/api/v1/dashboard";
+
+    // =========================================================================
+    // AUDITORÍA
+    // =========================================================================
+    public static final String AUDITORIA_BASE = "/api/v1/auditoria";
 
     // =========================================================================
     // SEGURIDAD — Usuarios, Roles, Permisos, Tipos de Documento

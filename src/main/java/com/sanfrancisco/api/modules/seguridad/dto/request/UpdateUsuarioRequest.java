@@ -1,9 +1,12 @@
 package com.sanfrancisco.api.modules.seguridad.dto.request;
 
 import com.sanfrancisco.api.modules.seguridad.enums.EstadoUsuario;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record UpdateUsuarioRequest(
@@ -35,6 +38,23 @@ public record UpdateUsuarioRequest(
 
         Integer tipoDocumentoId,
 
-        EstadoUsuario estado
+        EstadoUsuario estado,
+
+        // ── Campos laborales opcionales ──
+
+        @Size(max = 80, message = "El cargo no puede exceder 80 caracteres")
+        String cargo,
+
+        @Size(max = 80, message = "El departamento no puede exceder 80 caracteres")
+        String departamento,
+
+        @Size(max = 30, message = "El código de empleado no puede exceder 30 caracteres")
+        String codigoEmpleado,
+
+        LocalDate fechaIngreso,
+
+        @DecimalMin(value = "0.0", inclusive = true, message = "El salario no puede ser negativo")
+        @Digits(integer = 10, fraction = 2, message = "El salario no puede tener más de 10 enteros y 2 decimales")
+        BigDecimal salario
 ) {
 }
