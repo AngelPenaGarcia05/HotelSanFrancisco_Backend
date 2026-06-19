@@ -6,4 +6,3 @@ public record SendPaymentConfirmationRequest(
         @NotNull Integer pagoId
 ) {
 }
-
