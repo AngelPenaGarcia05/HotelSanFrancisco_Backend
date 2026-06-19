@@ -7,10 +7,13 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface CanalRepository extends JpaRepository<Canal, Integer>,
         JpaSpecificationExecutor<Canal> {
 
     List<Canal> findByEstado(EstadoActivo estado);
+
+    Optional<Canal> findByNombreIgnoreCase(String nombre);
 }
