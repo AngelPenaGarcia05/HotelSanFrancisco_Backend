@@ -12,6 +12,8 @@ import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Repository
 public interface ReservaRepository extends JpaRepository<Reserva, Integer>,
@@ -26,6 +28,8 @@ public interface ReservaRepository extends JpaRepository<Reserva, Integer>,
     List<Reserva> findByFechaInicioBetween(LocalDate inicio, LocalDate fin);
 
     List<Reserva> findByUsuarioUsuarioId(Integer usuarioId);
+
+    Page<Reserva> findByUsuarioUsuarioId(Integer usuarioId, Pageable pageable);
 
     /**
      * Busca reservas activas del huésped principal que se solapen con el rango dado.

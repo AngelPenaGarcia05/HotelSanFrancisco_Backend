@@ -360,6 +360,23 @@ public class ReservaServiceImpl implements ReservaService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Page<ReservaResponse> findByUsuarioId(Integer usuarioId, Pageable pageable) {
+        return reservaRepository.findByUsuarioUsuarioId(usuarioId, pageable)
+                .map(reservaMapper::toResponse);
+    }
+
+    @Override
+    public CancelacionResponse cancelarPropiaReserva(Integer reservaId, Integer usuarioId,
+                                                      CancelarReservaRequest request) {
+        Reserva reserva = obtenerOFallar(reservaId);
+        if (!reserva.getUsuario().getUsuarioId().equals(usuarioId)) {
+            throw new BusinessException("No tienes permiso para cancelar esta reserva");
+        }
+        return cancelar(reservaId, request);
+    }
+
+    @Override
     public void deleteById(Integer reservaId) {
         Reserva reserva = obtenerOFallar(reservaId);
         if (reserva.getEstado() != EstadoReserva.PENDIENTE && reserva.getEstado() != EstadoReserva.CANCELADA) {
