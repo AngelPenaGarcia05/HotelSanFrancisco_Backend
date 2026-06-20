@@ -33,7 +33,7 @@ INSERT INTO permisos (nombre, codigo, fecha_creacion)
 VALUES ('Consultar auditoría', 'auditoria:read', NOW())
 ON CONFLICT (codigo) DO NOTHING;
 
-INSERT INTO detalle_roles (rol_id, permiso_id, fecha_creacion)
+INSERT INTO detalles_rol (rol_id, permiso_id, fecha_creacion)
 SELECT r.rol_id, p.permiso_id, NOW()
 FROM roles r
          JOIN permisos p ON p.codigo = 'auditoria:read'

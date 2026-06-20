@@ -389,6 +389,28 @@ public class SecurityConfig {
                     .hasAuthority(Permissions.AUDITORIA_READ)
 
                 // =============================================================
+                // SOLICITUDES DE SERVICIO
+                // El filtrado "propias vs todas" se resuelve en la capa de servicio.
+                // Rutas específicas declaradas antes que los comodines.
+                // =============================================================
+                .requestMatchers(HttpMethod.GET, EndpointPaths.SOLICITUD_BASE + "/reporte")
+                    .hasAuthority(Permissions.SOLICITUD_REPORT)
+                .requestMatchers(HttpMethod.POST, EndpointPaths.SOLICITUD_BASE + "/*/seguimientos")
+                    .hasAuthority(Permissions.SOLICITUD_CHANGE_STATUS)
+                .requestMatchers(HttpMethod.PATCH, EndpointPaths.SOLICITUD_BASE + "/*/asignar")
+                    .hasAuthority(Permissions.SOLICITUD_ASSIGN)
+                .requestMatchers(HttpMethod.PATCH, EndpointPaths.SOLICITUD_BASE + "/*/estado")
+                    .hasAuthority(Permissions.SOLICITUD_CHANGE_STATUS)
+                .requestMatchers(HttpMethod.POST, EndpointPaths.SOLICITUD_BASE)
+                    .hasAuthority(Permissions.SOLICITUD_CREATE)
+                .requestMatchers(HttpMethod.GET, EndpointPaths.SOLICITUD_BASE + "/**")
+                    .hasAuthority(Permissions.SOLICITUD_READ)
+                .requestMatchers(HttpMethod.PUT, EndpointPaths.SOLICITUD_BASE + "/**")
+                    .hasAuthority(Permissions.SOLICITUD_UPDATE)
+                .requestMatchers(HttpMethod.DELETE, EndpointPaths.SOLICITUD_BASE + "/**")
+                    .hasAuthority(Permissions.SOLICITUD_DELETE)
+
+                // =============================================================
                 // SEGURIDAD — Usuarios, Roles, Permisos, Tipos de Documento
                 // =============================================================
                 .requestMatchers(HttpMethod.GET, EndpointPaths.USUARIO_BASE + "/**")

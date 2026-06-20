@@ -7,7 +7,7 @@ INSERT INTO permisos (nombre, codigo, fecha_creacion)
 VALUES ('Cambiar estado de usuario', 'usuario:change-status', NOW())
 ON CONFLICT (codigo) DO NOTHING;
 
-INSERT INTO detalle_roles (rol_id, permiso_id, fecha_creacion)
+INSERT INTO detalles_rol (rol_id, permiso_id, fecha_creacion)
 SELECT r.rol_id, p.permiso_id, NOW()
 FROM roles r
          JOIN permisos p ON p.codigo = 'usuario:change-status'
