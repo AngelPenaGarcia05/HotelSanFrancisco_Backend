@@ -14,6 +14,8 @@ public record UpdateHabitacionRequest(
 
         EstadoHabitacion estado,
 
+        Integer tipoHabitacionId,
+
         String descripcion,
 
         String observaciones
