@@ -3,12 +3,13 @@ spring:
     name: hotel-san-francisco-api
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/hotel_sf
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/hotel_sf}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:1234}
     driver-class-name: org.postgresql.Driver
+
     hikari:
-      maximum-pool-size: 10
+      maximum-pool-size: 25
       minimum-idle: 5
       connection-timeout: 30000
       idle-timeout: 600000
@@ -18,15 +19,19 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+
     show-sql: false
     open-in-view: false
+
     properties:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
         default_schema: public
+
         jdbc:
-          time_zone: America/Lima
+          time_zone: ${APP_TIMEZONE:America/Lima}
+
         order_inserts: true
         order_updates: true
         batch_size: 25
@@ -39,26 +44,92 @@ spring:
     out-of-order: false
 
   cache:
-    type: simple
+    type: caffeine
+
+    cache-names:
+      - tiposHabitacion
+      - habitaciones
+      - canales
+      - tiposDocumento
+      - metodosPago
+      - tiposServicio
+      - categoriasProducto
+      - horarios
+      - proveedores
+      - reniecDni
+
+    caffeine:
+      spec: maximumSize=${CACHE_MAX_SIZE:1000},expireAfterWrite=${CACHE_EXPIRE_AFTER_WRITE:15m},recordStats
 
   security:
     user:
-      name: admin
-      password: ${SECURITY_PASSWORD:changeme}
+     name: ${SECURITY_USERNAME:admin}
+    password: ${SECURITY_PASSWORD:admin123}
+    jwt:
+      secret-key: ${JWT_SECRET_KEY:default_key}
+      access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:900000} # 15 min (en ms)
+      refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:604800000} # 7 días (en ms)
+
+app:
+  cookie:
+    secure: ${APP_COOKIE_SECURE:false}
+    # Lax para mismo sitio (dev). En producción con frontend en otro dominio,
+    # usar None (requiere secure=true) para que las cookies viajen cross-site.
+    same-site: ${APP_COOKIE_SAMESITE:Lax}
+  frontend-url: ${APP_FRONTEND_URL:http://localhost:4200}
+  cors:
+    # Orígenes permitidos separados por coma. En producción: dominio del frontend.
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200,http://127.0.0.1:4200}
+  notificaciones:
+    smtp-cipher-key: ${SMTP_CIPHER_KEY:default_smtp_cipher_key}
+
+  reniec:
+    api-url: ${RENIEC_API_URL:https://dniruc.apisperu.com/api/v1/dni}
+    token: ${RENIEC_TOKEN:eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImFydGh1cjEyM2JtYkBnbWFpbC5jb20ifQ.FwX1j9OtB1qcTMSSJBK8XwUOuxNeOMSfACaqU_iUX_I}
+    enabled: ${RENIEC_ENABLED:true}
+
+  reserva:
+    online:
+      usuario-sistema-id: ${RESERVA_ONLINE_USUARIO_ID:1}
+      canal-nombre: ${RESERVA_ONLINE_CANAL_NOMBRE:ONLINE}
 
 server:
-  port: 8080
+  # Railway (y otros PaaS) inyectan el puerto a usar vía la variable PORT.
+  port: ${PORT:8080}
+
   servlet:
     encoding:
       charset: UTF-8
       force: true
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: ${SWAGGER_ENABLED:true}
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: ${SWAGGER_ENABLED:true}
+    operations-sorter: method
+    tags-sorter: alpha
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: ${ACTUATOR_EXPOSE:health}
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
 logging:
   level:
-    org.hibernate.SQL: DEBUG
-    org.hibernate.orm.jdbc.bind: TRACE
-    com.sanfrancisco.api: DEBUG
-    org.springframework.security: INFO
-    org.flywaydb: INFO
+    org.hibernate.SQL: ${LOG_LEVEL_SQL:DEBUG}
+    org.hibernate.orm.jdbc.bind: ${LOG_LEVEL_BIND:TRACE}
+    com.sanfrancisco.api: ${LOG_LEVEL_APP:INFO}
+    org.springframework.security: ${LOG_LEVEL_SECURITY:INFO}
+    org.flywaydb: ${LOG_LEVEL_FLYWAY:INFO}
+
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

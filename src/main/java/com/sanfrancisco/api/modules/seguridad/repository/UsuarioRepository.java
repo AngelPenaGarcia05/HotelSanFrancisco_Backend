@@ -22,4 +22,8 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Integer>,
     List<Usuario> findByEstado(EstadoUsuario estado);
 
     List<Usuario> findByRolRolId(Integer rolId);
+
+    boolean existsByCodigoEmpleado(String codigoEmpleado);
+
+    boolean existsByCodigoEmpleadoAndUsuarioIdNot(String codigoEmpleado, Integer usuarioId);
 }
