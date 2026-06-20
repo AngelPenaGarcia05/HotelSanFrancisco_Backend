@@ -15,6 +15,7 @@ import com.sanfrancisco.api.modules.recepcion.mapper.HistorialReservaMapper;
 import com.sanfrancisco.api.modules.recepcion.mapper.ReservaHabitacionMapper;
 import com.sanfrancisco.api.modules.recepcion.mapper.ReservaMapper;
 import com.sanfrancisco.api.modules.recepcion.repository.*;
+import com.sanfrancisco.api.modules.recepcion.entity.Estancia;
 import com.sanfrancisco.api.modules.recepcion.service.interfaces.DisponibilidadService;
 import com.sanfrancisco.api.modules.recepcion.service.interfaces.ReservaService;
 
@@ -63,6 +64,7 @@ public class ReservaServiceImpl implements ReservaService {
     private final HuespedRepository huespedRepository;
     private final ReservaHabitacionRepository reservaHabitacionRepository;
     private final DetalleHuespedRepository detalleHuespedRepository;
+    private final EstanciaRepository estanciaRepository;
     private final ReservaMapper reservaMapper;
     private final ReservaHabitacionMapper reservaHabitacionMapper;
     private final DetalleHuespedMapper detalleHuespedMapper;
@@ -79,6 +81,7 @@ public class ReservaServiceImpl implements ReservaService {
                               HuespedRepository huespedRepository,
                               ReservaHabitacionRepository reservaHabitacionRepository,
                               DetalleHuespedRepository detalleHuespedRepository,
+                              EstanciaRepository estanciaRepository,
                               ReservaMapper reservaMapper,
                               ReservaHabitacionMapper reservaHabitacionMapper,
                               DetalleHuespedMapper detalleHuespedMapper,
@@ -94,6 +97,7 @@ public class ReservaServiceImpl implements ReservaService {
         this.huespedRepository = huespedRepository;
         this.reservaHabitacionRepository = reservaHabitacionRepository;
         this.detalleHuespedRepository = detalleHuespedRepository;
+        this.estanciaRepository = estanciaRepository;
         this.reservaMapper = reservaMapper;
         this.reservaHabitacionMapper = reservaHabitacionMapper;
         this.detalleHuespedMapper = detalleHuespedMapper;
@@ -224,7 +228,8 @@ public class ReservaServiceImpl implements ReservaService {
         Reserva reserva = obtenerOFallar(reservaId);
         List<ReservaHabitacion> habitaciones = reservaHabitacionRepository.findByReservaReservaId(reservaId);
         List<DetalleHuesped> huespedes = detalleHuespedRepository.findByIdReservaId(reservaId);
-        return reservaMapper.toResponse(reserva, habitaciones, huespedes);
+        Integer estanciaId = resolverEstanciaId(reservaId);
+        return reservaMapper.toResponse(reserva, habitaciones, huespedes, estanciaId);
     }
 
     @Override
@@ -234,7 +239,8 @@ public class ReservaServiceImpl implements ReservaService {
                 .orElseThrow(() -> new ResourceNotFoundException("Reserva no encontrada: " + codReserva));
         List<ReservaHabitacion> habitaciones = reservaHabitacionRepository.findByReservaReservaId(reserva.getReservaId());
         List<DetalleHuesped> huespedes = detalleHuespedRepository.findByIdReservaId(reserva.getReservaId());
-        return reservaMapper.toResponse(reserva, habitaciones, huespedes);
+        Integer estanciaId = resolverEstanciaId(reserva.getReservaId());
+        return reservaMapper.toResponse(reserva, habitaciones, huespedes, estanciaId);
     }
 
     @Override
@@ -289,7 +295,8 @@ public class ReservaServiceImpl implements ReservaService {
 
         List<ReservaHabitacion> habitaciones = reservaHabitacionRepository.findByReservaReservaId(reservaId);
         List<DetalleHuesped> huespedes = detalleHuespedRepository.findByIdReservaId(reservaId);
-        return reservaMapper.toResponse(saved, habitaciones, huespedes);
+        Integer estanciaId = resolverEstanciaId(reservaId);
+        return reservaMapper.toResponse(saved, habitaciones, huespedes, estanciaId);
     }
 
     @Override
@@ -335,7 +342,8 @@ public class ReservaServiceImpl implements ReservaService {
 
         List<ReservaHabitacion> habitaciones = reservaHabitacionRepository.findByReservaReservaId(reservaId);
         List<DetalleHuesped> huespedes       = detalleHuespedRepository.findByIdReservaId(reservaId);
-        ReservaResponse reservaResponse      = reservaMapper.toResponse(saved, habitaciones, huespedes);
+        Integer estanciaId                   = resolverEstanciaId(reservaId);
+        ReservaResponse reservaResponse      = reservaMapper.toResponse(saved, habitaciones, huespedes, estanciaId);
 
         return new CancelacionResponse(reservaResponse, adelanto, penalizacion, devolucion, politica.descripcion());
     }
@@ -532,4 +540,10 @@ public class ReservaServiceImpl implements ReservaService {
     }
 
     private record PoliticaCancelacion(int porcentaje, String descripcion) {}
+
+    private Integer resolverEstanciaId(Integer reservaId) {
+        return estanciaRepository.findByReservaReservaId(reservaId)
+                .map(e -> e.getEstanciaId())
+                .orElse(null);
+    }
 }
