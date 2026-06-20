@@ -25,6 +25,7 @@ public record ReservaResponse(
         String usuarioNombre,
         Integer canalId,
         String canalNombre,
+        Integer estanciaId,
         List<ReservaHabitacionResponse> habitaciones,
         List<DetalleHuespedResponse> huespedes,
         LocalDateTime fechaCreacion,

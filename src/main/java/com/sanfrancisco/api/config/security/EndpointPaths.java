@@ -105,6 +105,11 @@ public final class EndpointPaths {
     public static final String BOOKING_BASE = "/api/v1/booking";
 
     // =========================================================================
+    // MIS RESERVAS — Panel del cliente autenticado
+    // =========================================================================
+    public static final String MIS_RESERVAS_BASE = "/api/v1/mis-reservas";
+
+    // =========================================================================
     // DASHBOARD
     // =========================================================================
     public static final String DASHBOARD_BASE = "/api/v1/dashboard";

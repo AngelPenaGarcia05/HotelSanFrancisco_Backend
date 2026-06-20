@@ -221,6 +221,13 @@ public final class Permissions {
     public static final String AUDITORIA_READ = "auditoria:read";
 
     // =========================================================================
+    // MIS RESERVAS (panel del cliente)
+    // =========================================================================
+    public static final String MIS_RESERVAS_READ   = "mis-reservas:read";
+    public static final String MIS_RESERVAS_CREATE = "mis-reservas:create";
+    public static final String MIS_RESERVAS_DELETE = "mis-reservas:delete";
+
+    // =========================================================================
     // SOLICITUDES DE SERVICIO
     // =========================================================================
     public static final String SOLICITUD_CREATE        = "solicitud:create";
