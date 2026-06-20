@@ -15,6 +15,7 @@ import com.sanfrancisco.api.modules.recepcion.entity.ReservaHabitacion;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoHabitacion;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReservaHabitacion;
+import com.sanfrancisco.api.modules.recepcion.entity.TipoHabitacion;
 import com.sanfrancisco.api.modules.recepcion.mapper.HabitacionMapper;
 import com.sanfrancisco.api.modules.recepcion.mapper.HistorialReservaMapper;
 import com.sanfrancisco.api.modules.recepcion.repository.EstanciaRepository;
@@ -22,6 +23,7 @@ import com.sanfrancisco.api.modules.recepcion.repository.HabitacionRepository;
 import com.sanfrancisco.api.modules.recepcion.repository.HistorialReservaRepository;
 import com.sanfrancisco.api.modules.recepcion.repository.ReservaHabitacionRepository;
 import com.sanfrancisco.api.modules.recepcion.repository.ReservaRepository;
+import com.sanfrancisco.api.modules.recepcion.repository.TipoHabitacionRepository;
 import com.sanfrancisco.api.modules.recepcion.service.interfaces.HabitacionService;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
 import com.sanfrancisco.api.modules.seguridad.repository.UsuarioRepository;
@@ -41,6 +43,7 @@ import java.util.List;
 public class HabitacionServiceImpl implements HabitacionService {
 
     private final HabitacionRepository habitacionRepository;
+    private final TipoHabitacionRepository tipoHabitacionRepository;
     private final ReservaRepository reservaRepository;
     private final ReservaHabitacionRepository reservaHabitacionRepository;
     private final EstanciaRepository estanciaRepository;
@@ -51,6 +54,7 @@ public class HabitacionServiceImpl implements HabitacionService {
     private final HistorialReservaMapper historialReservaMapper;
 
     public HabitacionServiceImpl(HabitacionRepository habitacionRepository,
+                                 TipoHabitacionRepository tipoHabitacionRepository,
                                  ReservaRepository reservaRepository,
                                  ReservaHabitacionRepository reservaHabitacionRepository,
                                  EstanciaRepository estanciaRepository,
@@ -60,6 +64,7 @@ public class HabitacionServiceImpl implements HabitacionService {
                                  HistorialReservaRepository historialReservaRepository,
                                  HistorialReservaMapper historialReservaMapper) {
         this.habitacionRepository = habitacionRepository;
+        this.tipoHabitacionRepository = tipoHabitacionRepository;
         this.reservaRepository = reservaRepository;
         this.reservaHabitacionRepository = reservaHabitacionRepository;
         this.estanciaRepository = estanciaRepository;
@@ -79,7 +84,13 @@ public class HabitacionServiceImpl implements HabitacionService {
         if (habitacionRepository.existsByNumero(request.numero().trim().toUpperCase())) {
             throw new BusinessException("Ya existe una habitación con el número: " + request.numero());
         }
-        Habitacion saved = habitacionRepository.save(mapper.toEntity(request));
+        Habitacion habitacion = mapper.toEntity(request);
+        if (request.tipoHabitacionId() != null) {
+            TipoHabitacion tipo = tipoHabitacionRepository.findById(request.tipoHabitacionId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Tipo de habitación no encontrado: " + request.tipoHabitacionId()));
+            habitacion.setTipoHabitacion(tipo);
+        }
+        Habitacion saved = habitacionRepository.save(habitacion);
         broadcast("HABITACION_CREADA", saved);
         return mapper.toResponse(saved);
     }
@@ -96,6 +107,11 @@ public class HabitacionServiceImpl implements HabitacionService {
         }
 
         mapper.updateEntity(habitacion, request);
+        if (request.tipoHabitacionId() != null) {
+            TipoHabitacion tipo = tipoHabitacionRepository.findById(request.tipoHabitacionId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Tipo de habitación no encontrado: " + request.tipoHabitacionId()));
+            habitacion.setTipoHabitacion(tipo);
+        }
         Habitacion saved = habitacionRepository.save(habitacion);
         broadcast("HABITACION_ACTUALIZADA", saved);
         return mapper.toResponse(saved);
