@@ -19,6 +19,8 @@ public interface ReservaHabitacionRepository extends JpaRepository<ReservaHabita
 
     List<ReservaHabitacion> findByReservaReservaId(Integer reservaId);
 
+    List<ReservaHabitacion> findByReservaReservaIdIn(Collection<Integer> reservaIds);
+
     List<ReservaHabitacion> findByHabitacionHabitacionId(Integer habitacionId);
 
     List<ReservaHabitacion> findByEstado(EstadoReservaHabitacion estado);
