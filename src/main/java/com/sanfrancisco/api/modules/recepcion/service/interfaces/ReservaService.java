@@ -32,4 +32,8 @@ public interface ReservaService {
     List<HistorialReservaResponse> obtenerHistorial(Integer reservaId);
 
     void deleteById(Integer reservaId);
+
+    Page<ReservaResponse> findByUsuarioId(Integer usuarioId, Pageable pageable);
+
+    CancelacionResponse cancelarPropiaReserva(Integer reservaId, Integer usuarioId, CancelarReservaRequest request);
 }

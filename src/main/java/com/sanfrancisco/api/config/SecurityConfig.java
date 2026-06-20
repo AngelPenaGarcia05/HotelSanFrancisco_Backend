@@ -106,6 +106,16 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, EndpointPaths.BOOKING_BASE).permitAll()
 
                 // =============================================================
+                // MIS RESERVAS — Panel del cliente autenticado
+                // =============================================================
+                .requestMatchers(HttpMethod.GET, EndpointPaths.MIS_RESERVAS_BASE + "/**")
+                    .hasAuthority(Permissions.MIS_RESERVAS_READ)
+                .requestMatchers(HttpMethod.POST, EndpointPaths.MIS_RESERVAS_BASE)
+                    .hasAuthority(Permissions.MIS_RESERVAS_CREATE)
+                .requestMatchers(HttpMethod.DELETE, EndpointPaths.MIS_RESERVAS_BASE + "/**")
+                    .hasAuthority(Permissions.MIS_RESERVAS_DELETE)
+
+                // =============================================================
                 // TIPO HABITACIÓN — catálogo visible en la landing page sin sesión
                 // =============================================================
                 .requestMatchers(HttpMethod.GET, EndpointPaths.TIPO_HABITACION_BASE + "/**").permitAll()
