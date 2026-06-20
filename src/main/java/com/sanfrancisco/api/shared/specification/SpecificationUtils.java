@@ -17,19 +17,19 @@ public final class SpecificationUtils {
     }
 
     public static <T> Specification<T> equalsIfPresent(String attribute, Object value) {
-        if (value == null) return null;
-        if (value instanceof String s && s.isBlank()) return null;
+        if (value == null) return Specification.unrestricted();
+        if (value instanceof String s && s.isBlank()) return Specification.unrestricted();
         return (root, query, cb) -> cb.equal(resolve(root, attribute), value);
     }
 
     public static <T> Specification<T> likeIfPresent(String attribute, String value) {
-        if (value == null || value.isBlank()) return null;
+        if (value == null || value.isBlank()) return Specification.unrestricted();
         String pattern = "%" + value.toLowerCase().trim() + "%";
         return (root, query, cb) -> cb.like(cb.lower(resolve(root, attribute)), pattern);
     }
 
     public static <T> Specification<T> dateBetween(String attribute, LocalDate from, LocalDate to) {
-        if (from == null && to == null) return null;
+        if (from == null && to == null) return Specification.unrestricted();
         return (root, query, cb) -> {
             Path<LocalDate> path = resolve(root, attribute);
             if (from != null && to != null) return cb.between(path, from, to);
@@ -39,7 +39,7 @@ public final class SpecificationUtils {
     }
 
     public static <T> Specification<T> dateTimeBetween(String attribute, LocalDateTime from, LocalDateTime to) {
-        if (from == null && to == null) return null;
+        if (from == null && to == null) return Specification.unrestricted();
         return (root, query, cb) -> {
             Path<LocalDateTime> path = resolve(root, attribute);
             if (from != null && to != null) return cb.between(path, from, to);
@@ -49,12 +49,12 @@ public final class SpecificationUtils {
     }
 
     public static <T, V extends Comparable<? super V>> Specification<T> greaterOrEqual(String attribute, V value) {
-        if (value == null) return null;
+        if (value == null) return Specification.unrestricted();
         return (root, query, cb) -> cb.greaterThanOrEqualTo(resolve(root, attribute), value);
     }
 
     public static <T, V extends Comparable<? super V>> Specification<T> lessOrEqual(String attribute, V value) {
-        if (value == null) return null;
+        if (value == null) return Specification.unrestricted();
         return (root, query, cb) -> cb.lessThanOrEqualTo(resolve(root, attribute), value);
     }
 
