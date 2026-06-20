@@ -34,7 +34,7 @@ public final class ReservaSpecification {
      * Usa subquery para evitar modificar la entidad Reserva con @OneToMany.
      */
     private static Specification<Reserva> byHuespedId(Integer huespedId) {
-        if (huespedId == null) return null;
+        if (huespedId == null) return Specification.unrestricted();
         return (root, query, cb) -> {
             Subquery<Integer> sub = query.subquery(Integer.class);
             Root<DetalleHuesped> dh = sub.from(DetalleHuesped.class);
