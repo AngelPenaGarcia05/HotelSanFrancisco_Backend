@@ -39,6 +39,11 @@ public interface NotificationService {
     // Auth — recuperación de contraseña
     void sendPasswordReset(String destinatario, String nombreUsuario, String linkReset);
 
+    // Solicitudes — notificación de cambio de estado
+    void sendSolicitudStatusChanged(String destinatario, String nombreUsuario, String codigoSolicitud,
+                                    String asuntoSolicitud, String estadoAnterior, String nuevoEstado,
+                                    String observacion);
+
     // Log
     Page<EmailLogResponse> searchLog(EmailLogFilterRequest filter, Pageable pageable);
 

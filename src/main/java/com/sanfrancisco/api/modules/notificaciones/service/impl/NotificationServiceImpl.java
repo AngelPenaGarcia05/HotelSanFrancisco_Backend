@@ -238,6 +238,30 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     // =====================================================================
+    // Solicitudes — notificación de cambio de estado
+    // =====================================================================
+
+    @Override
+    public void sendSolicitudStatusChanged(String destinatario, String nombreUsuario, String codigoSolicitud,
+                                           String asuntoSolicitud, String estadoAnterior, String nuevoEstado,
+                                           String observacion) {
+        Map<String, String> variables = Map.of(
+                "nombreUsuario", nombreUsuario,
+                "codigoSolicitud", codigoSolicitud,
+                "asuntoSolicitud", asuntoSolicitud,
+                "estadoAnterior", estadoAnterior,
+                "nuevoEstado", nuevoEstado,
+                "observacion", observacion != null ? observacion : ""
+        );
+        try {
+            enviarPorPlantilla(EmailTemplateKey.REQUEST_STATUS_CHANGED, destinatario, variables, null, null);
+        } catch (Exception e) {
+            log.warn("Fallo al enviar notificación de estado de solicitud {} a {}: {}",
+                    codigoSolicitud, destinatario, e.getMessage());
+        }
+    }
+
+    // =====================================================================
     // Recordatorios automáticos
     // =====================================================================
 

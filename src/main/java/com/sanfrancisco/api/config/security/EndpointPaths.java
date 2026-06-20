@@ -115,6 +115,11 @@ public final class EndpointPaths {
     public static final String AUDITORIA_BASE = "/api/v1/auditoria";
 
     // =========================================================================
+    // SOLICITUDES DE SERVICIO
+    // =========================================================================
+    public static final String SOLICITUD_BASE = "/api/v1/solicitudes";
+
+    // =========================================================================
     // SEGURIDAD — Usuarios, Roles, Permisos, Tipos de Documento
     // =========================================================================
     public static final String USUARIO_BASE        = "/api/v1/usuarios";
