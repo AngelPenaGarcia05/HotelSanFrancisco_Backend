@@ -104,6 +104,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET,  EndpointPaths.BOOKING_BASE + "/disponibles").permitAll()
                 .requestMatchers(HttpMethod.GET,  EndpointPaths.BOOKING_BASE + "/metodos-pago").permitAll()
                 .requestMatchers(HttpMethod.POST, EndpointPaths.BOOKING_BASE).permitAll()
+
+                // =============================================================
+                // TIPO HABITACIÓN — catálogo visible en la landing page sin sesión
+                // =============================================================
+                .requestMatchers(HttpMethod.GET, EndpointPaths.TIPO_HABITACION_BASE + "/**").permitAll()
                 
                 // =============================================================
                 // PÚBLICO — Reserva online y consulta de disponibilidad
