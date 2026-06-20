@@ -73,7 +73,8 @@ public class ReservaMapper {
 
     public ReservaResponse toResponse(Reserva entity,
                                       List<ReservaHabitacion> habitaciones,
-                                      List<DetalleHuesped> huespedes) {
+                                      List<DetalleHuesped> huespedes,
+                                      Integer estanciaId) {
         Usuario u = entity.getUsuario();
         Canal c = entity.getCanal();
 
@@ -103,6 +104,7 @@ public class ReservaMapper {
                 u != null ? buildNombreCompleto(u) : null,
                 c != null ? c.getCanalId() : null,
                 c != null ? c.getNombre() : null,
+                estanciaId,
                 habResp,
                 huespResp,
                 entity.getFechaCreacion(),
@@ -110,9 +112,15 @@ public class ReservaMapper {
         );
     }
 
+    public ReservaResponse toResponse(Reserva entity,
+                                      List<ReservaHabitacion> habitaciones,
+                                      List<DetalleHuesped> huespedes) {
+        return toResponse(entity, habitaciones, huespedes, null);
+    }
+
     /** Versión resumida para search/paginación: sin cargar listas anidadas. */
     public ReservaResponse toResponse(Reserva entity) {
-        return toResponse(entity, null, null);
+        return toResponse(entity, null, null, null);
     }
 
     private BigDecimal calcularMontoTotal(BigDecimal subtotal, BigDecimal descuento, BigDecimal impuesto) {
