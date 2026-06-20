@@ -85,7 +85,7 @@ app:
 
   reniec:
     api-url: ${RENIEC_API_URL:https://dniruc.apisperu.com/api/v1/dni}
-    token: ${RENIEC_TOKEN:}
+    token: ${RENIEC_TOKEN:eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImFydGh1cjEyM2JtYkBnbWFpbC5jb20ifQ.FwX1j9OtB1qcTMSSJBK8XwUOuxNeOMSfACaqU_iUX_I}
     enabled: ${RENIEC_ENABLED:true}
 
   reserva:
