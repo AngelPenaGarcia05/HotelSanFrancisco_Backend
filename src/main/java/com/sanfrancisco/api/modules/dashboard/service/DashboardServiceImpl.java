@@ -3,6 +3,8 @@ package com.sanfrancisco.api.modules.dashboard.service;
 import com.sanfrancisco.api.config.security.Permissions;
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
 import com.sanfrancisco.api.modules.auditoria.dto.request.AuditoriaFilterRequest;
+import com.sanfrancisco.api.modules.solicitudes.enums.EstadoSolicitud;
+import com.sanfrancisco.api.modules.solicitudes.repository.SolicitudRepository;
 import com.sanfrancisco.api.modules.auditoria.enums.ResultadoAuditoria;
 import com.sanfrancisco.api.modules.auditoria.repository.RegistroAuditoriaRepository;
 import com.sanfrancisco.api.modules.auditoria.specification.RegistroAuditoriaSpecification;
@@ -56,6 +58,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final IncidenciaRepository incidenciaRepository;
     private final RegistroAuditoriaRepository registroAuditoriaRepository;
     private final ReportService reportService;
+    private final SolicitudRepository solicitudRepository;
 
     public DashboardServiceImpl(UsuarioRepository usuarioRepository,
                                 ReservaRepository reservaRepository,
@@ -64,7 +67,8 @@ public class DashboardServiceImpl implements DashboardService {
                                 ProductoRepository productoRepository,
                                 IncidenciaRepository incidenciaRepository,
                                 RegistroAuditoriaRepository registroAuditoriaRepository,
-                                ReportService reportService) {
+                                ReportService reportService,
+                                SolicitudRepository solicitudRepository) {
         this.usuarioRepository = usuarioRepository;
         this.reservaRepository = reservaRepository;
         this.habitacionRepository = habitacionRepository;
@@ -73,6 +77,7 @@ public class DashboardServiceImpl implements DashboardService {
         this.incidenciaRepository = incidenciaRepository;
         this.registroAuditoriaRepository = registroAuditoriaRepository;
         this.reportService = reportService;
+        this.solicitudRepository = solicitudRepository;
     }
 
     @Override
@@ -105,7 +110,8 @@ public class DashboardServiceImpl implements DashboardService {
                 permisos.contains(Permissions.PRODUCTO_READ) ? buildInventario() : null,
                 permisos.contains(Permissions.INCIDENCIA_READ) ? buildIncidencias() : null,
                 permisos.contains(Permissions.USUARIO_READ) ? buildUsuarios() : null,
-                permisos.contains(Permissions.AUDITORIA_READ) ? buildAuditoria(hoy) : null
+                permisos.contains(Permissions.AUDITORIA_READ) ? buildAuditoria(hoy) : null,
+                permisos.contains(Permissions.SOLICITUD_READ) ? buildSolicitudes() : null
         );
     }
 
@@ -218,6 +224,14 @@ public class DashboardServiceImpl implements DashboardService {
                 RegistroAuditoriaSpecification.build(
                         new AuditoriaFilterRequest(null, null, null, null, ResultadoAuditoria.ERROR, hoy, hoy)));
         return new DashboardResponse.AuditoriaCard(accionesHoy, erroresHoy);
+    }
+
+    private DashboardResponse.SolicitudesCard buildSolicitudes() {
+        long total = solicitudRepository.count();
+        long pendientes = solicitudRepository.countByEstado(EstadoSolicitud.REGISTRADA);
+        long enEvaluacion = solicitudRepository.countByEstado(EstadoSolicitud.EN_EVALUACION);
+        long cerradas = solicitudRepository.countByEstado(EstadoSolicitud.CERRADA);
+        return new DashboardResponse.SolicitudesCard(total, pendientes, enEvaluacion, cerradas);
     }
 
     // =====================================================================

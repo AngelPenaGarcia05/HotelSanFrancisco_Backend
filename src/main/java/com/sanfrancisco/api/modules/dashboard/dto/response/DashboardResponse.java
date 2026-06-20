@@ -22,7 +22,8 @@ public record DashboardResponse(
         InventarioCard inventario,
         IncidenciasCard incidencias,
         UsuariosCard usuarios,
-        AuditoriaCard auditoria
+        AuditoriaCard auditoria,
+        SolicitudesCard solicitudes
 ) {
 
     /** Información del usuario autenticado (siempre presente). */
@@ -91,5 +92,13 @@ public record DashboardResponse(
     public record AuditoriaCard(
             long accionesHoy,
             long erroresHoy
+    ) {}
+
+    /** solicitud:read — pendientes = REGISTRADA + EN_EVALUACION */
+    public record SolicitudesCard(
+            long total,
+            long pendientes,
+            long enEvaluacion,
+            long cerradas
     ) {}
 }
