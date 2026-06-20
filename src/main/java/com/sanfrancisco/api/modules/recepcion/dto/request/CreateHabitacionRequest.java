@@ -17,6 +17,8 @@ public record CreateHabitacionRequest(
         @NotNull
         EstadoHabitacion estado,
 
+        Integer tipoHabitacionId,
+
         String descripcion,
 
         String observaciones

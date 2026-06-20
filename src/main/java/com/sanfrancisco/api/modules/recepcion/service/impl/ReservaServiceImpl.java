@@ -240,9 +240,27 @@ public class ReservaServiceImpl implements ReservaService {
     @Override
     @Transactional(readOnly = true)
     public Page<ReservaResponse> search(ReservaFilterRequest filter, Pageable pageable) {
-        // Versión resumida sin listas anidadas para evitar N+1 en paginación
-        return reservaRepository.findAll(ReservaSpecification.build(filter), pageable)
-                .map(reservaMapper::toResponse);
+        Page<Reserva> page = reservaRepository.findAll(ReservaSpecification.build(filter), pageable);
+
+        List<Integer> ids = page.stream().map(Reserva::getReservaId).toList();
+        if (ids.isEmpty()) return page.map(reservaMapper::toResponse);
+
+        // Batch: 2 queries extra en total, no N×2
+        Map<Integer, List<ReservaHabitacion>> habPorReserva =
+                reservaHabitacionRepository.findByReservaReservaIdIn(ids)
+                        .stream()
+                        .collect(Collectors.groupingBy(rh -> rh.getReserva().getReservaId()));
+
+        Map<Integer, List<DetalleHuesped>> huesPorReserva =
+                detalleHuespedRepository.findByIdReservaIdIn(ids)
+                        .stream()
+                        .collect(Collectors.groupingBy(dh -> dh.getId().getReservaId()));
+
+        return page.map(r -> reservaMapper.toResponse(
+                r,
+                habPorReserva.getOrDefault(r.getReservaId(), Collections.emptyList()),
+                huesPorReserva.getOrDefault(r.getReservaId(), Collections.emptyList())
+        ));
     }
 
     @Override
