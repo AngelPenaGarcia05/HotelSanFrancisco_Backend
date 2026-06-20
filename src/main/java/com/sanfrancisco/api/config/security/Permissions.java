@@ -219,4 +219,16 @@ public final class Permissions {
     // AUDITORÍA
     // =========================================================================
     public static final String AUDITORIA_READ = "auditoria:read";
+
+    // =========================================================================
+    // SOLICITUDES DE SERVICIO
+    // =========================================================================
+    public static final String SOLICITUD_CREATE        = "solicitud:create";
+    public static final String SOLICITUD_READ          = "solicitud:read";
+    public static final String SOLICITUD_READ_ALL      = "solicitud:read-all";
+    public static final String SOLICITUD_UPDATE        = "solicitud:update";
+    public static final String SOLICITUD_ASSIGN        = "solicitud:assign";
+    public static final String SOLICITUD_CHANGE_STATUS = "solicitud:change-status";
+    public static final String SOLICITUD_REPORT        = "solicitud:report";
+    public static final String SOLICITUD_DELETE        = "solicitud:delete";
 }
