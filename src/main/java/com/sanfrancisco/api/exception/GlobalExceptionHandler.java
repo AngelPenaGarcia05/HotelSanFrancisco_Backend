@@ -1,5 +1,7 @@
 package com.sanfrancisco.api.exception;
 
+import com.sanfrancisco.api.modules.seguridad.exception.SesionExpiradaException;
+import com.sanfrancisco.api.modules.seguridad.exception.UsuarioInactivoException;
 import com.sanfrancisco.api.shared.api.ErrorResponse;
 import com.sanfrancisco.api.shared.exception.ConflictException;
 import com.sanfrancisco.api.shared.exception.ValidationException;
@@ -30,6 +32,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex, HttpServletRequest req) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ErrorResponse.of("RESOURCE_NOT_FOUND", ex.getMessage(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler(SesionExpiradaException.class)
+    public ResponseEntity<ErrorResponse> handleSesionExpirada(SesionExpiradaException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ErrorResponse.of("SESSION_EXPIRED", ex.getMessage(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler(UsuarioInactivoException.class)
+    public ResponseEntity<ErrorResponse> handleUsuarioInactivo(UsuarioInactivoException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ErrorResponse.of("USER_INACTIVE", ex.getMessage(), req.getRequestURI()));
     }
 
     @ExceptionHandler(BusinessException.class)
