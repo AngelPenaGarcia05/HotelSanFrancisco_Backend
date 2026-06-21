@@ -54,4 +54,16 @@ public interface ReservaHabitacionRepository extends JpaRepository<ReservaHabita
             @Param("fechaFin") LocalDate fechaFin,
             @Param("estadosLibera") Collection<EstadoReserva> estadosLibera,
             @Param("excluirReservaId") Integer excluirReservaId);
+
+    /** Todas las asignaciones cuya reserva se solapa con el rango dado (para el calendario). */
+    @Query("""
+            SELECT rh FROM ReservaHabitacion rh
+            WHERE rh.reserva.estado NOT IN :estadosExcluir
+              AND rh.reserva.fechaInicio < :fechaFin
+              AND rh.reserva.fechaFin    > :fechaInicio
+            """)
+    List<ReservaHabitacion> findEnRango(
+            @Param("fechaInicio") LocalDate fechaInicio,
+            @Param("fechaFin") LocalDate fechaFin,
+            @Param("estadosExcluir") Collection<EstadoReserva> estadosExcluir);
 }

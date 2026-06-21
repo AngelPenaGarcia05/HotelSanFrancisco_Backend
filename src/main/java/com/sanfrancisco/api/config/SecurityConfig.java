@@ -218,13 +218,18 @@ public class SecurityConfig {
                     .hasAuthority(Permissions.METODO_PAGO_DELETE)
 
                 // =============================================================
-                // NOTIFICACIONES Y REPORTES
-                // Solo requieren sesión autenticada (sin permiso granular específico
-                // todavía); cualquier usuario logueado del panel administrativo puede
-                // consultarlos y operarlos.
+                // NOTIFICACIONES — Configuración SMTP, plantillas, log de envíos.
+                // Requiere usuario:read (ADMIN, RRHH). Clientes excluidos.
                 // =============================================================
-                .requestMatchers(EndpointPaths.NOTIFICACIONES_BASE + "/**").authenticated()
-                .requestMatchers(EndpointPaths.REPORTES_BASE + "/**").authenticated()
+                .requestMatchers(EndpointPaths.NOTIFICACIONES_BASE + "/**")
+                    .hasAuthority(Permissions.USUARIO_READ)
+
+                // =============================================================
+                // REPORTES — Ingresos, reservas, ocupación, dashboard gerencial.
+                // Requiere pago:read (ADMIN, RECEPCIÓN, CAJA). Clientes excluidos.
+                // =============================================================
+                .requestMatchers(EndpointPaths.REPORTES_BASE + "/**")
+                    .hasAuthority(Permissions.PAGO_READ)
 
                 // =============================================================
                 // VENTAS
