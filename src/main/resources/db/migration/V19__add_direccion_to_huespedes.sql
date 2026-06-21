@@ -1,0 +1,1 @@
+ALTER TABLE huespedes ADD COLUMN direccion VARCHAR(200);

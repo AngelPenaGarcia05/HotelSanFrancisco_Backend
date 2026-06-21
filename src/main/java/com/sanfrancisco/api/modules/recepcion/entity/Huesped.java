@@ -53,6 +53,10 @@ public class Huesped extends AuditedEntity {
     @Column(name = "telefono", length = 20)
     private String telefono;
 
+    @Size(max = 200)
+    @Column(name = "direccion", length = 200)
+    private String direccion;
+
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "estado", nullable = false, length = 10)
