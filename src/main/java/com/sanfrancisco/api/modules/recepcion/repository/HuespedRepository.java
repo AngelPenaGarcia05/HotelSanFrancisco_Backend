@@ -15,6 +15,8 @@ public interface HuespedRepository extends JpaRepository<Huesped, Integer>,
 
     Optional<Huesped> findByNumeroDocumento(String numeroDocumento);
 
+    Optional<Huesped> findByUsuarioUsuarioId(Integer usuarioId);
+
     List<Huesped> findByEstado(EstadoActivo estado);
 
     List<Huesped> findByApellidoPaternoContainingIgnoreCaseOrNombreContainingIgnoreCase(
