@@ -8,11 +8,9 @@ import com.sanfrancisco.api.modules.notificaciones.entity.LogCorreo;
 import com.sanfrancisco.api.modules.notificaciones.entity.PlantillaCorreo;
 import com.sanfrancisco.api.modules.notificaciones.entity.RecordatorioConfig;
 import com.sanfrancisco.api.modules.notificaciones.entity.SmtpConfig;
-import com.sanfrancisco.api.modules.notificaciones.enums.EmailTemplateKey;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -21,14 +19,7 @@ public class NotificationMapper {
 
     private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\{\\{(\\w+)}}");
 
-    private static final Map<EmailTemplateKey, String> NOMBRES = Map.of(
-            EmailTemplateKey.RESERVATION_CONFIRMATION, "Confirmación de reserva",
-            EmailTemplateKey.PAYMENT_CONFIRMATION, "Confirmación de pago",
-            EmailTemplateKey.RESERVATION_CANCELLATION, "Cancelación de reserva",
-            EmailTemplateKey.STAY_REMINDER, "Recordatorio de estadía"
-    );
-
-    public SmtpConfigResponse toResponse(SmtpConfig entity) {
+public SmtpConfigResponse toResponse(SmtpConfig entity) {
         return new SmtpConfigResponse(
                 entity.getHost(),
                 entity.getPuerto(),

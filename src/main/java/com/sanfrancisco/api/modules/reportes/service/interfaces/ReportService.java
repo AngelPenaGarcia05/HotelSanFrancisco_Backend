@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.reportes.service.interfaces;
 
+import com.sanfrancisco.api.modules.reportes.dto.request.ExportReporteRequest;
 import com.sanfrancisco.api.modules.reportes.dto.request.ReportRangeRequest;
 import com.sanfrancisco.api.modules.reportes.dto.response.ManagementDashboardResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.OccupancyReportResponse;
@@ -15,4 +16,6 @@ public interface ReportService {
     OccupancyReportResponse buildOccupancyReport(ReportRangeRequest range);
 
     ManagementDashboardResponse buildManagementDashboard(ReportRangeRequest range);
+
+    byte[] exportar(ExportReporteRequest request);
 }

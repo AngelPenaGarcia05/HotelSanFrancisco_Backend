@@ -6,7 +6,7 @@ import com.sanfrancisco.api.modules.recepcion.dto.request.MisReservasCreateReque
 import com.sanfrancisco.api.modules.recepcion.dto.response.CancelacionResponse;
 import com.sanfrancisco.api.modules.recepcion.dto.response.ReservaResponse;
 import com.sanfrancisco.api.modules.recepcion.service.interfaces.ReservaService;
-import com.sanfrancisco.api.modules.seguridad.security.CustomUserDetails;
+import com.sanfrancisco.api.modules.seguridad.security.UserPrincipal;
 import com.sanfrancisco.api.shared.api.ApiResponse;
 import com.sanfrancisco.api.shared.api.PageResponse;
 import jakarta.validation.Valid;
@@ -30,34 +30,33 @@ public class MisReservasController {
 
     @GetMapping
     public ApiResponse<PageResponse<ReservaResponse>> listarMisReservas(
-            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
             Pageable pageable) {
         return ApiResponse.ok(
-                PageResponse.from(reservaService.findByUsuarioId(userDetails.getUserId(), pageable))
+                PageResponse.from(reservaService.findByUsuarioId(userPrincipal.userId(), pageable))
         );
     }
 
     @PostMapping
     public ResponseEntity<ApiResponse<ReservaResponse>> crear(
-            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
             @Valid @RequestBody MisReservasCreateRequest request) {
 
-        // Construir el request completo forzando el usuarioId del token
         CreateReservaRequest fullRequest = new CreateReservaRequest(
                 request.codReserva(),
                 request.fechaInicio(),
                 request.fechaFin(),
                 request.nroAdultos(),
                 request.nroNinos(),
-                BigDecimal.ZERO,                                                 // descuento = 0 para clientes
+                BigDecimal.ZERO,
                 request.adelanto() != null ? request.adelanto() : BigDecimal.ZERO,
-                BigDecimal.ZERO,                                                 // impuesto = 0 para clientes
+                BigDecimal.ZERO,
                 request.observaciones(),
-                userDetails.getUserId(),                                         // forzado desde JWT
-                null,                                                            // canalId = directo
+                userPrincipal.userId(),
+                null,
                 request.habitaciones(),
                 request.huespedes(),
-                false                                                            // forzar = false
+                false
         );
 
         ReservaResponse response = reservaService.create(fullRequest);
@@ -67,12 +66,12 @@ public class MisReservasController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<CancelacionResponse>> cancelar(
-            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
             @PathVariable Integer id,
             @Valid @RequestBody CancelarReservaRequest request) {
 
         CancelacionResponse response = reservaService.cancelarPropiaReserva(
-                id, userDetails.getUserId(), request);
+                id, userPrincipal.userId(), request);
         return ResponseEntity.ok(ApiResponse.ok(response, "Reserva cancelada exitosamente"));
     }
 }

@@ -4,16 +4,19 @@ import com.sanfrancisco.api.modules.recepcion.dto.request.CheckInRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CheckOutRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CreateHabitacionRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.UpdateHabitacionRequest;
+import com.sanfrancisco.api.modules.recepcion.dto.response.CalendarioHabitacionResponse;
 import com.sanfrancisco.api.modules.recepcion.dto.response.CheckOutLiquidacionResponse;
 import com.sanfrancisco.api.modules.recepcion.dto.response.HabitacionResponse;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoHabitacion;
 import com.sanfrancisco.api.modules.recepcion.service.interfaces.HabitacionService;
 import com.sanfrancisco.api.shared.api.ApiResponse;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -97,5 +100,16 @@ public class HabitacionController {
     @PatchMapping("/{id}/limpieza-completada")
     public ApiResponse<HabitacionResponse> limpiezaCompletada(@PathVariable Integer id) {
         return ApiResponse.ok(service.registrarLimpiezaCompletada(id), "Habitación disponible");
+    }
+
+    /**
+     * Vista calendario: devuelve todas las habitaciones con las reservas activas
+     * que se solapan con el rango [fechaInicio, fechaFin).
+     */
+    @GetMapping("/calendario")
+    public ApiResponse<List<CalendarioHabitacionResponse>> calendario(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaInicio,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin) {
+        return ApiResponse.ok(service.getCalendario(fechaInicio, fechaFin));
     }
 }

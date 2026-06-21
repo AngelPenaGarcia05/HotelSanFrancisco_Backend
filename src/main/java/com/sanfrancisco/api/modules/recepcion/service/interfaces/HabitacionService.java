@@ -4,10 +4,12 @@ import com.sanfrancisco.api.modules.recepcion.dto.request.CheckInRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CheckOutRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CreateHabitacionRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.UpdateHabitacionRequest;
+import com.sanfrancisco.api.modules.recepcion.dto.response.CalendarioHabitacionResponse;
 import com.sanfrancisco.api.modules.recepcion.dto.response.CheckOutLiquidacionResponse;
 import com.sanfrancisco.api.modules.recepcion.dto.response.HabitacionResponse;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoHabitacion;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface HabitacionService {
@@ -38,4 +40,7 @@ public interface HabitacionService {
 
     /** Marca una habitación en LIMPIEZA como DISPONIBLE. */
     HabitacionResponse registrarLimpiezaCompletada(Integer habitacionId);
+
+    /** Vista calendario: todas las habitaciones con sus reservas solapadas en el rango. */
+    List<CalendarioHabitacionResponse> getCalendario(LocalDate fechaInicio, LocalDate fechaFin);
 }

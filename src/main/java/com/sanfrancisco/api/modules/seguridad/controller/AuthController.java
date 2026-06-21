@@ -5,7 +5,9 @@ import com.sanfrancisco.api.modules.seguridad.dto.request.ForgotPasswordRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.LoginRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.RegisterRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.ResetPasswordRequest;
+import com.sanfrancisco.api.modules.seguridad.dto.request.UpdatePerfilRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.response.AuthUserResponse;
+import com.sanfrancisco.api.modules.seguridad.dto.response.DashboardClienteResponse;
 import com.sanfrancisco.api.modules.seguridad.dto.response.LoginResponse;
 import com.sanfrancisco.api.modules.seguridad.dto.response.PublicTipoDocumentoResponse;
 import com.sanfrancisco.api.modules.seguridad.dto.response.ReniecConsultaResponse;
@@ -125,6 +127,16 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
+    @Operation(summary = "Actualizar perfil",
+            description = "Actualiza los campos editables del perfil del usuario autenticado (teléfono, dirección, nacionalidad). Solo se actualizan los campos presentes en el request.")
+    @PatchMapping("/me")
+    public ResponseEntity<ApiResponse<AuthUserResponse>> updateMe(
+            @Valid @RequestBody UpdatePerfilRequest request
+    ) {
+        AuthUserResponse response = authenticationService.updateCurrentUser(request);
+        return ResponseEntity.ok(ApiResponse.ok(response, "Perfil actualizado correctamente"));
+    }
+
     @Operation(summary = "Cambiar contraseña",
             description = "Cambia la contraseña del usuario autenticado (requiere la contraseña actual) "
                     + "e invalida todas sus sesiones activas.")
@@ -157,5 +169,12 @@ public class AuthController {
     ) {
         authenticationService.resetPassword(request);
         return ResponseEntity.ok(ApiResponse.message("Contraseña restablecida exitosamente. Ya puedes iniciar sesión."));
+    }
+
+    @Operation(summary = "Dashboard del cliente",
+            description = "Devuelve un resumen de reservas, saldo pendiente, próxima estadía y reserva activa del usuario autenticado.")
+    @GetMapping("/me/dashboard")
+    public ResponseEntity<ApiResponse<DashboardClienteResponse>> dashboard() {
+        return ResponseEntity.ok(ApiResponse.ok(authenticationService.getDashboard()));
     }
 }

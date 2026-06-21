@@ -9,6 +9,7 @@ import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
 import com.sanfrancisco.api.modules.recepcion.repository.HabitacionRepository;
 import com.sanfrancisco.api.modules.recepcion.repository.ReservaHabitacionRepository;
 import com.sanfrancisco.api.modules.recepcion.repository.ReservaRepository;
+import com.sanfrancisco.api.modules.reportes.dto.request.ExportReporteRequest;
 import com.sanfrancisco.api.modules.reportes.dto.request.ReportRangeRequest;
 import com.sanfrancisco.api.modules.reportes.dto.response.ManagementDashboardResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.OccupancyReportResponse;
@@ -24,6 +25,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -290,6 +292,139 @@ public class ReportServiceImpl implements ReportService {
 
         return new ManagementDashboardResponse(
                 LocalDateTime.now(), kpis, ingresosMesActual, reservasMesActual, ocupacionMesActual);
+    }
+
+    // =====================================================================
+    // EXPORTAR CSV
+    // =====================================================================
+
+    @Override
+    public byte[] exportar(ExportReporteRequest request) {
+        ReportRangeRequest range = request.toRangeRequest();
+        String csv = switch (request.tipo() == null ? "" : request.tipo().toLowerCase()) {
+            case "ingresos" -> buildIngresosCSV(buildRevenueReport(range));
+            case "reservas" -> buildReservasCSV(buildReservationsReport(range));
+            case "ocupacion" -> buildOcupacionCSV(buildOccupancyReport(range));
+            case "gerencial" -> buildGerencialCSV(buildManagementDashboard(range));
+            default -> throw new IllegalArgumentException("Tipo de reporte no válido: " + request.tipo());
+        };
+        return csv.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private String buildIngresosCSV(RevenueReportResponse r) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("# REPORTE DE INGRESOS\n");
+        sb.append("total_ingresos,total_anticipos,total_saldos,total_reembolsos,ingreso_promedio_diario\n");
+        sb.append(r.totalIngresos()).append(',')
+          .append(r.totalAnticipos()).append(',')
+          .append(r.totalSaldos()).append(',')
+          .append(r.totalReembolsos()).append(',')
+          .append(r.ingresoPromedioDiario()).append('\n');
+        sb.append('\n');
+        sb.append("# SERIE DIARIA\n");
+        sb.append("fecha,anticipos,saldos,reembolsos\n");
+        for (RevenueReportResponse.RevenuePoint p : r.serie()) {
+            sb.append(p.fecha()).append(',')
+              .append(p.ingresosAnticipos()).append(',')
+              .append(p.ingresosSaldos()).append(',')
+              .append(p.reembolsos()).append('\n');
+        }
+        sb.append('\n');
+        sb.append("# POR MÉTODO DE PAGO\n");
+        sb.append("metodo_pago,monto,porcentaje\n");
+        for (RevenueReportResponse.RevenueByMethod m : r.porMetodoPago()) {
+            sb.append(escape(m.metodoPago())).append(',')
+              .append(m.monto()).append(',')
+              .append(m.porcentaje()).append('\n');
+        }
+        return sb.toString();
+    }
+
+    private String buildReservasCSV(ReservationsReportResponse r) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("# REPORTE DE RESERVAS\n");
+        sb.append("total_reservas,total_canceladas,tasa_cancelacion,estancia_promedio_noches\n");
+        sb.append(r.totalReservas()).append(',')
+          .append(r.totalCanceladas()).append(',')
+          .append(r.tasaCancelacion()).append(',')
+          .append(r.estanciaPromedioNoches()).append('\n');
+        sb.append('\n');
+        sb.append("# SERIE DIARIA\n");
+        sb.append("fecha,nuevas,canceladas,check_ins,check_outs\n");
+        for (ReservationsReportResponse.ReservationsPoint p : r.serie()) {
+            sb.append(p.fecha()).append(',')
+              .append(p.nuevas()).append(',')
+              .append(p.canceladas()).append(',')
+              .append(p.checkIns()).append(',')
+              .append(p.checkOuts()).append('\n');
+        }
+        sb.append('\n');
+        sb.append("# POR ESTADO\n");
+        sb.append("estado,cantidad,porcentaje\n");
+        for (ReservationsReportResponse.ReservationsByStatus s : r.porEstado()) {
+            sb.append(escape(s.estado())).append(',')
+              .append(s.cantidad()).append(',')
+              .append(s.porcentaje()).append('\n');
+        }
+        return sb.toString();
+    }
+
+    private String buildOcupacionCSV(OccupancyReportResponse r) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("# REPORTE DE OCUPACIÓN\n");
+        sb.append("ocupacion_promedio,adr_promedio,revpar_promedio\n");
+        sb.append(r.ocupacionPromedio()).append(',')
+          .append(r.adrPromedio()).append(',')
+          .append(r.revparPromedio()).append('\n');
+        sb.append('\n');
+        sb.append("# SERIE DIARIA\n");
+        sb.append("fecha,habitaciones_total,habitaciones_ocupadas,porcentaje_ocupacion\n");
+        for (OccupancyReportResponse.OccupancyPoint p : r.serie()) {
+            sb.append(p.fecha()).append(',')
+              .append(p.habitacionesTotal()).append(',')
+              .append(p.habitacionesOcupadas()).append(',')
+              .append(p.porcentajeOcupacion()).append('\n');
+        }
+        sb.append('\n');
+        sb.append("# POR TIPO DE HABITACIÓN\n");
+        sb.append("tipo_habitacion,habitaciones_total,noches_disponibles,noches_ocupadas,porcentaje_ocupacion,adr,revpar\n");
+        for (OccupancyReportResponse.OccupancyByRoomType t : r.porTipoHabitacion()) {
+            sb.append(escape(t.tipoHabitacion())).append(',')
+              .append(t.habitacionesTotal()).append(',')
+              .append(t.nochesDisponibles()).append(',')
+              .append(t.nochesOcupadas()).append(',')
+              .append(t.porcentajeOcupacion()).append(',')
+              .append(t.adr()).append(',')
+              .append(t.revpar()).append('\n');
+        }
+        return sb.toString();
+    }
+
+    private String buildGerencialCSV(ManagementDashboardResponse r) {
+        ManagementDashboardResponse.ManagementKpis k = r.kpis();
+        StringBuilder sb = new StringBuilder();
+        sb.append("# DASHBOARD GERENCIAL\n");
+        sb.append("indicador,valor\n");
+        sb.append("ingresos_mes_actual,").append(k.ingresosMesActual()).append('\n');
+        sb.append("ingresos_mes_anterior,").append(k.ingresosMesAnterior()).append('\n');
+        sb.append("variacion_ingresos_%,").append(k.variacionIngresos()).append('\n');
+        sb.append("ocupacion_actual_%,").append(k.ocupacionActual()).append('\n');
+        sb.append("ocupacion_mes_anterior_%,").append(k.ocupacionMesAnterior()).append('\n');
+        sb.append("variacion_ocupacion_%,").append(k.variacionOcupacion()).append('\n');
+        sb.append("reservas_activas,").append(k.reservasActivas()).append('\n');
+        sb.append("reservas_pendientes_pago,").append(k.reservasPendientesPago()).append('\n');
+        sb.append("adr_actual,").append(k.adrActual()).append('\n');
+        sb.append("revpar_actual,").append(k.revparActual()).append('\n');
+        sb.append("cancelaciones_mes,").append(k.cancelacionesMes()).append('\n');
+        return sb.toString();
+    }
+
+    private String escape(String value) {
+        if (value == null) return "";
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 
     // =====================================================================

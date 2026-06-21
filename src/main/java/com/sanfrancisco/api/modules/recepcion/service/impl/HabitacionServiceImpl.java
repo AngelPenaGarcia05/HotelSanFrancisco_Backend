@@ -6,6 +6,7 @@ import com.sanfrancisco.api.modules.recepcion.dto.request.CheckInRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CheckOutRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CreateHabitacionRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.UpdateHabitacionRequest;
+import com.sanfrancisco.api.modules.recepcion.dto.response.CalendarioHabitacionResponse;
 import com.sanfrancisco.api.modules.recepcion.dto.response.CheckOutLiquidacionResponse;
 import com.sanfrancisco.api.modules.recepcion.dto.response.HabitacionResponse;
 import com.sanfrancisco.api.modules.recepcion.entity.Estancia;
@@ -34,9 +35,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -358,6 +363,53 @@ public class HabitacionServiceImpl implements HabitacionService {
     private Habitacion obtenerOFallar(Integer habitacionId) {
         return habitacionRepository.findById(habitacionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Habitación no encontrada: " + habitacionId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CalendarioHabitacionResponse> getCalendario(LocalDate fechaInicio, LocalDate fechaFin) {
+        List<EstadoReserva> excluidos = List.of(EstadoReserva.CANCELADA, EstadoReserva.NO_SHOW);
+
+        Map<Integer, List<ReservaHabitacion>> porHabitacion = reservaHabitacionRepository
+                .findEnRango(fechaInicio, fechaFin, excluidos)
+                .stream()
+                .collect(Collectors.groupingBy(rh -> rh.getHabitacion().getHabitacionId()));
+
+        return habitacionRepository.findAll().stream()
+                .sorted(Comparator.comparing(Habitacion::getNumero))
+                .map(hab -> {
+                    List<CalendarioHabitacionResponse.CalendarioReservaItem> reservas =
+                            porHabitacion.getOrDefault(hab.getHabitacionId(), List.of())
+                                    .stream()
+                                    .map(rh -> {
+                                        Reserva res = rh.getReserva();
+                                        Usuario u = res.getUsuario();
+                                        String nombreHuesped = (u.getNombre() + " " + u.getApellidoPaterno()).trim();
+                                        return new CalendarioHabitacionResponse.CalendarioReservaItem(
+                                                res.getReservaId(),
+                                                res.getCodReserva(),
+                                                nombreHuesped,
+                                                res.getFechaInicio(),
+                                                res.getFechaFin(),
+                                                res.getEstado()
+                                        );
+                                    })
+                                    .sorted(Comparator.comparing(
+                                            CalendarioHabitacionResponse.CalendarioReservaItem::fechaInicio))
+                                    .toList();
+
+                    TipoHabitacion tipo = hab.getTipoHabitacion();
+                    return new CalendarioHabitacionResponse(
+                            hab.getHabitacionId(),
+                            hab.getNumero(),
+                            hab.getPiso(),
+                            tipo != null ? tipo.getNombre() : null,
+                            tipo != null ? tipo.getPrecioBase() : null,
+                            hab.getEstado(),
+                            reservas
+                    );
+                })
+                .toList();
     }
 
     private void registrarHistorial(Reserva reserva, EstadoReserva anterior, EstadoReserva nuevo, String motivo) {

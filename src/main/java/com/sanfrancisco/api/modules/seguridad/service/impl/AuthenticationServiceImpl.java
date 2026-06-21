@@ -4,13 +4,18 @@ import com.sanfrancisco.api.exception.BusinessException;
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
 import com.sanfrancisco.api.modules.notificaciones.service.interfaces.NotificationService;
 import com.sanfrancisco.api.modules.recepcion.entity.Huesped;
+import com.sanfrancisco.api.modules.recepcion.entity.Reserva;
+import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
 import com.sanfrancisco.api.modules.recepcion.repository.HuespedRepository;
+import com.sanfrancisco.api.modules.recepcion.repository.ReservaRepository;
 import com.sanfrancisco.api.modules.seguridad.dto.request.ChangePasswordRequest;
+import com.sanfrancisco.api.modules.seguridad.dto.request.UpdatePerfilRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.ForgotPasswordRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.LoginRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.RegisterRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.ResetPasswordRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.response.AuthUserResponse;
+import com.sanfrancisco.api.modules.seguridad.dto.response.DashboardClienteResponse;
 import com.sanfrancisco.api.modules.seguridad.dto.response.LoginResponse;
 import com.sanfrancisco.api.modules.seguridad.dto.response.PublicTipoDocumentoResponse;
 import com.sanfrancisco.api.modules.seguridad.entity.Rol;
@@ -54,8 +59,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
@@ -85,6 +93,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final TokenRecuperacionRepository tokenRecuperacionRepository;
     private final NotificationService notificationService;
     private final ReniecService reniecService;
+    private final ReservaRepository reservaRepository;
 
     public AuthenticationServiceImpl(CustomUserDetailsService userDetailsService,
                                      PasswordEncoder passwordEncoder,
@@ -98,7 +107,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                                      DetalleRolRepository detalleRolRepository,
                                      TokenRecuperacionRepository tokenRecuperacionRepository,
                                      NotificationService notificationService,
-                                     ReniecService reniecService) {
+                                     ReniecService reniecService,
+                                     ReservaRepository reservaRepository) {
         this.userDetailsService = userDetailsService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -112,6 +122,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         this.tokenRecuperacionRepository = tokenRecuperacionRepository;
         this.notificationService = notificationService;
         this.reniecService = reniecService;
+        this.reservaRepository = reservaRepository;
     }
 
     @Override
@@ -192,6 +203,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 usuario.getCorreo(),
                 roleName,
                 permissions,
+                null,
+                null,
+                null,
                 null,
                 null
         );
@@ -304,6 +318,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 rolCliente.getNombre(),
                 permissions,
                 null,
+                null,
+                null,
+                null,
                 null
         );
 
@@ -406,6 +423,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 roleName,
                 permissions,
                 null,
+                null,
+                null,
+                null,
                 null
         );
 
@@ -492,12 +512,46 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     usuario.getCorreo(),
                     roleName,
                     permissions,
+                    usuario.getNumeroDocumento(),
+                    usuario.getTelefono(),
                     direccion,
-                    nacionalidad
+                    nacionalidad,
+                    usuario.getFechaCreacion()
             );
         }
 
         throw new BadCredentialsException("Principal no soportado");
+    }
+
+    @Override
+    @Transactional
+    public AuthUserResponse updateCurrentUser(UpdatePerfilRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UserPrincipal principal)) {
+            throw new BadCredentialsException("No autenticado");
+        }
+
+        Usuario usuario = usuarioRepository.findById(principal.userId())
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado: " + principal.userId()));
+
+        if (usuario.getEstado() != EstadoUsuario.ACTIVO) {
+            throw new UsuarioInactivoException("El usuario está inactivo o bloqueado.");
+        }
+
+        if (request.telefono() != null) {
+            usuario.setTelefono(request.telefono());
+            usuarioRepository.save(usuario);
+        }
+
+        if (request.direccion() != null || request.nacionalidad() != null) {
+            huespedRepository.findByUsuarioUsuarioId(usuario.getUsuarioId()).ifPresent(huesped -> {
+                if (request.direccion() != null) huesped.setDireccion(request.direccion());
+                if (request.nacionalidad() != null) huesped.setNacionalidad(request.nacionalidad());
+                huespedRepository.save(huesped);
+            });
+        }
+
+        return getCurrentUser();
     }
 
     @Override
@@ -619,6 +673,56 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             return httpRequest.getRemoteAddr();
         }
         return xfHeader.split(",")[0].trim();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DashboardClienteResponse getDashboard() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UserPrincipal principal)) {
+            throw new BadCredentialsException("No autenticado");
+        }
+
+        List<Reserva> reservas = reservaRepository.findByUsuarioUsuarioId(principal.userId());
+
+        long totalReservas = reservas.size();
+        long reservasCompletadas = reservas.stream()
+                .filter(r -> r.getEstado() == EstadoReserva.CHECK_OUT).count();
+        long reservasCanceladas = reservas.stream()
+                .filter(r -> r.getEstado() == EstadoReserva.CANCELADA).count();
+
+        BigDecimal saldoPendiente = reservas.stream()
+                .filter(r -> r.getEstado() != EstadoReserva.CANCELADA
+                          && r.getEstado() != EstadoReserva.NO_SHOW)
+                .map(r -> r.getMontoTotal().subtract(r.getAdelanto()))
+                .filter(saldo -> saldo.compareTo(BigDecimal.ZERO) > 0)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        LocalDate hoy = LocalDate.now();
+
+        DashboardClienteResponse.ReservaResumenItem proximaReserva = reservas.stream()
+                .filter(r -> r.getEstado() == EstadoReserva.CONFIRMADA
+                          && !r.getFechaInicio().isBefore(hoy))
+                .min(Comparator.comparing(Reserva::getFechaInicio))
+                .map(AuthenticationServiceImpl::toResumenItem)
+                .orElse(null);
+
+        DashboardClienteResponse.ReservaResumenItem reservaActiva = reservas.stream()
+                .filter(r -> r.getEstado() == EstadoReserva.CHECK_IN)
+                .findFirst()
+                .map(AuthenticationServiceImpl::toResumenItem)
+                .orElse(null);
+
+        return new DashboardClienteResponse(
+                totalReservas, reservasCompletadas, reservasCanceladas,
+                saldoPendiente, proximaReserva, reservaActiva);
+    }
+
+    private static DashboardClienteResponse.ReservaResumenItem toResumenItem(Reserva r) {
+        return new DashboardClienteResponse.ReservaResumenItem(
+                r.getReservaId(), r.getCodReserva(),
+                r.getFechaInicio(), r.getFechaFin(),
+                r.getEstado(), r.getMontoTotal(), r.getAdelanto());
     }
 
     private String hashSha256(String data) {
