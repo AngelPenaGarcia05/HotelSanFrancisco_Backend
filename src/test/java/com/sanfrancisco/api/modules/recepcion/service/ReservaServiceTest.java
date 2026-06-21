@@ -142,6 +142,7 @@ class ReservaServiceTest {
                 2, 0, new BigDecimal("300.00"), BigDecimal.ZERO,
                 new BigDecimal("100.00"), BigDecimal.ZERO,
                 null, 1, "Juan Pérez", null, null,
+                null,
                 Collections.emptyList(), Collections.emptyList(),
                 null, null
         );

@@ -6,6 +6,7 @@ import com.sanfrancisco.api.modules.notificaciones.service.interfaces.Notificati
 import com.sanfrancisco.api.modules.recepcion.entity.Huesped;
 import com.sanfrancisco.api.modules.recepcion.repository.HuespedRepository;
 import com.sanfrancisco.api.modules.seguridad.dto.request.ChangePasswordRequest;
+import com.sanfrancisco.api.modules.seguridad.dto.request.UpdatePerfilRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.ForgotPasswordRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.LoginRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.RegisterRequest;
@@ -193,6 +194,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 roleName,
                 permissions,
                 null,
+                null,
+                null,
+                null,
                 null
         );
 
@@ -304,6 +308,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 rolCliente.getNombre(),
                 permissions,
                 null,
+                null,
+                null,
+                null,
                 null
         );
 
@@ -406,6 +413,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 roleName,
                 permissions,
                 null,
+                null,
+                null,
+                null,
                 null
         );
 
@@ -492,12 +502,46 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     usuario.getCorreo(),
                     roleName,
                     permissions,
+                    usuario.getNumeroDocumento(),
+                    usuario.getTelefono(),
                     direccion,
-                    nacionalidad
+                    nacionalidad,
+                    usuario.getFechaCreacion()
             );
         }
 
         throw new BadCredentialsException("Principal no soportado");
+    }
+
+    @Override
+    @Transactional
+    public AuthUserResponse updateCurrentUser(UpdatePerfilRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof UserPrincipal principal)) {
+            throw new BadCredentialsException("No autenticado");
+        }
+
+        Usuario usuario = usuarioRepository.findById(principal.userId())
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado: " + principal.userId()));
+
+        if (usuario.getEstado() != EstadoUsuario.ACTIVO) {
+            throw new UsuarioInactivoException("El usuario está inactivo o bloqueado.");
+        }
+
+        if (request.telefono() != null) {
+            usuario.setTelefono(request.telefono());
+            usuarioRepository.save(usuario);
+        }
+
+        if (request.direccion() != null || request.nacionalidad() != null) {
+            huespedRepository.findByUsuarioUsuarioId(usuario.getUsuarioId()).ifPresent(huesped -> {
+                if (request.direccion() != null) huesped.setDireccion(request.direccion());
+                if (request.nacionalidad() != null) huesped.setNacionalidad(request.nacionalidad());
+                huespedRepository.save(huesped);
+            });
+        }
+
+        return getCurrentUser();
     }
 
     @Override

@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.seguridad.dto.response;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public record AuthUserResponse(
@@ -11,6 +12,9 @@ public record AuthUserResponse(
         String correo,
         String rol,
         List<String> permisos,
+        String numeroDocumento,
+        String telefono,
         String direccion,
-        String nacionalidad
+        String nacionalidad,
+        LocalDateTime fechaCreacion
 ) {}

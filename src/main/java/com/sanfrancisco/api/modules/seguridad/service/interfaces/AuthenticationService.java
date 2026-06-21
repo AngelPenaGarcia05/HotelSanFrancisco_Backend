@@ -5,6 +5,7 @@ import com.sanfrancisco.api.modules.seguridad.dto.request.ForgotPasswordRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.LoginRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.RegisterRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.ResetPasswordRequest;
+import com.sanfrancisco.api.modules.seguridad.dto.request.UpdatePerfilRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.response.AuthUserResponse;
 import com.sanfrancisco.api.modules.seguridad.dto.response.LoginResponse;
 import com.sanfrancisco.api.modules.seguridad.dto.response.PublicTipoDocumentoResponse;
@@ -28,6 +29,8 @@ public interface AuthenticationService {
     void logoutAll(HttpServletRequest httpRequest, HttpServletResponse httpResponse);
 
     AuthUserResponse getCurrentUser();
+
+    AuthUserResponse updateCurrentUser(UpdatePerfilRequest request);
 
     void changePassword(ChangePasswordRequest request);
 
