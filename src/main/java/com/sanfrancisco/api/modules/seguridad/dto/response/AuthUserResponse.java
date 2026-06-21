@@ -10,5 +10,7 @@ public record AuthUserResponse(
         String nombreCompleto,
         String correo,
         String rol,
-        List<String> permisos
+        List<String> permisos,
+        String direccion,
+        String nacionalidad
 ) {}

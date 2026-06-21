@@ -191,7 +191,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 fullName,
                 usuario.getCorreo(),
                 roleName,
-                permissions
+                permissions,
+                null,
+                null
         );
 
         return new LoginResponse(true, "Inicio de sesión exitoso", authUser, Instant.now());
@@ -300,7 +302,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 fullName,
                 usuario.getCorreo(),
                 rolCliente.getNombre(),
-                permissions
+                permissions,
+                null,
+                null
         );
 
         return new LoginResponse(true, "Registro completado. Sesión iniciada.", authUser, Instant.now());
@@ -400,7 +404,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 fullName,
                 usuario.getCorreo(),
                 roleName,
-                permissions
+                permissions,
+                null,
+                null
         );
 
         return new LoginResponse(true, "Token refrescado con éxito", authUser, Instant.now());
@@ -473,6 +479,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 fullName += " " + usuario.getApellidoMaterno();
             }
 
+            Huesped huesped = huespedRepository.findByUsuarioUsuarioId(usuario.getUsuarioId()).orElse(null);
+            String direccion = huesped != null ? huesped.getDireccion() : null;
+            String nacionalidad = huesped != null ? huesped.getNacionalidad() : null;
+
             return new AuthUserResponse(
                     usuario.getUsuarioId(),
                     usuario.getNombre(),
@@ -481,7 +491,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     fullName,
                     usuario.getCorreo(),
                     roleName,
-                    permissions
+                    permissions,
+                    direccion,
+                    nacionalidad
             );
         }
 
