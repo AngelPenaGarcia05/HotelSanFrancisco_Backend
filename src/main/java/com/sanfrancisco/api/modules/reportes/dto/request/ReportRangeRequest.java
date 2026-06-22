@@ -1,4 +1,5 @@
 package com.sanfrancisco.api.modules.reportes.dto.request;
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import java.time.LocalDate;
 
 /**
@@ -19,7 +20,7 @@ public record ReportRangeRequest(
 
     /** Resuelve el rango efectivo [desde, hasta] según el period seleccionado. */
     public LocalDate resolveDesde() {
-        LocalDate hoy = LocalDate.now();
+        LocalDate hoy = DateTimeUtils.today();
         return switch (period.toUpperCase()) {
             case "TODAY" -> hoy;
             case "WEEK" -> hoy.minusDays(6);
@@ -32,6 +33,6 @@ public record ReportRangeRequest(
 
     public LocalDate resolveHasta() {
         if ("CUSTOM".equalsIgnoreCase(period) && fechaFin != null) return fechaFin;
-        return LocalDate.now();
+        return DateTimeUtils.today();
     }
 }

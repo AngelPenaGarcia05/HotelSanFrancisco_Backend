@@ -11,6 +11,7 @@ import com.sanfrancisco.api.modules.recepcion.entity.Reserva;
 import com.sanfrancisco.api.modules.recepcion.entity.ReservaHabitacion;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -108,7 +109,9 @@ public class ReservaMapper {
                 habResp,
                 huespResp,
                 entity.getFechaCreacion(),
-                entity.getFechaModificacion()
+                entity.getFechaModificacion(),
+                entity.getFechaInicio() != null
+                        && entity.getFechaInicio().isEqual(DateTimeUtils.today())
         );
     }
 

@@ -13,6 +13,8 @@ import com.sanfrancisco.api.modules.pagos.repository.PagoRepository;
 import com.sanfrancisco.api.modules.pagos.service.interfaces.PagoService;
 import com.sanfrancisco.api.modules.pagos.specification.PagoSpecification;
 import com.sanfrancisco.api.modules.pagos.websocket.PagoEventPublisher;
+import com.sanfrancisco.api.modules.notificacionescliente.enums.TipoNotificacionHuesped;
+import com.sanfrancisco.api.modules.notificacionescliente.service.interfaces.NotificacionClienteService;
 import com.sanfrancisco.api.modules.recepcion.entity.Reserva;
 import com.sanfrancisco.api.modules.recepcion.repository.ReservaRepository;
 import com.sanfrancisco.api.modules.ventas.entity.Venta;
@@ -35,19 +37,22 @@ public class PagoServiceImpl implements PagoService {
     private final ReservaRepository reservaRepository;
     private final PagoMapper pagoMapper;
     private final PagoEventPublisher eventPublisher;
+    private final NotificacionClienteService notificacionClienteService;
 
     public PagoServiceImpl(PagoRepository pagoRepository,
                            MetodoPagoRepository metodoPagoRepository,
                            VentaRepository ventaRepository,
                            ReservaRepository reservaRepository,
                            PagoMapper pagoMapper,
-                           PagoEventPublisher eventPublisher) {
+                           PagoEventPublisher eventPublisher,
+                           NotificacionClienteService notificacionClienteService) {
         this.pagoRepository = pagoRepository;
         this.metodoPagoRepository = metodoPagoRepository;
         this.ventaRepository = ventaRepository;
         this.reservaRepository = reservaRepository;
         this.pagoMapper = pagoMapper;
         this.eventPublisher = eventPublisher;
+        this.notificacionClienteService = notificacionClienteService;
     }
 
     @Override
@@ -78,6 +83,17 @@ public class PagoServiceImpl implements PagoService {
 
         Pago saved = pagoRepository.save(pagoMapper.toEntity(request, metodoPago, venta, reserva));
         eventPublisher.publishCreated(saved);
+
+        if (reserva != null && reserva.getUsuario() != null) {
+            notificacionClienteService.registrar(
+                    reserva.getUsuario().getUsuarioId(),
+                    TipoNotificacionHuesped.PAGO,
+                    "Pago registrado",
+                    "Se registró un pago de S/ " + saved.getMonto()
+                            + " para tu reserva " + reserva.getCodReserva() + ".",
+                    reserva.getReservaId());
+        }
+
         return pagoMapper.toResponse(saved);
     }
 

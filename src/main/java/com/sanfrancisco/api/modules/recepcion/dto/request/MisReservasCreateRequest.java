@@ -40,7 +40,8 @@ public record MisReservasCreateRequest(
         @Valid
         List<ReservaHabitacionRequest> habitaciones,
 
-        @NotEmpty(message = "La reserva debe incluir al menos un huésped")
+        // Opcional para el endpoint /mis-reservas: si llega vacío o nulo, el backend
+        // infiere/crea el huésped principal a partir del usuario autenticado (JWT).
         @Valid
         List<HuespedReservaRequest> huespedes
 ) {

@@ -26,6 +26,7 @@ import com.sanfrancisco.api.modules.recepcion.repository.DetalleHuespedRepositor
 import com.sanfrancisco.api.modules.recepcion.repository.ReservaRepository;
 import com.sanfrancisco.api.modules.notificaciones.service.interfaces.NotificationService;
 import com.sanfrancisco.api.shared.exception.ValidationException;
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -287,11 +288,11 @@ public class NotificationServiceImpl implements NotificationService {
             return 0;
         }
 
-        LocalDate limite = LocalDate.now().plusDays(
+        LocalDate limite = DateTimeUtils.today().plusDays(
                 Math.max(1, config.getHorasAntesCheckin() / 24 + (config.getHorasAntesCheckin() % 24 > 0 ? 1 : 0)));
 
         List<Reserva> proximasLlegadas = reservaRepository.findAll().stream()
-                .filter(r -> !r.getFechaInicio().isBefore(LocalDate.now()) && !r.getFechaInicio().isAfter(limite))
+                .filter(r -> !r.getFechaInicio().isBefore(DateTimeUtils.today()) && !r.getFechaInicio().isAfter(limite))
                 .filter(r -> r.getEstado() == EstadoReserva.CONFIRMADA)
                 .toList();
 

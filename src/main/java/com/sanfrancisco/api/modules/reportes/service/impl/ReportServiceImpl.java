@@ -16,6 +16,7 @@ import com.sanfrancisco.api.modules.reportes.dto.response.OccupancyReportRespons
 import com.sanfrancisco.api.modules.reportes.dto.response.ReservationsReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.RevenueReportResponse;
 import com.sanfrancisco.api.modules.reportes.service.interfaces.ReportService;
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -249,7 +250,7 @@ public class ReportServiceImpl implements ReportService {
 
     @Override
     public ManagementDashboardResponse buildManagementDashboard(ReportRangeRequest range) {
-        LocalDate hoy = LocalDate.now();
+        LocalDate hoy = DateTimeUtils.today();
         LocalDate inicioMesActual = hoy.withDayOfMonth(1);
         LocalDate inicioMesAnterior = inicioMesActual.minusMonths(1);
         LocalDate finMesAnterior = inicioMesActual.minusDays(1);
@@ -291,7 +292,7 @@ public class ReportServiceImpl implements ReportService {
         );
 
         return new ManagementDashboardResponse(
-                LocalDateTime.now(), kpis, ingresosMesActual, reservasMesActual, ocupacionMesActual);
+                DateTimeUtils.now(), kpis, ingresosMesActual, reservasMesActual, ocupacionMesActual);
     }
 
     // =====================================================================
