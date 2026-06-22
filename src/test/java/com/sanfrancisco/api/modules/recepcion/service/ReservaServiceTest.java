@@ -144,7 +144,7 @@ class ReservaServiceTest {
                 null, 1, "Juan Pérez", null, null,
                 null,
                 Collections.emptyList(), Collections.emptyList(),
-                null, null
+                null, null, false
         );
 
         huespedPrincipal = new HuespedReservaRequest(20, true);

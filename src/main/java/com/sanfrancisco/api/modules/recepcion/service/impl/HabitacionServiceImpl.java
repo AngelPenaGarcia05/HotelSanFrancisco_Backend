@@ -6,6 +6,8 @@ import com.sanfrancisco.api.modules.recepcion.dto.request.CheckInRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CheckOutRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CreateHabitacionRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.UpdateHabitacionRequest;
+import com.sanfrancisco.api.modules.notificacionescliente.enums.TipoNotificacionHuesped;
+import com.sanfrancisco.api.modules.notificacionescliente.service.interfaces.NotificacionClienteService;
 import com.sanfrancisco.api.modules.recepcion.dto.response.CalendarioHabitacionResponse;
 import com.sanfrancisco.api.modules.recepcion.dto.response.CheckOutLiquidacionResponse;
 import com.sanfrancisco.api.modules.recepcion.dto.response.HabitacionResponse;
@@ -26,6 +28,7 @@ import com.sanfrancisco.api.modules.recepcion.repository.ReservaHabitacionReposi
 import com.sanfrancisco.api.modules.recepcion.repository.ReservaRepository;
 import com.sanfrancisco.api.modules.recepcion.repository.TipoHabitacionRepository;
 import com.sanfrancisco.api.modules.recepcion.service.interfaces.HabitacionService;
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
 import com.sanfrancisco.api.modules.seguridad.repository.UsuarioRepository;
 import com.sanfrancisco.api.shared.websocket.WebSocketEvent;
@@ -57,6 +60,7 @@ public class HabitacionServiceImpl implements HabitacionService {
     private final WebSocketPublisher wsPublisher;
     private final HistorialReservaRepository historialReservaRepository;
     private final HistorialReservaMapper historialReservaMapper;
+    private final NotificacionClienteService notificacionClienteService;
 
     public HabitacionServiceImpl(HabitacionRepository habitacionRepository,
                                  TipoHabitacionRepository tipoHabitacionRepository,
@@ -67,7 +71,8 @@ public class HabitacionServiceImpl implements HabitacionService {
                                  HabitacionMapper mapper,
                                  WebSocketPublisher wsPublisher,
                                  HistorialReservaRepository historialReservaRepository,
-                                 HistorialReservaMapper historialReservaMapper) {
+                                 HistorialReservaMapper historialReservaMapper,
+                                 NotificacionClienteService notificacionClienteService) {
         this.habitacionRepository = habitacionRepository;
         this.tipoHabitacionRepository = tipoHabitacionRepository;
         this.reservaRepository = reservaRepository;
@@ -78,6 +83,7 @@ public class HabitacionServiceImpl implements HabitacionService {
         this.wsPublisher = wsPublisher;
         this.historialReservaRepository = historialReservaRepository;
         this.historialReservaMapper = historialReservaMapper;
+        this.notificacionClienteService = notificacionClienteService;
     }
 
     // =========================================================================
@@ -237,7 +243,7 @@ public class HabitacionServiceImpl implements HabitacionService {
 
         // Crear registro de estancia
         estanciaRepository.save(Estancia.builder()
-                .fechaCheckin(LocalDateTime.now())
+                .fechaCheckin(DateTimeUtils.now())
                 .usuarioCheckin(usuario)
                 .reserva(reserva)
                 .build());
@@ -246,6 +252,16 @@ public class HabitacionServiceImpl implements HabitacionService {
 
         // Notificar todas las habitaciones del check-in
         asignaciones.forEach(rh -> broadcast("CHECKIN_REALIZADO", rh.getHabitacion()));
+
+        if (reserva.getUsuario() != null) {
+            notificacionClienteService.registrar(
+                    reserva.getUsuario().getUsuarioId(),
+                    TipoNotificacionHuesped.CHECK_IN,
+                    "Check-in realizado",
+                    "Tu check-in para la reserva " + reserva.getCodReserva() + " se realizó correctamente. ¡Bienvenido!",
+                    reserva.getReservaId());
+        }
+
         return mapper.toResponse(asignaciones.get(0).getHabitacion());
     }
 
@@ -305,7 +321,7 @@ public class HabitacionServiceImpl implements HabitacionService {
         reservaRepository.save(reserva);
 
         // Registrar fecha y personal de checkout en la estancia (debe existir desde el check-in)
-        LocalDateTime ahora = LocalDateTime.now();
+        LocalDateTime ahora = DateTimeUtils.now();
         Estancia estancia = estanciaRepository.findByReservaReservaId(reserva.getReservaId())
                 .orElseThrow(() -> new BusinessException(
                         "No se encontró el registro de estancia para la reserva: " + reserva.getCodReserva()));
@@ -320,6 +336,16 @@ public class HabitacionServiceImpl implements HabitacionService {
 
         wsPublisher.broadcast(WebSocketChannels.TOPIC_HABITACIONES,
                 WebSocketEvent.of("CHECKOUT_REALIZADO", "reserva", reserva.getReservaId()));
+
+        if (reserva.getUsuario() != null) {
+            notificacionClienteService.registrar(
+                    reserva.getUsuario().getUsuarioId(),
+                    TipoNotificacionHuesped.CHECK_OUT,
+                    "Check-out registrado",
+                    "Tu check-out para la reserva " + reserva.getCodReserva()
+                            + " se completó. Gracias por tu estadía.",
+                    reserva.getReservaId());
+        }
 
         return new CheckOutLiquidacionResponse(
                 reserva.getReservaId(),

@@ -110,6 +110,12 @@ public final class EndpointPaths {
     public static final String MIS_RESERVAS_BASE = "/api/v1/mis-reservas";
 
     // =========================================================================
+    // MIS PAGOS / MIS FACTURAS — Panel del cliente autenticado
+    // =========================================================================
+    public static final String MIS_PAGOS_BASE    = "/api/v1/mis-pagos";
+    public static final String MIS_FACTURAS_BASE = "/api/v1/mis-facturas";
+
+    // =========================================================================
     // DASHBOARD
     // =========================================================================
     public static final String DASHBOARD_BASE = "/api/v1/dashboard";

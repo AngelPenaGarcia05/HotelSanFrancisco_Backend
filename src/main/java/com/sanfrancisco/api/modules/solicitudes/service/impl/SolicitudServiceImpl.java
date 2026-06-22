@@ -22,6 +22,8 @@ import com.sanfrancisco.api.modules.solicitudes.enums.AccionSeguimiento;
 import com.sanfrancisco.api.modules.solicitudes.enums.EstadoSolicitud;
 import com.sanfrancisco.api.modules.solicitudes.enums.TipoSolicitud;
 import com.sanfrancisco.api.modules.notificaciones.service.interfaces.NotificationService;
+import com.sanfrancisco.api.modules.notificacionescliente.enums.TipoNotificacionHuesped;
+import com.sanfrancisco.api.modules.notificacionescliente.service.interfaces.NotificacionClienteService;
 import com.sanfrancisco.api.modules.solicitudes.mapper.SeguimientoSolicitudMapper;
 import com.sanfrancisco.api.modules.solicitudes.mapper.SolicitudMapper;
 import com.sanfrancisco.api.modules.solicitudes.repository.SeguimientoSolicitudRepository;
@@ -75,19 +77,22 @@ public class SolicitudServiceImpl implements SolicitudService {
     private final SolicitudMapper solicitudMapper;
     private final SeguimientoSolicitudMapper seguimientoMapper;
     private final NotificationService notificationService;
+    private final NotificacionClienteService notificacionClienteService;
 
     public SolicitudServiceImpl(SolicitudRepository solicitudRepository,
                                 SeguimientoSolicitudRepository seguimientoRepository,
                                 UsuarioRepository usuarioRepository,
                                 SolicitudMapper solicitudMapper,
                                 SeguimientoSolicitudMapper seguimientoMapper,
-                                NotificationService notificationService) {
+                                NotificationService notificationService,
+                                NotificacionClienteService notificacionClienteService) {
         this.solicitudRepository = solicitudRepository;
         this.seguimientoRepository = seguimientoRepository;
         this.usuarioRepository = usuarioRepository;
         this.solicitudMapper = solicitudMapper;
         this.seguimientoMapper = seguimientoMapper;
         this.notificationService = notificationService;
+        this.notificacionClienteService = notificacionClienteService;
     }
 
     // =========================================================================
@@ -115,6 +120,14 @@ public class SolicitudServiceImpl implements SolicitudService {
 
         Solicitud saved = solicitudRepository.save(solicitud);
         log.info("Solicitud creada {} por usuarioId={}", saved.getCodigoSolicitud(), solicitante.getUsuarioId());
+
+        notificacionClienteService.registrar(
+                solicitante.getUsuarioId(),
+                TipoNotificacionHuesped.SERVICIO,
+                "Solicitud registrada",
+                "Tu solicitud " + saved.getCodigoSolicitud() + " ha sido registrada y está en evaluación.",
+                saved.getSolicitudId());
+
         return solicitudMapper.toResponse(saved);
     }
 

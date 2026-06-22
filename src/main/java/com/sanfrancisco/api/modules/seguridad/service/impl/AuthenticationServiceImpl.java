@@ -3,6 +3,9 @@ package com.sanfrancisco.api.modules.seguridad.service.impl;
 import com.sanfrancisco.api.exception.BusinessException;
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
 import com.sanfrancisco.api.modules.notificaciones.service.interfaces.NotificationService;
+import com.sanfrancisco.api.modules.pagos.entity.Pago;
+import com.sanfrancisco.api.modules.pagos.enums.TipoPago;
+import com.sanfrancisco.api.modules.pagos.repository.PagoRepository;
 import com.sanfrancisco.api.modules.recepcion.entity.Huesped;
 import com.sanfrancisco.api.modules.recepcion.entity.Reserva;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
@@ -25,6 +28,7 @@ import com.sanfrancisco.api.modules.seguridad.entity.TokenRecuperacion;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
 import com.sanfrancisco.api.modules.seguridad.enums.EstadoSesion;
 import com.sanfrancisco.api.modules.seguridad.enums.EstadoUsuario;
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.modules.seguridad.exception.SesionExpiradaException;
 import com.sanfrancisco.api.modules.seguridad.exception.UsuarioInactivoException;
 import com.sanfrancisco.api.modules.seguridad.repository.DetalleRolRepository;
@@ -94,6 +98,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final NotificationService notificationService;
     private final ReniecService reniecService;
     private final ReservaRepository reservaRepository;
+    private final PagoRepository pagoRepository;
 
     public AuthenticationServiceImpl(CustomUserDetailsService userDetailsService,
                                      PasswordEncoder passwordEncoder,
@@ -108,7 +113,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                                      TokenRecuperacionRepository tokenRecuperacionRepository,
                                      NotificationService notificationService,
                                      ReniecService reniecService,
-                                     ReservaRepository reservaRepository) {
+                                     ReservaRepository reservaRepository,
+                                     PagoRepository pagoRepository) {
         this.userDetailsService = userDetailsService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -123,6 +129,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         this.notificationService = notificationService;
         this.reniecService = reniecService;
         this.reservaRepository = reservaRepository;
+        this.pagoRepository = pagoRepository;
     }
 
     @Override
@@ -691,14 +698,26 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         long reservasCanceladas = reservas.stream()
                 .filter(r -> r.getEstado() == EstadoReserva.CANCELADA).count();
 
-        BigDecimal saldoPendiente = reservas.stream()
-                .filter(r -> r.getEstado() != EstadoReserva.CANCELADA
-                          && r.getEstado() != EstadoReserva.NO_SHOW)
-                .map(r -> r.getMontoTotal().subtract(r.getAdelanto()))
-                .filter(saldo -> saldo.compareTo(BigDecimal.ZERO) > 0)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Deuda: saldo de reservas activas, calculado contra los pagos reales
+        // (consistente con el cálculo de la página "Mis pagos").
+        long pagosPendientes = 0;
+        BigDecimal montoDeuda = BigDecimal.ZERO;
+        for (Reserva r : reservas) {
+            if (r.getEstado() == EstadoReserva.CANCELADA || r.getEstado() == EstadoReserva.NO_SHOW) {
+                continue;
+            }
+            BigDecimal pagado = pagoRepository.findByReservaReservaId(r.getReservaId()).stream()
+                    .filter(p -> p.getTipoPago() != TipoPago.REEMBOLSO)
+                    .map(Pago::getMonto)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal saldo = r.getMontoTotal().subtract(pagado);
+            if (saldo.compareTo(BigDecimal.ZERO) > 0) {
+                pagosPendientes++;
+                montoDeuda = montoDeuda.add(saldo);
+            }
+        }
 
-        LocalDate hoy = LocalDate.now();
+        LocalDate hoy = DateTimeUtils.today();
 
         DashboardClienteResponse.ReservaResumenItem proximaReserva = reservas.stream()
                 .filter(r -> r.getEstado() == EstadoReserva.CONFIRMADA
@@ -715,7 +734,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         return new DashboardClienteResponse(
                 totalReservas, reservasCompletadas, reservasCanceladas,
-                saldoPendiente, proximaReserva, reservaActiva);
+                pagosPendientes, montoDeuda, proximaReserva, reservaActiva);
     }
 
     private static DashboardClienteResponse.ReservaResumenItem toResumenItem(Reserva r) {

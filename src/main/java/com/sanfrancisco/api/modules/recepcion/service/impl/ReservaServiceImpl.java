@@ -7,6 +7,8 @@ import com.sanfrancisco.api.modules.recepcion.dto.response.CancelacionResponse;
 import com.sanfrancisco.api.modules.recepcion.dto.response.HistorialReservaResponse;
 import com.sanfrancisco.api.modules.recepcion.dto.response.ReservaResponse;
 import com.sanfrancisco.api.modules.recepcion.entity.*;
+import com.sanfrancisco.api.modules.notificacionescliente.enums.TipoNotificacionHuesped;
+import com.sanfrancisco.api.modules.notificacionescliente.service.interfaces.NotificacionClienteService;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoHabitacion;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReservaHabitacion;
@@ -24,8 +26,10 @@ import com.sanfrancisco.api.modules.recepcion.specification.ReservaSpecification
 import com.sanfrancisco.api.modules.recepcion.websocket.ReservaEventPublisher;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
 import com.sanfrancisco.api.modules.seguridad.repository.UsuarioRepository;
+import com.sanfrancisco.api.shared.enums.EstadoActivo;
 import com.sanfrancisco.api.shared.exception.ConflictException;
 import com.sanfrancisco.api.shared.exception.ValidationException;
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -72,6 +76,7 @@ public class ReservaServiceImpl implements ReservaService {
     private final HistorialReservaRepository historialReservaRepository;
     private final DisponibilidadService disponibilidadService;
     private final ReservaEventPublisher eventPublisher;
+    private final NotificacionClienteService notificacionClienteService;
 
     public ReservaServiceImpl(ReservaRepository reservaRepository,
                               UsuarioRepository usuarioRepository,
@@ -88,7 +93,8 @@ public class ReservaServiceImpl implements ReservaService {
                               HistorialReservaMapper historialReservaMapper,
                               HistorialReservaRepository historialReservaRepository,
                               DisponibilidadService disponibilidadService,
-                              ReservaEventPublisher eventPublisher) {
+                              ReservaEventPublisher eventPublisher,
+                              NotificacionClienteService notificacionClienteService) {
         this.reservaRepository = reservaRepository;
         this.usuarioRepository = usuarioRepository;
         this.canalRepository = canalRepository;
@@ -105,6 +111,7 @@ public class ReservaServiceImpl implements ReservaService {
         this.historialReservaRepository = historialReservaRepository;
         this.disponibilidadService = disponibilidadService;
         this.eventPublisher = eventPublisher;
+        this.notificacionClienteService = notificacionClienteService;
     }
 
     @Override
@@ -151,7 +158,68 @@ public class ReservaServiceImpl implements ReservaService {
 
         registrarHistorial(saved, null, EstadoReserva.PENDIENTE, "Alta de reserva");
         eventPublisher.publishCreated(saved);
+
+        notificacionClienteService.registrar(
+                saved.getUsuario().getUsuarioId(),
+                TipoNotificacionHuesped.CONFIRMACION,
+                "Reserva registrada",
+                "Tu reserva " + saved.getCodReserva() + " ha sido registrada para el "
+                        + saved.getFechaInicio() + " al " + saved.getFechaFin() + ".",
+                saved.getReservaId());
+
         return reservaMapper.toResponse(saved, reservaHabitaciones, detalleHuespedes);
+    }
+
+    @Override
+    public ReservaResponse createParaCliente(CreateReservaRequest request, Integer usuarioId) {
+        // Seguridad: el usuario (y el huésped) se derivan del JWT, nunca del body.
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado: " + usuarioId));
+
+        List<HuespedReservaRequest> huespedes = request.huespedes();
+        if (huespedes == null || huespedes.isEmpty()) {
+            Huesped huesped = obtenerOCrearHuespedDeUsuario(usuario);
+            huespedes = List.of(new HuespedReservaRequest(huesped.getHuespedId(), true));
+        }
+
+        CreateReservaRequest fullRequest = new CreateReservaRequest(
+                request.codReserva(),
+                request.fechaInicio(),
+                request.fechaFin(),
+                request.nroAdultos(),
+                request.nroNinos(),
+                request.descuento(),
+                request.adelanto(),
+                request.impuesto(),
+                request.observaciones(),
+                usuarioId,
+                request.canalId(),
+                request.habitaciones(),
+                huespedes,
+                request.forzar()
+        );
+
+        return create(fullRequest);
+    }
+
+    /**
+     * Devuelve el huésped asociado al usuario autenticado; si no existe, lo crea a partir
+     * de los datos del usuario y lo enlaza por usuario_id.
+     */
+    private Huesped obtenerOCrearHuespedDeUsuario(Usuario usuario) {
+        return huespedRepository.findByUsuarioUsuarioId(usuario.getUsuarioId())
+                .orElseGet(() -> huespedRepository.save(
+                        Huesped.builder()
+                                .nombre(usuario.getNombre())
+                                .apellidoPaterno(usuario.getApellidoPaterno())
+                                .apellidoMaterno(usuario.getApellidoMaterno())
+                                .numeroDocumento(usuario.getNumeroDocumento())
+                                .correo(usuario.getCorreo())
+                                .telefono(usuario.getTelefono())
+                                .estado(EstadoActivo.ACTIVO)
+                                .usuario(usuario)
+                                .build()
+                ));
     }
 
     @Override
@@ -549,7 +617,7 @@ public class ReservaServiceImpl implements ReservaService {
         if (!aplicar) {
             return new PoliticaCancelacion(0, "Sin penalización (exonerado por recepción)");
         }
-        long dias = ChronoUnit.DAYS.between(LocalDate.now(), fechaInicio);
+        long dias = ChronoUnit.DAYS.between(DateTimeUtils.today(), fechaInicio);
         if (dias >= 7) return new PoliticaCancelacion(0,   "Sin penalización (≥7 días de anticipación)");
         if (dias >= 3) return new PoliticaCancelacion(25,  "Penalización del 25 % (3-6 días de anticipación)");
         if (dias >= 1) return new PoliticaCancelacion(50,  "Penalización del 50 % (1-2 días de anticipación)");

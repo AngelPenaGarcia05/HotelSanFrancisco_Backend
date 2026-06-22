@@ -28,6 +28,7 @@ import com.sanfrancisco.api.modules.ventas.entity.Venta;
 import com.sanfrancisco.api.modules.ventas.enums.EstadoVenta;
 import com.sanfrancisco.api.modules.ventas.repository.VentaRepository;
 import com.sanfrancisco.api.shared.enums.EstadoActivo;
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -95,7 +96,7 @@ public class DashboardServiceImpl implements DashboardService {
         Usuario usuario = usuarioRepository.findById(principal.userId())
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado: " + principal.userId()));
 
-        LocalDate hoy = LocalDate.now();
+        LocalDate hoy = DateTimeUtils.today();
         LocalDate inicioMes = hoy.withDayOfMonth(1);
         LocalDate inicioMesAnterior = inicioMes.minusMonths(1);
         LocalDate finMesAnterior = inicioMes.minusDays(1);

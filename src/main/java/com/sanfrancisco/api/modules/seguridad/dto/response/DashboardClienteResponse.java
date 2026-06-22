@@ -9,7 +9,8 @@ public record DashboardClienteResponse(
         long totalReservas,
         long reservasCompletadas,
         long reservasCanceladas,
-        BigDecimal saldoPendiente,
+        long pagosPendientes,
+        BigDecimal montoDeuda,
         ReservaResumenItem proximaReserva,
         ReservaResumenItem reservaActiva
 ) {

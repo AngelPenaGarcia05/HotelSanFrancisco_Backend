@@ -17,6 +17,14 @@ public interface ReservaService {
 
     ReservaResponse create(CreateReservaRequest request);
 
+    /**
+     * Alta de reserva del cliente autenticado ("a su propio nombre").
+     * El usuario (y por tanto el huésped principal) se derivan del JWT, ignorando el
+     * usuarioId del body. Si no llega ningún huésped, se infiere/crea el huésped
+     * principal a partir de los datos del usuario autenticado.
+     */
+    ReservaResponse createParaCliente(CreateReservaRequest request, Integer usuarioId);
+
     ReservaResponse update(Integer reservaId, UpdateReservaRequest request);
 
     ReservaResponse findById(Integer reservaId);
