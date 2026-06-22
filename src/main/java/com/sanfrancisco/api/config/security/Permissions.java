@@ -228,6 +228,17 @@ public final class Permissions {
     public static final String MIS_RESERVAS_DELETE = "mis-reservas:delete";
 
     // =========================================================================
+    // NOTIFICACIONES DEL CLIENTE (bandeja in-app)
+    // =========================================================================
+    public static final String NOTIFICACION_CLIENTE_READ   = "notificacion-cliente:read";
+    public static final String NOTIFICACION_CLIENTE_UPDATE = "notificacion-cliente:update";
+
+    // =========================================================================
+    // MIS PAGOS (pagos y facturas del cliente)
+    // =========================================================================
+    public static final String MIS_PAGOS_READ = "mis-pagos:read";
+
+    // =========================================================================
     // SOLICITUDES DE SERVICIO
     // =========================================================================
     public static final String SOLICITUD_CREATE        = "solicitud:create";

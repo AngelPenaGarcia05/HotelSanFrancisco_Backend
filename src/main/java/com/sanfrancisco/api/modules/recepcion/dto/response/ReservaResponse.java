@@ -29,6 +29,7 @@ public record ReservaResponse(
         List<ReservaHabitacionResponse> habitaciones,
         List<DetalleHuespedResponse> huespedes,
         LocalDateTime fechaCreacion,
-        LocalDateTime fechaModificacion
+        LocalDateTime fechaModificacion,
+        boolean llegadaHoy
 ) {
 }

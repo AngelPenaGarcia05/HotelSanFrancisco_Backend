@@ -116,6 +116,14 @@ public class SecurityConfig {
                     .hasAuthority(Permissions.MIS_RESERVAS_DELETE)
 
                 // =============================================================
+                // MIS PAGOS / MIS FACTURAS — Panel del cliente autenticado
+                // =============================================================
+                .requestMatchers(HttpMethod.GET, EndpointPaths.MIS_PAGOS_BASE + "/**")
+                    .hasAuthority(Permissions.MIS_PAGOS_READ)
+                .requestMatchers(HttpMethod.GET, EndpointPaths.MIS_FACTURAS_BASE + "/**")
+                    .hasAuthority(Permissions.MIS_PAGOS_READ)
+
+                // =============================================================
                 // TIPO HABITACIÓN — catálogo visible en la landing page sin sesión
                 // =============================================================
                 .requestMatchers(HttpMethod.GET, EndpointPaths.TIPO_HABITACION_BASE + "/**").permitAll()
@@ -216,6 +224,15 @@ public class SecurityConfig {
                     .hasAuthority(Permissions.METODO_PAGO_UPDATE)
                 .requestMatchers(HttpMethod.DELETE, EndpointPaths.METODO_PAGO_BASE + "/**")
                     .hasAuthority(Permissions.METODO_PAGO_DELETE)
+
+                // =============================================================
+                // NOTIFICACIONES DEL CLIENTE — Bandeja in-app (rol CLIENTE).
+                // Rutas específicas declaradas ANTES del comodín admin.
+                // =============================================================
+                .requestMatchers(HttpMethod.GET, EndpointPaths.NOTIFICACIONES_BASE)
+                    .hasAuthority(Permissions.NOTIFICACION_CLIENTE_READ)
+                .requestMatchers(HttpMethod.PATCH, EndpointPaths.NOTIFICACIONES_BASE + "/leer-todas")
+                    .hasAuthority(Permissions.NOTIFICACION_CLIENTE_UPDATE)
 
                 // =============================================================
                 // NOTIFICACIONES — Configuración SMTP, plantillas, log de envíos.
