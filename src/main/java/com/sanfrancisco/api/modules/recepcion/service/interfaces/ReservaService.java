@@ -43,5 +43,12 @@ public interface ReservaService {
 
     Page<ReservaResponse> findByUsuarioId(Integer usuarioId, Pageable pageable);
 
+    /**
+     * Detalle completo de una reserva propia del cliente autenticado.
+     * Valida que la reserva pertenezca al usuario del JWT y devuelve el desglose
+     * de habitaciones, huéspedes y estanciaId (igual que el detalle admin).
+     */
+    ReservaResponse findPropiaById(Integer reservaId, Integer usuarioId);
+
     CancelacionResponse cancelarPropiaReserva(Integer reservaId, Integer usuarioId, CancelarReservaRequest request);
 }

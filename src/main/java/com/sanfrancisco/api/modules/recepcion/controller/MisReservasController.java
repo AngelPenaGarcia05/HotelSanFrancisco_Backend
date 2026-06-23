@@ -37,6 +37,15 @@ public class MisReservasController {
         );
     }
 
+    @GetMapping("/{id}")
+    public ApiResponse<ReservaResponse> detalle(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable Integer id) {
+        return ApiResponse.ok(
+                reservaService.findPropiaById(id, userPrincipal.userId())
+        );
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<ReservaResponse>> crear(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
