@@ -37,6 +37,10 @@ public class LogCorreo extends AuditedEntity {
     @Column(name = "asunto", nullable = false, length = 200)
     private String asunto;
 
+    /** Cuerpo HTML ya renderizado (con variables reemplazadas) para reenviarlo idéntico en un reintento. */
+    @Column(name = "cuerpo_html", columnDefinition = "TEXT")
+    private String cuerpoHtml;
+
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "plantilla_clave", nullable = false, length = 40)
