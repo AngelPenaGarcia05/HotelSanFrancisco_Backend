@@ -6,7 +6,6 @@ import com.sanfrancisco.api.modules.notificaciones.dto.response.*;
 import com.sanfrancisco.api.modules.notificaciones.entity.LogCorreo;
 import com.sanfrancisco.api.modules.notificaciones.entity.PlantillaCorreo;
 import com.sanfrancisco.api.modules.notificaciones.entity.RecordatorioConfig;
-import com.sanfrancisco.api.modules.notificaciones.entity.SmtpConfig;
 import com.sanfrancisco.api.modules.notificaciones.enums.EmailStatus;
 import com.sanfrancisco.api.modules.notificaciones.enums.EmailTemplateKey;
 import com.sanfrancisco.api.modules.notificaciones.enums.SmtpSecurity;
@@ -14,9 +13,7 @@ import com.sanfrancisco.api.modules.notificaciones.mapper.NotificationMapper;
 import com.sanfrancisco.api.modules.notificaciones.repository.LogCorreoRepository;
 import com.sanfrancisco.api.modules.notificaciones.repository.PlantillaCorreoRepository;
 import com.sanfrancisco.api.modules.notificaciones.repository.RecordatorioConfigRepository;
-import com.sanfrancisco.api.modules.notificaciones.repository.SmtpConfigRepository;
 import com.sanfrancisco.api.modules.notificaciones.specification.LogCorreoSpecification;
-import com.sanfrancisco.api.modules.notificaciones.util.SmtpCredentialCipher;
 import com.sanfrancisco.api.modules.pagos.entity.Pago;
 import com.sanfrancisco.api.modules.pagos.repository.PagoRepository;
 import com.sanfrancisco.api.modules.recepcion.entity.DetalleHuesped;
@@ -30,9 +27,10 @@ import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,7 +40,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 @Service
 @Transactional
@@ -52,7 +49,6 @@ public class NotificationServiceImpl implements NotificationService {
     private static final Integer SINGLETON_ID = 1;
     private static final DateTimeFormatter FECHA_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
-    private final SmtpConfigRepository smtpConfigRepository;
     private final PlantillaCorreoRepository plantillaCorreoRepository;
     private final LogCorreoRepository logCorreoRepository;
     private final RecordatorioConfigRepository recordatorioConfigRepository;
@@ -60,18 +56,32 @@ public class NotificationServiceImpl implements NotificationService {
     private final PagoRepository pagoRepository;
     private final DetalleHuespedRepository detalleHuespedRepository;
     private final NotificationMapper mapper;
-    private final SmtpCredentialCipher cipher;
+    private final JavaMailSender mailSender;
 
-    public NotificationServiceImpl(SmtpConfigRepository smtpConfigRepository,
-                                    PlantillaCorreoRepository plantillaCorreoRepository,
+    // Configuración de correo gestionada por entorno (spring.mail.* y app.notificaciones.*)
+    private final boolean emailHabilitado;
+    private final String remitenteNombre;
+    private final String remitenteCorreo;
+    private final String responderA;
+    private final String mailHost;
+    private final Integer mailPort;
+    private final String mailUsername;
+
+    public NotificationServiceImpl(PlantillaCorreoRepository plantillaCorreoRepository,
                                     LogCorreoRepository logCorreoRepository,
                                     RecordatorioConfigRepository recordatorioConfigRepository,
                                     ReservaRepository reservaRepository,
                                     PagoRepository pagoRepository,
                                     DetalleHuespedRepository detalleHuespedRepository,
                                     NotificationMapper mapper,
-                                    SmtpCredentialCipher cipher) {
-        this.smtpConfigRepository = smtpConfigRepository;
+                                    JavaMailSender mailSender,
+                                    @Value("${app.notificaciones.email-habilitado:false}") boolean emailHabilitado,
+                                    @Value("${app.notificaciones.remitente-nombre:Hotel San Francisco}") String remitenteNombre,
+                                    @Value("${app.notificaciones.remitente-correo:no-reply@hotelsanfrancisco.pe}") String remitenteCorreo,
+                                    @Value("${app.notificaciones.responder-a:}") String responderA,
+                                    @Value("${spring.mail.host:}") String mailHost,
+                                    @Value("${spring.mail.port:587}") Integer mailPort,
+                                    @Value("${spring.mail.username:}") String mailUsername) {
         this.plantillaCorreoRepository = plantillaCorreoRepository;
         this.logCorreoRepository = logCorreoRepository;
         this.recordatorioConfigRepository = recordatorioConfigRepository;
@@ -79,7 +89,14 @@ public class NotificationServiceImpl implements NotificationService {
         this.pagoRepository = pagoRepository;
         this.detalleHuespedRepository = detalleHuespedRepository;
         this.mapper = mapper;
-        this.cipher = cipher;
+        this.mailSender = mailSender;
+        this.emailHabilitado = emailHabilitado;
+        this.remitenteNombre = remitenteNombre;
+        this.remitenteCorreo = remitenteCorreo;
+        this.responderA = responderA;
+        this.mailHost = mailHost;
+        this.mailPort = mailPort;
+        this.mailUsername = mailUsername;
     }
 
     // =====================================================================
@@ -89,34 +106,32 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional(readOnly = true)
     public SmtpConfigResponse getSmtpConfig() {
-        return mapper.toResponse(loadSmtpConfig());
+        // Refleja la configuración efectiva tomada del entorno (solo lectura).
+        // La contraseña nunca se expone.
+        return new SmtpConfigResponse(
+                mailHost,
+                mailPort,
+                mailUsername,
+                SmtpSecurity.TLS,
+                remitenteNombre,
+                remitenteCorreo,
+                (responderA == null || responderA.isBlank()) ? null : responderA,
+                emailHabilitado
+        );
     }
 
     @Override
     public SmtpConfigResponse updateSmtpConfig(UpdateSmtpConfigRequest request) {
-        SmtpConfig config = loadSmtpConfig();
-        config.setHost(request.host());
-        config.setPuerto(request.puerto());
-        config.setUsuario(request.usuario());
-        if (request.password() != null && !request.password().isBlank()) {
-            config.setPasswordCifrado(cipher.encrypt(request.password()));
-        }
-        config.setSeguridad(request.seguridad());
-        config.setNombreRemitente(request.nombreRemitente());
-        config.setCorreoRemitente(request.correoRemitente());
-        config.setResponderA(request.responderA());
-        config.setHabilitado(request.habilitado());
-
-        SmtpConfig saved = smtpConfigRepository.save(config);
-        return mapper.toResponse(saved);
+        // La configuración SMTP ahora vive en variables de entorno (Spring Mail), no en BD.
+        throw new ValidationException("La configuración SMTP se gestiona por variables de entorno "
+                + "(SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, MAIL_ENABLED). "
+                + "Edítala en el despliegue (Railway), no desde la aplicación.");
     }
 
     @Override
     public SmtpTestResultResponse testSmtpConfig(TestSmtpRequest request) {
-        SmtpConfig config = loadSmtpConfig();
         try {
             enviarCorreoHtml(
-                    config,
                     request.destinatario(),
                     "Correo de prueba — Hotel San Francisco",
                     "<p>Este es un correo de prueba de la configuración SMTP del Hotel San Francisco.</p>"
@@ -126,11 +141,6 @@ public class NotificationServiceImpl implements NotificationService {
             log.warn("Fallo al enviar correo de prueba SMTP: {}", e.getMessage());
             return new SmtpTestResultResponse(false, "No se pudo enviar el correo de prueba: " + e.getMessage(), LocalDateTime.now());
         }
-    }
-
-    private SmtpConfig loadSmtpConfig() {
-        return smtpConfigRepository.findById(SINGLETON_ID)
-                .orElseThrow(() -> new ResourceNotFoundException("Configuración SMTP", SINGLETON_ID));
     }
 
     // =====================================================================
@@ -343,11 +353,10 @@ public class NotificationServiceImpl implements NotificationService {
             throw new ValidationException("Solo se pueden reintentar correos en estado FALLIDO.");
         }
 
-        SmtpConfig config = loadSmtpConfig();
         try {
             PlantillaCorreo plantilla = plantillaCorreoRepository.findByClave(entry.getPlantillaClave())
                     .orElseThrow(() -> new ResourceNotFoundException("Plantilla de correo", entry.getPlantillaClave()));
-            enviarCorreoHtml(config, entry.getDestinatario(), entry.getAsunto(), plantilla.getCuerpoHtml());
+            enviarCorreoHtml(entry.getDestinatario(), entry.getAsunto(), plantilla.getCuerpoHtml());
             entry.setEstado(EmailStatus.ENVIADO);
             entry.setError(null);
         } catch (Exception e) {
@@ -388,15 +397,14 @@ public class NotificationServiceImpl implements NotificationService {
                 .enviadoEn(LocalDateTime.now())
                 .intentos(1);
 
-        SmtpConfig config = loadSmtpConfig();
         LogCorreo entry;
-        if (!Boolean.TRUE.equals(config.getHabilitado())) {
+        if (!emailHabilitado) {
             entry = logBuilder.estado(EmailStatus.PENDIENTE)
-                    .error("El envío automático de correos está deshabilitado en la configuración SMTP.")
+                    .error("El envío de correos está deshabilitado (MAIL_ENABLED=false).")
                     .build();
         } else {
             try {
-                enviarCorreoHtml(config, destinatario, asunto, cuerpo);
+                enviarCorreoHtml(destinatario, asunto, cuerpo);
                 entry = logBuilder.estado(EmailStatus.ENVIADO).build();
             } catch (Exception e) {
                 log.warn("Fallo al enviar correo '{}' a {}: {}", key, destinatario, e.getMessage());
@@ -407,40 +415,17 @@ public class NotificationServiceImpl implements NotificationService {
         return mapper.toResponse(logCorreoRepository.save(entry));
     }
 
-    private void enviarCorreoHtml(SmtpConfig config, String destinatario, String asunto, String cuerpoHtml) throws Exception {
-        JavaMailSenderImpl mailSender = buildMailSender(config);
+    private void enviarCorreoHtml(String destinatario, String asunto, String cuerpoHtml) throws Exception {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
         helper.setTo(destinatario);
         helper.setSubject(asunto);
         helper.setText(cuerpoHtml, true);
-        helper.setFrom(config.getCorreoRemitente(), config.getNombreRemitente());
-        if (config.getResponderA() != null && !config.getResponderA().isBlank()) {
-            helper.setReplyTo(config.getResponderA());
+        helper.setFrom(remitenteCorreo, remitenteNombre);
+        if (responderA != null && !responderA.isBlank()) {
+            helper.setReplyTo(responderA);
         }
         mailSender.send(message);
-    }
-
-    private JavaMailSenderImpl buildMailSender(SmtpConfig config) {
-        JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
-        mailSender.setHost(config.getHost());
-        mailSender.setPort(config.getPuerto());
-        mailSender.setUsername(config.getUsuario());
-        mailSender.setPassword(cipher.decrypt(config.getPasswordCifrado()));
-
-        Properties props = mailSender.getJavaMailProperties();
-        props.put("mail.transport.protocol", "smtp");
-        props.put("mail.smtp.auth", "true");
-
-        if (config.getSeguridad() == SmtpSecurity.TLS) {
-            props.put("mail.smtp.starttls.enable", "true");
-        } else if (config.getSeguridad() == SmtpSecurity.SSL) {
-            props.put("mail.smtp.ssl.enable", "true");
-        }
-        props.put("mail.smtp.connectiontimeout", "5000");
-        props.put("mail.smtp.timeout", "5000");
-
-        return mailSender;
     }
 
     private String interpolar(String texto, Map<String, String> variables) {
