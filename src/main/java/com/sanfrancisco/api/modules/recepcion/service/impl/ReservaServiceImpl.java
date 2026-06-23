@@ -435,6 +435,19 @@ public class ReservaServiceImpl implements ReservaService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public ReservaResponse findPropiaById(Integer reservaId, Integer usuarioId) {
+        Reserva reserva = obtenerOFallar(reservaId);
+        if (!reserva.getUsuario().getUsuarioId().equals(usuarioId)) {
+            throw new BusinessException("No tienes permiso para ver esta reserva");
+        }
+        List<ReservaHabitacion> habitaciones = reservaHabitacionRepository.findByReservaReservaId(reservaId);
+        List<DetalleHuesped> huespedes = detalleHuespedRepository.findByIdReservaId(reservaId);
+        Integer estanciaId = resolverEstanciaId(reservaId);
+        return reservaMapper.toResponse(reserva, habitaciones, huespedes, estanciaId);
+    }
+
+    @Override
     public CancelacionResponse cancelarPropiaReserva(Integer reservaId, Integer usuarioId,
                                                       CancelarReservaRequest request) {
         Reserva reserva = obtenerOFallar(reservaId);

@@ -124,6 +124,16 @@ public class SecurityConfig {
                     .hasAuthority(Permissions.MIS_PAGOS_READ)
 
                 // =============================================================
+                // MIS SERVICIOS — Pedidos de servicio del cliente autenticado
+                // =============================================================
+                .requestMatchers(HttpMethod.POST, EndpointPaths.MIS_SERVICIOS_BASE)
+                    .hasAuthority(Permissions.MIS_SERVICIOS_CREATE)
+                .requestMatchers(HttpMethod.PATCH, EndpointPaths.MIS_SERVICIOS_BASE + "/**")
+                    .hasAuthority(Permissions.MIS_SERVICIOS_CREATE)
+                .requestMatchers(HttpMethod.GET, EndpointPaths.MIS_SERVICIOS_BASE + "/**")
+                    .hasAuthority(Permissions.MIS_SERVICIOS_READ)
+
+                // =============================================================
                 // TIPO HABITACIÓN — catálogo visible en la landing page sin sesión
                 // =============================================================
                 .requestMatchers(HttpMethod.GET, EndpointPaths.TIPO_HABITACION_BASE + "/**").permitAll()
@@ -315,6 +325,16 @@ public class SecurityConfig {
                     .hasAuthority(Permissions.PROVEEDOR_DELETE)
 
                 // =============================================================
+                // PEDIDOS DE SERVICIO — Gestión por recepción/admin.
+                // Reutiliza permisos de servicios: lectura servicio:read,
+                // aprobar/rechazar servicio:create (aprobar genera el consumo).
+                // =============================================================
+                .requestMatchers(HttpMethod.GET, EndpointPaths.PEDIDO_SERVICIO_BASE + "/**")
+                    .hasAuthority(Permissions.SERVICIO_READ)
+                .requestMatchers(HttpMethod.PATCH, EndpointPaths.PEDIDO_SERVICIO_BASE + "/**")
+                    .hasAuthority(Permissions.SERVICIO_CREATE)
+
+                // =============================================================
                 // SERVICIOS
                 // =============================================================
                 .requestMatchers(HttpMethod.GET, EndpointPaths.SERVICIO_BASE + "/**")
@@ -325,6 +345,14 @@ public class SecurityConfig {
                     .hasAuthority(Permissions.SERVICIO_UPDATE)
                 .requestMatchers(HttpMethod.DELETE, EndpointPaths.SERVICIO_BASE + "/**")
                     .hasAuthority(Permissions.SERVICIO_DELETE)
+
+                // =============================================================
+                // CATÁLOGO DE SERVICIOS — Lectura para el cliente autenticado.
+                // Devuelve solo los servicios ACTIVO. CLIENTE no tiene
+                // tipo-servicio:read, por eso se expone un permiso propio.
+                // =============================================================
+                .requestMatchers(HttpMethod.GET, EndpointPaths.SERVICIO_CATALOGO_BASE + "/**")
+                    .hasAuthority(Permissions.SERVICIO_CATALOGO_READ)
 
                 // =============================================================
                 // TIPOS DE SERVICIO

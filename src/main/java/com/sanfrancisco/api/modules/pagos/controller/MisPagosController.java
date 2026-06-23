@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -29,5 +30,14 @@ public class MisPagosController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<MiPagoResponse>>> listarMisPagos() {
         return ResponseEntity.ok(ApiResponse.ok(misPagosService.getMisPagos()));
+    }
+
+    @Operation(summary = "Mis pagos de una reserva",
+            description = "Devuelve los pagos y el saldo pendiente de una reserva del cliente autenticado. "
+                    + "Responde 404 si la reserva no existe o no pertenece al cliente.")
+    @GetMapping("/reserva/{reservaId}")
+    public ResponseEntity<ApiResponse<List<MiPagoResponse>>> listarMisPagosPorReserva(
+            @PathVariable Integer reservaId) {
+        return ResponseEntity.ok(ApiResponse.ok(misPagosService.getMisPagosPorReserva(reservaId)));
     }
 }
