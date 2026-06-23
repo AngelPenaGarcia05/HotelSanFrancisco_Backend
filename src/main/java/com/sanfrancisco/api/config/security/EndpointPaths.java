@@ -85,6 +85,9 @@ public final class EndpointPaths {
     public static final String SERVICIO_BASE      = "/api/v1/servicios";
     public static final String TIPO_SERVICIO_BASE = "/api/v1/tipos-servicio";
 
+    // Catálogo de servicios disponible para el cliente autenticado (rol CLIENTE)
+    public static final String SERVICIO_CATALOGO_BASE = "/api/v1/servicios-catalogo";
+
     // =========================================================================
     // OPERACIONES — Incidencias
     // =========================================================================
@@ -114,6 +117,12 @@ public final class EndpointPaths {
     // =========================================================================
     public static final String MIS_PAGOS_BASE    = "/api/v1/mis-pagos";
     public static final String MIS_FACTURAS_BASE = "/api/v1/mis-facturas";
+
+    // =========================================================================
+    // MIS SERVICIOS / PEDIDOS DE SERVICIO — Pedidos del cliente y su gestión
+    // =========================================================================
+    public static final String MIS_SERVICIOS_BASE   = "/api/v1/mis-servicios";
+    public static final String PEDIDO_SERVICIO_BASE = "/api/v1/pedidos-servicio";
 
     // =========================================================================
     // DASHBOARD

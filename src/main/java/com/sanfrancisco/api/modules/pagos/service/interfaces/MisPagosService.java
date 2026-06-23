@@ -11,4 +11,11 @@ public interface MisPagosService {
      * Combina registros de pago reales (PAGADO) con saldos sintéticos por reserva (PENDIENTE).
      */
     List<MiPagoResponse> getMisPagos();
+
+    /**
+     * Pagos y saldo pendiente de UNA reserva del cliente autenticado.
+     * Valida que la reserva pertenezca al usuario; si no existe o no le pertenece,
+     * lanza {@link com.sanfrancisco.api.exception.ResourceNotFoundException}.
+     */
+    List<MiPagoResponse> getMisPagosPorReserva(Integer reservaId);
 }

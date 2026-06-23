@@ -239,6 +239,18 @@ public final class Permissions {
     public static final String MIS_PAGOS_READ = "mis-pagos:read";
 
     // =========================================================================
+    // CATÁLOGO DE SERVICIOS (lectura para el cliente)
+    // =========================================================================
+    public static final String SERVICIO_CATALOGO_READ = "servicio-catalogo:read";
+
+    // =========================================================================
+    // MIS SERVICIOS (pedidos de servicio del cliente)
+    // El lado de recepción reutiliza servicio:read y servicio:create.
+    // =========================================================================
+    public static final String MIS_SERVICIOS_READ   = "mis-servicios:read";
+    public static final String MIS_SERVICIOS_CREATE = "mis-servicios:create";
+
+    // =========================================================================
     // SOLICITUDES DE SERVICIO
     // =========================================================================
     public static final String SOLICITUD_CREATE        = "solicitud:create";
