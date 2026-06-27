@@ -26,6 +26,11 @@ import com.sanfrancisco.api.modules.inventario.entity.Producto;
 import com.sanfrancisco.api.modules.inventario.repository.ProductoRepository;
 import com.sanfrancisco.api.shared.exception.ValidationException;
 import com.sanfrancisco.api.shared.specification.SpecificationUtils;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -59,6 +64,7 @@ public class CompraServiceImpl implements CompraService {
     private final CompraMapper compraMapper;
     private final DetalleCompraMapper detalleCompraMapper;
     private final CompraEventPublisher eventPublisher;
+    private final EntityManager entityManager;
 
     public CompraServiceImpl(CompraRepository compraRepository,
                              DetalleCompraRepository detalleCompraRepository,
@@ -66,7 +72,8 @@ public class CompraServiceImpl implements CompraService {
                              ProductoRepository productoRepository,
                              CompraMapper compraMapper,
                              DetalleCompraMapper detalleCompraMapper,
-                             CompraEventPublisher eventPublisher) {
+                             CompraEventPublisher eventPublisher,
+                             EntityManager entityManager) {
         this.compraRepository = compraRepository;
         this.detalleCompraRepository = detalleCompraRepository;
         this.proveedorRepository = proveedorRepository;
@@ -74,6 +81,7 @@ public class CompraServiceImpl implements CompraService {
         this.compraMapper = compraMapper;
         this.detalleCompraMapper = detalleCompraMapper;
         this.eventPublisher = eventPublisher;
+        this.entityManager = entityManager;
     }
 
     @Override
@@ -143,17 +151,34 @@ public class CompraServiceImpl implements CompraService {
         long recibidas = compraRepository.count(base.and(porEstado(EstadoCompra.RECIBIDA)));
         long anuladas = compraRepository.count(base.and(porEstado(EstadoCompra.ANULADA)));
 
-        BigDecimal montoTotalPeriodo = compraRepository.sumMontoNoAnuladas(
-                filter != null ? filter.proveedorId() : null,
-                filter != null ? filter.fechaCompraDesde() : null,
-                filter != null ? filter.fechaCompraHasta() : null
-        );
+        BigDecimal montoTotalPeriodo = sumMontoNoAnuladas(filter);
 
         return new CompraStatsResponse(total, pendientes, recibidas, anuladas, montoTotalPeriodo);
     }
 
     private Specification<Compra> porEstado(EstadoCompra estado) {
         return SpecificationUtils.equalsIfPresent("estado", estado);
+    }
+
+    /**
+     * Suma de montoTotal vía Criteria (mismo mecanismo que el listado, que sí
+     * maneja bien los filtros de fecha) excluyendo SIEMPRE las compras ANULADA.
+     * Se evita JPQL con el patrón ":param IS NULL OR ..." porque PostgreSQL no
+     * puede inferir el tipo del parámetro de fecha y lanza 500.
+     */
+    private BigDecimal sumMontoNoAnuladas(CompraFilterRequest filter) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<BigDecimal> cq = cb.createQuery(BigDecimal.class);
+        Root<Compra> root = cq.from(Compra.class);
+        cq.select(cb.coalesce(cb.sum(root.get("montoTotal")), BigDecimal.ZERO));
+
+        Specification<Compra> spec = CompraSpecification.build(filter)
+                .and((r, q, c) -> c.notEqual(r.get("estado"), EstadoCompra.ANULADA));
+        Predicate predicate = spec.toPredicate(root, cq, cb);
+        if (predicate != null) {
+            cq.where(predicate);
+        }
+        return entityManager.createQuery(cq).getSingleResult();
     }
 
     @Override
