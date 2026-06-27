@@ -8,6 +8,7 @@ import com.sanfrancisco.api.modules.compras.dto.request.CreateCompraRequest;
 import com.sanfrancisco.api.modules.compras.dto.request.CreateDetalleCompraRequest;
 import com.sanfrancisco.api.modules.compras.dto.request.UpdateCompraRequest;
 import com.sanfrancisco.api.modules.compras.dto.response.CompraResponse;
+import com.sanfrancisco.api.modules.compras.dto.response.CompraStatsResponse;
 import com.sanfrancisco.api.modules.compras.dto.response.DetalleCompraResponse;
 import com.sanfrancisco.api.modules.compras.entity.Compra;
 import com.sanfrancisco.api.modules.compras.entity.DetalleCompra;
@@ -24,8 +25,10 @@ import com.sanfrancisco.api.modules.compras.websocket.CompraEventPublisher;
 import com.sanfrancisco.api.modules.inventario.entity.Producto;
 import com.sanfrancisco.api.modules.inventario.repository.ProductoRepository;
 import com.sanfrancisco.api.shared.exception.ValidationException;
+import com.sanfrancisco.api.shared.specification.SpecificationUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -128,6 +131,29 @@ public class CompraServiceImpl implements CompraService {
     public Page<CompraResponse> search(CompraFilterRequest filter, Pageable pageable) {
         return compraRepository.findAll(CompraSpecification.build(filter), pageable)
                 .map(this::buildResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CompraStatsResponse stats(CompraFilterRequest filter) {
+        Specification<Compra> base = CompraSpecification.build(filter);
+
+        long total = compraRepository.count(base);
+        long pendientes = compraRepository.count(base.and(porEstado(EstadoCompra.PENDIENTE)));
+        long recibidas = compraRepository.count(base.and(porEstado(EstadoCompra.RECIBIDA)));
+        long anuladas = compraRepository.count(base.and(porEstado(EstadoCompra.ANULADA)));
+
+        BigDecimal montoTotalPeriodo = compraRepository.sumMontoNoAnuladas(
+                filter != null ? filter.proveedorId() : null,
+                filter != null ? filter.fechaCompraDesde() : null,
+                filter != null ? filter.fechaCompraHasta() : null
+        );
+
+        return new CompraStatsResponse(total, pendientes, recibidas, anuladas, montoTotalPeriodo);
+    }
+
+    private Specification<Compra> porEstado(EstadoCompra estado) {
+        return SpecificationUtils.equalsIfPresent("estado", estado);
     }
 
     @Override
