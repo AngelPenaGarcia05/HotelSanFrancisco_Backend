@@ -354,9 +354,15 @@ public class NotificationServiceImpl implements NotificationService {
         }
 
         try {
-            PlantillaCorreo plantilla = plantillaCorreoRepository.findByClave(entry.getPlantillaClave())
-                    .orElseThrow(() -> new ResourceNotFoundException("Plantilla de correo", entry.getPlantillaClave()));
-            enviarCorreoHtml(entry.getDestinatario(), entry.getAsunto(), plantilla.getCuerpoHtml());
+            // Reenviar el cuerpo ya renderizado que se guardó al crear el registro.
+            // Fallback a la plantilla cruda solo para registros antiguos sin cuerpo guardado.
+            String cuerpo = entry.getCuerpoHtml();
+            if (cuerpo == null || cuerpo.isBlank()) {
+                cuerpo = plantillaCorreoRepository.findByClave(entry.getPlantillaClave())
+                        .orElseThrow(() -> new ResourceNotFoundException("Plantilla de correo", entry.getPlantillaClave()))
+                        .getCuerpoHtml();
+            }
+            enviarCorreoHtml(entry.getDestinatario(), entry.getAsunto(), cuerpo);
             entry.setEstado(EmailStatus.ENVIADO);
             entry.setError(null);
         } catch (Exception e) {
@@ -391,6 +397,7 @@ public class NotificationServiceImpl implements NotificationService {
         LogCorreo.LogCorreoBuilder logBuilder = LogCorreo.builder()
                 .destinatario(destinatario)
                 .asunto(asunto)
+                .cuerpoHtml(cuerpo)
                 .plantillaClave(key)
                 .reserva(reserva)
                 .pago(pago)

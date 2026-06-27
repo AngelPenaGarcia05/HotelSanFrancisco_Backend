@@ -5,6 +5,7 @@ import com.sanfrancisco.api.modules.compras.dto.request.CompraFilterRequest;
 import com.sanfrancisco.api.modules.compras.dto.request.CreateCompraRequest;
 import com.sanfrancisco.api.modules.compras.dto.request.UpdateCompraRequest;
 import com.sanfrancisco.api.modules.compras.dto.response.CompraResponse;
+import com.sanfrancisco.api.modules.compras.dto.response.CompraStatsResponse;
 import com.sanfrancisco.api.modules.compras.service.interfaces.CompraService;
 import com.sanfrancisco.api.shared.api.ApiResponse;
 import com.sanfrancisco.api.shared.api.PageResponse;
@@ -51,6 +52,11 @@ public class CompraController {
     @GetMapping
     public ApiResponse<PageResponse<CompraResponse>> search(CompraFilterRequest filter, Pageable pageable) {
         return ApiResponse.ok(PageResponse.from(compraService.search(filter, pageable)));
+    }
+
+    @GetMapping("/stats")
+    public ApiResponse<CompraStatsResponse> stats(CompraFilterRequest filter) {
+        return ApiResponse.ok(compraService.stats(filter));
     }
 
     @DeleteMapping("/{id}")

@@ -11,6 +11,7 @@ import java.time.LocalDate;
  */
 public record CompraFilterRequest(
         String numeroFactura,
+        String search,
         EstadoCompra estado,
         Integer proveedorId,
         LocalDate fechaCompraDesde,
