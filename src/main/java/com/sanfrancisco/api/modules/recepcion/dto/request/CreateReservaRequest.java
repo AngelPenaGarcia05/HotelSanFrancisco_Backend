@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.recepcion.dto.request;
 
+import com.sanfrancisco.api.modules.recepcion.enums.ModalidadPago;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 
@@ -9,9 +10,9 @@ import java.util.List;
 
 public record CreateReservaRequest(
 
-        @NotBlank(message = "El código de reserva es obligatorio")
+        // El código lo genera el backend; si llega del front se ignora.
         @Size(max = 30, message = "El código de reserva no puede exceder 30 caracteres")
-        @Pattern(regexp = "^[A-Z0-9\\-]+$", message = "El código de reserva solo permite mayúsculas, números y guiones")
+        @Pattern(regexp = "^[A-Z0-9\\-]*$", message = "El código de reserva solo permite mayúsculas, números y guiones")
         String codReserva,
 
         @NotNull(message = "La fecha de inicio es obligatoria")
@@ -30,18 +31,20 @@ public record CreateReservaRequest(
         @Min(value = 0, message = "El número de niños no puede ser negativo")
         Integer nroNinos,
 
-        // descuento, adelanto e impuesto los provee el cliente; subtotal se calcula del lado servidor
-        @NotNull(message = "El descuento es obligatorio")
+        // descuento: solo aplicable por staff y con tope (30% del subtotal); cliente => 0.
         @PositiveOrZero(message = "El descuento no puede ser negativo")
         BigDecimal descuento,
 
-        @NotNull(message = "El adelanto es obligatorio")
+        // adelanto e impuesto se IGNORAN: el backend los recalcula. Se mantienen
+        // en el contrato solo por compatibilidad hacia atrás con el front actual.
         @PositiveOrZero(message = "El adelanto no puede ser negativo")
         BigDecimal adelanto,
 
-        @NotNull(message = "El impuesto es obligatorio")
         @PositiveOrZero(message = "El impuesto no puede ser negativo")
         BigDecimal impuesto,
+
+        // Modalidad de pago: PARCIAL (50%) o TOTAL (100%). Si es null, el backend asume PARCIAL.
+        ModalidadPago modalidadPago,
 
         @Size(max = 2000, message = "Las observaciones no pueden exceder 2000 caracteres")
         String observaciones,

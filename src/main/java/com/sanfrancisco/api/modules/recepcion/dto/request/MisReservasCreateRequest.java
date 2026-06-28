@@ -1,18 +1,13 @@
 package com.sanfrancisco.api.modules.recepcion.dto.request;
 
+import com.sanfrancisco.api.modules.recepcion.enums.ModalidadPago;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
 public record MisReservasCreateRequest(
-
-        @NotBlank(message = "El código de reserva es obligatorio")
-        @Size(max = 30, message = "El código de reserva no puede exceder 30 caracteres")
-        @Pattern(regexp = "^[A-Z0-9\\-]+$", message = "El código solo permite mayúsculas, números y guiones")
-        String codReserva,
 
         @NotNull(message = "La fecha de inicio es obligatoria")
         @FutureOrPresent(message = "La fecha de inicio no puede ser anterior a hoy")
@@ -30,8 +25,8 @@ public record MisReservasCreateRequest(
         @Min(value = 0, message = "El número de niños no puede ser negativo")
         Integer nroNinos,
 
-        @PositiveOrZero(message = "El adelanto no puede ser negativo")
-        BigDecimal adelanto,
+        // Modalidad de pago: PARCIAL (50%) o TOTAL (100%). Si es null, el backend asume PARCIAL.
+        ModalidadPago modalidadPago,
 
         @Size(max = 2000, message = "Las observaciones no pueden exceder 2000 caracteres")
         String observaciones,

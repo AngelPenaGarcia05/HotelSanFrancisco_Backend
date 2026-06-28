@@ -52,8 +52,9 @@ public class ReservaOnlineServiceImpl implements ReservaOnlineService {
                 request.nroAdultos(),
                 request.nroNinos(),
                 BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
+                null,
+                null,
+                null,                       // modalidadPago: backend asume PARCIAL
                 request.observaciones(),
                 usuarioSistemaId,
                 canal.getCanalId(),

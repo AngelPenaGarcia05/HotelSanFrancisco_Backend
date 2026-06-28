@@ -1,6 +1,7 @@
 package com.sanfrancisco.api.modules.recepcion.dto.response;
 
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
+import com.sanfrancisco.api.modules.recepcion.enums.ModalidadPago;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -20,6 +21,8 @@ public record ReservaResponse(
         BigDecimal descuento,
         BigDecimal adelanto,
         BigDecimal impuesto,
+        BigDecimal saldoPendiente,
+        ModalidadPago modalidadPago,
         String observaciones,
         Integer usuarioId,
         String usuarioNombre,

@@ -2,6 +2,7 @@ package com.sanfrancisco.api.modules.recepcion.service;
 
 import com.sanfrancisco.api.exception.BusinessException;
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
+import com.sanfrancisco.api.modules.recepcion.dto.ReservaMontos;
 import com.sanfrancisco.api.modules.recepcion.dto.request.*;
 import com.sanfrancisco.api.modules.recepcion.dto.response.CancelacionResponse;
 import com.sanfrancisco.api.modules.recepcion.dto.response.HistorialReservaResponse;
@@ -10,6 +11,8 @@ import com.sanfrancisco.api.modules.recepcion.entity.*;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoHabitacion;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReservaHabitacion;
+import com.sanfrancisco.api.modules.recepcion.enums.ModalidadPago;
+import com.sanfrancisco.api.modules.notificacionescliente.service.interfaces.NotificacionClienteService;
 import com.sanfrancisco.api.modules.recepcion.mapper.*;
 import com.sanfrancisco.api.modules.recepcion.repository.*;
 import com.sanfrancisco.api.modules.recepcion.service.impl.ReservaServiceImpl;
@@ -22,6 +25,7 @@ import com.sanfrancisco.api.shared.exception.ConflictException;
 import com.sanfrancisco.api.shared.exception.ValidationException;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -48,6 +52,7 @@ class ReservaServiceTest {
     @Mock HuespedRepository huespedRepository;
     @Mock ReservaHabitacionRepository reservaHabitacionRepository;
     @Mock DetalleHuespedRepository detalleHuespedRepository;
+    @Mock EstanciaRepository estanciaRepository;
     @Mock ReservaMapper reservaMapper;
     @Mock ReservaHabitacionMapper reservaHabitacionMapper;
     @Mock DetalleHuespedMapper detalleHuespedMapper;
@@ -55,6 +60,7 @@ class ReservaServiceTest {
     @Mock HistorialReservaRepository historialReservaRepository;
     @Mock DisponibilidadService disponibilidadService;
     @Mock ReservaEventPublisher eventPublisher;
+    @Mock NotificacionClienteService notificacionClienteService;
 
     @InjectMocks
     ReservaServiceImpl service;
@@ -141,6 +147,7 @@ class ReservaServiceTest {
                 new BigDecimal("300.00"), EstadoReserva.PENDIENTE,
                 2, 0, new BigDecimal("300.00"), BigDecimal.ZERO,
                 new BigDecimal("100.00"), BigDecimal.ZERO,
+                new BigDecimal("200.00"), null,
                 null, 1, "Juan Pérez", null, null,
                 null,
                 Collections.emptyList(), Collections.emptyList(),
@@ -169,7 +176,7 @@ class ReservaServiceTest {
             when(tipoHabitacionRepository.findById(3)).thenReturn(Optional.of(tipo));
             when(reservaRepository.findSolapadasPorHuespedPrincipal(eq(20), any(), any(), any()))
                     .thenReturn(Collections.emptyList());
-            when(reservaMapper.toEntity(any(), eq(usuario), isNull(), eq(new BigDecimal("300.00"))))
+            when(reservaMapper.toEntity(any(), eq(usuario), isNull(), any(ReservaMontos.class)))
                     .thenReturn(reserva);
             when(reservaRepository.save(any())).thenReturn(reserva);
             when(reservaHabitacionMapper.toEntity(any(), any(), any(), any(), anyLong()))
@@ -177,15 +184,19 @@ class ReservaServiceTest {
             when(reservaHabitacionRepository.save(any())).thenReturn(reservaHabitacion);
             when(huespedRepository.findById(20)).thenReturn(Optional.of(huesped));
             when(detalleHuespedRepository.save(any())).thenReturn(detalleHuesped);
-            when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+                    .thenReturn(reservaResponse);
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList(), any()))
                     .thenReturn(reservaResponse);
 
             ReservaResponse result = service.create(req);
 
             assertThat(result).isNotNull();
             assertThat(result.codReserva()).isEqualTo("RES-001");
-            // subtotalCalculado correcto llegó al mapper
-            verify(reservaMapper).toEntity(any(), eq(usuario), isNull(), eq(new BigDecimal("300.00")));
+            // subtotalCalculado correcto llegó al mapper (dentro de ReservaMontos)
+            verify(reservaMapper).toEntity(any(), eq(usuario), isNull(),
+                    argThat(m -> m.subtotal().compareTo(new BigDecimal("300.00")) == 0
+                              && m.impuesto().compareTo(new BigDecimal("54.00")) == 0));
             verify(historialReservaRepository).save(any());
             verify(eventPublisher).publishCreated(any());
         }
@@ -197,6 +208,7 @@ class ReservaServiceTest {
             CreateReservaRequest req = new CreateReservaRequest(
                     "RES-001", INICIO, FIN, 2, 0,
                     BigDecimal.ZERO, new BigDecimal("100.00"), BigDecimal.ZERO,
+                    null,
                     null, 1, null,
                     List.of(conTarifa), List.of(huespedPrincipal), null
             );
@@ -207,7 +219,7 @@ class ReservaServiceTest {
             when(tipoHabitacionRepository.findById(3)).thenReturn(Optional.of(tipo));
             when(reservaRepository.findSolapadasPorHuespedPrincipal(eq(20), any(), any(), any()))
                     .thenReturn(Collections.emptyList());
-            when(reservaMapper.toEntity(any(), any(), any(), eq(new BigDecimal("400.00"))))
+            when(reservaMapper.toEntity(any(), any(), any(), any(ReservaMontos.class)))
                     .thenReturn(reserva);
             when(reservaRepository.save(any())).thenReturn(reserva);
             when(reservaHabitacionMapper.toEntity(any(), any(), any(), any(), anyLong()))
@@ -215,12 +227,15 @@ class ReservaServiceTest {
             when(reservaHabitacionRepository.save(any())).thenReturn(reservaHabitacion);
             when(huespedRepository.findById(20)).thenReturn(Optional.of(huesped));
             when(detalleHuespedRepository.save(any())).thenReturn(detalleHuesped);
-            when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+                    .thenReturn(reservaResponse);
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList(), any()))
                     .thenReturn(reservaResponse);
 
             service.create(req);
 
-            verify(reservaMapper).toEntity(any(), any(), any(), eq(new BigDecimal("400.00")));
+            verify(reservaMapper).toEntity(any(), any(), any(),
+                    argThat(m -> m.subtotal().compareTo(new BigDecimal("400.00")) == 0));
         }
 
         @Test
@@ -229,6 +244,7 @@ class ReservaServiceTest {
             CreateReservaRequest req = new CreateReservaRequest(
                     "RES-001", INICIO, INICIO, 2, 0,
                     BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                    null,
                     null, 1, null,
                     List.of(habRequest), List.of(huespedPrincipal), null
             );
@@ -244,6 +260,7 @@ class ReservaServiceTest {
             CreateReservaRequest req = new CreateReservaRequest(
                     "RES-001", INICIO, FIN, 2, 0,
                     BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                    null,
                     null, 1, null,
                     List.of(habRequest), List.of(new HuespedReservaRequest(20, false)), null
             );
@@ -259,6 +276,7 @@ class ReservaServiceTest {
             CreateReservaRequest req = new CreateReservaRequest(
                     "RES-001", INICIO, FIN, 2, 0,
                     BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                    null,
                     null, 1, null,
                     List.of(habRequest),
                     List.of(huespedPrincipal, new HuespedReservaRequest(21, true)),
@@ -339,7 +357,9 @@ class ReservaServiceTest {
             when(reservaHabitacionRepository.save(any())).thenReturn(reservaHabitacion);
             when(huespedRepository.findById(20)).thenReturn(Optional.of(huesped));
             when(detalleHuespedRepository.save(any())).thenReturn(detalleHuesped);
-            when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+                    .thenReturn(reservaResponse);
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList(), any()))
                     .thenReturn(reservaResponse);
 
             ReservaResponse result = service.create(req);
@@ -349,10 +369,102 @@ class ReservaServiceTest {
                     .findSolapadasPorHuespedPrincipal(any(), any(), any(), any());
         }
 
+        @Test
+        @DisplayName("Exitoso: IGV 18% recalculado y adelanto PARCIAL = 50% del total (subtotal 300 → IGV 54, total 354, adelanto 177)")
+        void create_recalculaImpuestoYAdelantoParcial() {
+            CreateReservaRequest req = buildCreate(null); // modalidadPago null → PARCIAL
+
+            when(reservaRepository.existsByCodReserva("RES-001")).thenReturn(false);
+            when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
+            when(habitacionRepository.findById(10)).thenReturn(Optional.of(habitacion));
+            when(tipoHabitacionRepository.findById(3)).thenReturn(Optional.of(tipo));
+            when(reservaRepository.findSolapadasPorHuespedPrincipal(eq(20), any(), any(), any()))
+                    .thenReturn(Collections.emptyList());
+            when(reservaMapper.toEntity(any(), any(), any(), any(ReservaMontos.class))).thenReturn(reserva);
+            when(reservaRepository.save(any())).thenReturn(reserva);
+            when(reservaHabitacionMapper.toEntity(any(), any(), any(), any(), anyLong()))
+                    .thenReturn(reservaHabitacion);
+            when(reservaHabitacionRepository.save(any())).thenReturn(reservaHabitacion);
+            when(huespedRepository.findById(20)).thenReturn(Optional.of(huesped));
+            when(detalleHuespedRepository.save(any())).thenReturn(detalleHuesped);
+            when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList())).thenReturn(reservaResponse);
+
+            service.create(req);
+
+            ArgumentCaptor<ReservaMontos> captor = ArgumentCaptor.forClass(ReservaMontos.class);
+            verify(reservaMapper).toEntity(any(), any(), any(), captor.capture());
+            ReservaMontos montos = captor.getValue();
+            assertThat(montos.impuesto()).isEqualByComparingTo("54.00");
+            assertThat(montos.montoTotal()).isEqualByComparingTo("354.00");
+            assertThat(montos.adelanto()).isEqualByComparingTo("177.00");
+            assertThat(montos.modalidadPago()).isEqualTo(ModalidadPago.PARCIAL);
+        }
+
+        @Test
+        @DisplayName("Falla: descuento de staff supera el 30% del subtotal → ValidationException")
+        void create_falla_descuentoSuperaTope_lanzaValidation() {
+            CreateReservaRequest req = new CreateReservaRequest(
+                    "RES-001", INICIO, FIN, 2, 0,
+                    new BigDecimal("100.00"), null, null,   // descuento 100 > 30% de 300 (=90)
+                    null,
+                    null, 1, null,
+                    List.of(habRequest), List.of(huespedPrincipal), null
+            );
+
+            when(reservaRepository.existsByCodReserva("RES-001")).thenReturn(false);
+            when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
+            when(habitacionRepository.findById(10)).thenReturn(Optional.of(habitacion));
+            when(tipoHabitacionRepository.findById(3)).thenReturn(Optional.of(tipo));
+            when(reservaRepository.findSolapadasPorHuespedPrincipal(eq(20), any(), any(), any()))
+                    .thenReturn(Collections.emptyList());
+
+            assertThatThrownBy(() -> service.create(req))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessageContaining("30%");
+        }
+
+        @Test
+        @DisplayName("Cliente: descuento forzado a 0 e ignorado, y adelanto TOTAL = 100% del total")
+        void createParaCliente_fuerzaDescuentoCeroYAdelantoTotal() {
+            CreateReservaRequest req = new CreateReservaRequest(
+                    null, INICIO, FIN, 2, 0,
+                    new BigDecimal("100.00"), null, null,   // el cliente intenta descuento 100
+                    ModalidadPago.TOTAL,
+                    null, 1, null,
+                    List.of(habRequest), List.of(huespedPrincipal), null
+            );
+
+            when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
+            when(reservaRepository.existsByCodReserva(any())).thenReturn(false);
+            when(habitacionRepository.findById(10)).thenReturn(Optional.of(habitacion));
+            when(tipoHabitacionRepository.findById(3)).thenReturn(Optional.of(tipo));
+            when(reservaRepository.findSolapadasPorHuespedPrincipal(eq(20), any(), any(), any()))
+                    .thenReturn(Collections.emptyList());
+            when(reservaMapper.toEntity(any(), any(), any(), any(ReservaMontos.class))).thenReturn(reserva);
+            when(reservaRepository.save(any())).thenReturn(reserva);
+            when(reservaHabitacionMapper.toEntity(any(), any(), any(), any(), anyLong()))
+                    .thenReturn(reservaHabitacion);
+            when(reservaHabitacionRepository.save(any())).thenReturn(reservaHabitacion);
+            when(huespedRepository.findById(20)).thenReturn(Optional.of(huesped));
+            when(detalleHuespedRepository.save(any())).thenReturn(detalleHuesped);
+            when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList())).thenReturn(reservaResponse);
+
+            service.createParaCliente(req, 1);
+
+            ArgumentCaptor<ReservaMontos> captor = ArgumentCaptor.forClass(ReservaMontos.class);
+            verify(reservaMapper).toEntity(any(), any(), any(), captor.capture());
+            ReservaMontos montos = captor.getValue();
+            assertThat(montos.descuento()).isEqualByComparingTo("0");
+            assertThat(montos.montoTotal()).isEqualByComparingTo("354.00");
+            assertThat(montos.adelanto()).isEqualByComparingTo("354.00"); // TOTAL = 100%
+            assertThat(montos.modalidadPago()).isEqualTo(ModalidadPago.TOTAL);
+        }
+
         private CreateReservaRequest buildCreate(Boolean forzar) {
             return new CreateReservaRequest(
                     "RES-001", INICIO, FIN, 2, 0,
                     BigDecimal.ZERO, new BigDecimal("100.00"), BigDecimal.ZERO,
+                    null,
                     null, 1, null,
                     List.of(habRequest), List.of(huespedPrincipal), forzar
             );
@@ -375,7 +487,9 @@ class ReservaServiceTest {
                     .thenReturn(List.of(reservaHabitacion));
             when(detalleHuespedRepository.findByIdReservaId(5))
                     .thenReturn(List.of(detalleHuesped));
-            when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+                    .thenReturn(reservaResponse);
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList(), any()))
                     .thenReturn(reservaResponse);
 
             service.cambiarEstado(5, new CambiarEstadoReservaRequest(EstadoReserva.CONFIRMADA, "Pago recibido"));
@@ -395,7 +509,9 @@ class ReservaServiceTest {
             when(reservaHabitacionRepository.findByReservaReservaId(5))
                     .thenReturn(Collections.emptyList());
             when(detalleHuespedRepository.findByIdReservaId(5)).thenReturn(Collections.emptyList());
-            when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+                    .thenReturn(reservaResponse);
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList(), any()))
                     .thenReturn(reservaResponse);
 
             service.cambiarEstado(5, new CambiarEstadoReservaRequest(EstadoReserva.NO_SHOW, null));
@@ -459,7 +575,9 @@ class ReservaServiceTest {
             when(reservaHabitacionRepository.save(any())).thenReturn(reservaHabitacion);
             when(reservaRepository.save(any())).thenReturn(reserva);
             when(detalleHuespedRepository.findByIdReservaId(5)).thenReturn(Collections.emptyList());
-            when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+                    .thenReturn(reservaResponse);
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList(), any()))
                     .thenReturn(reservaResponse);
 
             CancelacionResponse result = service.cancelar(5, new CancelarReservaRequest("Cambio de planes", null));
@@ -481,7 +599,9 @@ class ReservaServiceTest {
             when(reservaHabitacionRepository.save(any())).thenReturn(reservaHabitacion);
             when(reservaRepository.save(any())).thenReturn(reserva);
             when(detalleHuespedRepository.findByIdReservaId(5)).thenReturn(Collections.emptyList());
-            when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+                    .thenReturn(reservaResponse);
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList(), any()))
                     .thenReturn(reservaResponse);
 
             CancelacionResponse result = service.cancelar(5, new CancelarReservaRequest("Emergencia", null));
@@ -500,7 +620,9 @@ class ReservaServiceTest {
             when(reservaHabitacionRepository.save(any())).thenReturn(reservaHabitacion);
             when(reservaRepository.save(any())).thenReturn(reserva);
             when(detalleHuespedRepository.findByIdReservaId(5)).thenReturn(Collections.emptyList());
-            when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+                    .thenReturn(reservaResponse);
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList(), any()))
                     .thenReturn(reservaResponse);
 
             CancelacionResponse result = service.cancelar(5, new CancelarReservaRequest("Override recepción", false));
@@ -631,7 +753,9 @@ class ReservaServiceTest {
             when(reservaHabitacionRepository.findByReservaReservaId(5))
                     .thenReturn(List.of(reservaHabitacion));
             when(detalleHuespedRepository.findByIdReservaId(5)).thenReturn(List.of(detalleHuesped));
-            when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+                    .thenReturn(reservaResponse);
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList(), any()))
                     .thenReturn(reservaResponse);
 
             ReservaResponse result = service.findById(5);
@@ -657,7 +781,9 @@ class ReservaServiceTest {
             when(reservaHabitacionRepository.findByReservaReservaId(5))
                     .thenReturn(List.of(reservaHabitacion));
             when(detalleHuespedRepository.findByIdReservaId(5)).thenReturn(Collections.emptyList());
-            when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList()))
+                    .thenReturn(reservaResponse);
+            lenient().when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList(), any()))
                     .thenReturn(reservaResponse);
 
             ReservaResponse result = service.findByCodigo("RES-001");

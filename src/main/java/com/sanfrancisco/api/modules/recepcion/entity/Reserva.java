@@ -1,6 +1,7 @@
 package com.sanfrancisco.api.modules.recepcion.entity;
 
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
+import com.sanfrancisco.api.modules.recepcion.enums.ModalidadPago;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
 import com.sanfrancisco.api.shared.entity.AuditedEntity;
 import jakarta.persistence.*;
@@ -77,6 +78,10 @@ public class Reserva extends AuditedEntity {
     @PositiveOrZero
     @Column(name = "impuesto", nullable = false, precision = 12, scale = 2)
     private BigDecimal impuesto;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_pago", length = 10)
+    private ModalidadPago modalidadPago;
 
     @Column(name = "observaciones", columnDefinition = "TEXT")
     private String observaciones;

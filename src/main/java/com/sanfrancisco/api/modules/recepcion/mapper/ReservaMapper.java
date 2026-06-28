@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.recepcion.mapper;
 
+import com.sanfrancisco.api.modules.recepcion.dto.ReservaMontos;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CreateReservaRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.UpdateReservaRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.response.DetalleHuespedResponse;
@@ -36,19 +37,19 @@ public class ReservaMapper {
     }
 
     public Reserva toEntity(CreateReservaRequest request, Usuario usuario, Canal canal,
-                            BigDecimal subtotalCalculado) {
-        BigDecimal montoTotal = calcularMontoTotal(subtotalCalculado, request.descuento(), request.impuesto());
+                            ReservaMontos montos) {
         return Reserva.builder()
-                .codReserva(request.codReserva())
+                .codReserva(montos.codReserva())
                 .fechaInicio(request.fechaInicio())
                 .fechaFin(request.fechaFin())
                 .nroAdultos(request.nroAdultos())
                 .nroNinos(request.nroNinos())
-                .subtotal(subtotalCalculado)
-                .descuento(request.descuento())
-                .adelanto(request.adelanto())
-                .impuesto(request.impuesto())
-                .montoTotal(montoTotal)
+                .subtotal(montos.subtotal())
+                .descuento(montos.descuento())
+                .adelanto(montos.adelanto())
+                .impuesto(montos.impuesto())
+                .montoTotal(montos.montoTotal())
+                .modalidadPago(montos.modalidadPago())
                 .estado(EstadoReserva.PENDIENTE)
                 .observaciones(request.observaciones())
                 .usuario(usuario)
@@ -56,20 +57,26 @@ public class ReservaMapper {
                 .build();
     }
 
+    /**
+     * Aplica los campos no-monetarios presentes en el request (update parcial) y
+     * fija TODOS los montos a partir de {@link ReservaMontos} ya recalculados por el
+     * service. Los montos del request (impuesto, adelanto) se ignoran a propósito.
+     */
     public void updateEntity(Reserva target, UpdateReservaRequest request, Canal canal,
-                             BigDecimal subtotalCalculado) {
+                             ReservaMontos montos) {
         if (request.fechaInicio() != null) target.setFechaInicio(request.fechaInicio());
         if (request.fechaFin() != null) target.setFechaFin(request.fechaFin());
         if (request.nroAdultos() != null) target.setNroAdultos(request.nroAdultos());
         if (request.nroNinos() != null) target.setNroNinos(request.nroNinos());
-        if (request.descuento() != null) target.setDescuento(request.descuento());
-        if (request.adelanto() != null) target.setAdelanto(request.adelanto());
-        if (request.impuesto() != null) target.setImpuesto(request.impuesto());
         if (request.observaciones() != null) target.setObservaciones(request.observaciones());
         if (canal != null) target.setCanal(canal);
-        if (subtotalCalculado != null) target.setSubtotal(subtotalCalculado);
 
-        target.setMontoTotal(calcularMontoTotal(target.getSubtotal(), target.getDescuento(), target.getImpuesto()));
+        target.setSubtotal(montos.subtotal());
+        target.setDescuento(montos.descuento());
+        target.setImpuesto(montos.impuesto());
+        target.setMontoTotal(montos.montoTotal());
+        target.setAdelanto(montos.adelanto());
+        target.setModalidadPago(montos.modalidadPago());
     }
 
     public ReservaResponse toResponse(Reserva entity,
@@ -100,6 +107,8 @@ public class ReservaMapper {
                 entity.getDescuento(),
                 entity.getAdelanto(),
                 entity.getImpuesto(),
+                calcularSaldoPendiente(entity.getMontoTotal(), entity.getAdelanto()),
+                entity.getModalidadPago(),
                 entity.getObservaciones(),
                 u != null ? u.getUsuarioId() : null,
                 u != null ? buildNombreCompleto(u) : null,
@@ -126,11 +135,10 @@ public class ReservaMapper {
         return toResponse(entity, null, null, null);
     }
 
-    private BigDecimal calcularMontoTotal(BigDecimal subtotal, BigDecimal descuento, BigDecimal impuesto) {
-        BigDecimal s = Optional.ofNullable(subtotal).orElse(BigDecimal.ZERO);
-        BigDecimal d = Optional.ofNullable(descuento).orElse(BigDecimal.ZERO);
-        BigDecimal i = Optional.ofNullable(impuesto).orElse(BigDecimal.ZERO);
-        return s.subtract(d).add(i);
+    private BigDecimal calcularSaldoPendiente(BigDecimal montoTotal, BigDecimal adelanto) {
+        BigDecimal t = Optional.ofNullable(montoTotal).orElse(BigDecimal.ZERO);
+        BigDecimal a = Optional.ofNullable(adelanto).orElse(BigDecimal.ZERO);
+        return t.subtract(a);
     }
 
     private String buildNombreCompleto(Usuario u) {

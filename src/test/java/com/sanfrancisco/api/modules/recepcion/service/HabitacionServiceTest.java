@@ -56,6 +56,7 @@ class HabitacionServiceTest {
     @Mock WebSocketPublisher wsPublisher;
     @Mock HistorialReservaRepository historialReservaRepository;
     @Mock HistorialReservaMapper historialReservaMapper;
+    @Mock com.sanfrancisco.api.modules.notificacionescliente.service.interfaces.NotificacionClienteService notificacionClienteService;
 
     @InjectMocks
     HabitacionServiceImpl service;

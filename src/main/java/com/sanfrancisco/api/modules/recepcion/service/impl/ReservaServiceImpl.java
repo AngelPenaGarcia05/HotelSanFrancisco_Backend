@@ -2,6 +2,7 @@ package com.sanfrancisco.api.modules.recepcion.service.impl;
 
 import com.sanfrancisco.api.exception.BusinessException;
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
+import com.sanfrancisco.api.modules.recepcion.dto.ReservaMontos;
 import com.sanfrancisco.api.modules.recepcion.dto.request.*;
 import com.sanfrancisco.api.modules.recepcion.dto.response.CancelacionResponse;
 import com.sanfrancisco.api.modules.recepcion.dto.response.HistorialReservaResponse;
@@ -11,6 +12,7 @@ import com.sanfrancisco.api.modules.notificacionescliente.enums.TipoNotificacion
 import com.sanfrancisco.api.modules.notificacionescliente.service.interfaces.NotificacionClienteService;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoHabitacion;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
+import com.sanfrancisco.api.modules.recepcion.enums.ModalidadPago;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReservaHabitacion;
 import com.sanfrancisco.api.modules.recepcion.mapper.DetalleHuespedMapper;
 import com.sanfrancisco.api.modules.recepcion.mapper.HistorialReservaMapper;
@@ -48,6 +50,13 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class ReservaServiceImpl implements ReservaService {
+
+    private static final BigDecimal IGV = new BigDecimal("0.18");
+    private static final BigDecimal PORC_ADELANTO_PARCIAL = new BigDecimal("0.50");
+    private static final BigDecimal MAX_DESCUENTO_RATIO = new BigDecimal("0.30");   // tope 30% del subtotal (staff)
+    private static final BigDecimal TARIFA_MIN_RATIO = new BigDecimal("0.50");      // tarifa pactada >= 50% del precio base
+    private static final BigDecimal TARIFA_MAX_RATIO = new BigDecimal("2.00");      // tarifa pactada <= 200% del precio base
+    private static final java.util.Random RNG = new java.util.Random();
 
     private static final Map<EstadoReserva, Set<EstadoReserva>> TRANSICIONES = new EnumMap<>(EstadoReserva.class);
 
@@ -116,12 +125,17 @@ public class ReservaServiceImpl implements ReservaService {
 
     @Override
     public ReservaResponse create(CreateReservaRequest request) {
+        // Alta por staff (RECEPCIONISTA/ADMIN): puede pactar tarifa y aplicar descuento (con tope).
+        return crearInterno(request, false);
+    }
+
+    private ReservaResponse crearInterno(CreateReservaRequest request, boolean esCliente) {
         validarFechas(request.fechaInicio(), request.fechaFin());
         validarUnSoloPrincipal(request.huespedes());
 
-        if (reservaRepository.existsByCodReserva(request.codReserva())) {
-            throw new ConflictException("Ya existe una reserva con código " + request.codReserva());
-        }
+        // El código lo genera el backend salvo que un llamador interno (p.ej. canal online)
+        // provea uno explícito, en cuyo caso se valida unicidad. El wizard manda null.
+        String codReserva = resolverCodReserva(request.codReserva());
 
         Usuario usuario = usuarioRepository.findById(request.usuarioId())
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado: " + request.usuarioId()));
@@ -148,12 +162,16 @@ public class ReservaServiceImpl implements ReservaService {
             detectarDuplicado(request.huespedes(), request.fechaInicio(), request.fechaFin());
         }
 
-        BigDecimal subtotalCalculado = calcularSubtotal(habRequests, tipos, noches);
+        // Normalizar tarifas (cliente => precio base; staff => validar rango) y recalcular montos server-side
+        List<ReservaHabitacionRequest> habNormalizadas = normalizarTarifas(habRequests, tipos, esCliente);
+        BigDecimal subtotal = calcularSubtotal(habNormalizadas, tipos, noches);
+        BigDecimal descuento = normalizarDescuento(request.descuento(), subtotal, esCliente);
+        ReservaMontos montos = calcularMontos(codReserva, subtotal, descuento, request.modalidadPago());
 
-        Reserva entity = reservaMapper.toEntity(request, usuario, canal, subtotalCalculado);
+        Reserva entity = reservaMapper.toEntity(request, usuario, canal, montos);
         Reserva saved = reservaRepository.save(entity);
 
-        List<ReservaHabitacion> reservaHabitaciones = persistirHabitaciones(habRequests, saved, habitaciones, tipos, noches);
+        List<ReservaHabitacion> reservaHabitaciones = persistirHabitaciones(habNormalizadas, saved, habitaciones, tipos, noches);
         List<DetalleHuesped> detalleHuespedes = persistirHuespedes(request.huespedes(), saved);
 
         registrarHistorial(saved, null, EstadoReserva.PENDIENTE, "Alta de reserva");
@@ -183,14 +201,15 @@ public class ReservaServiceImpl implements ReservaService {
         }
 
         CreateReservaRequest fullRequest = new CreateReservaRequest(
-                request.codReserva(),
+                null,                       // codReserva lo genera el backend
                 request.fechaInicio(),
                 request.fechaFin(),
                 request.nroAdultos(),
                 request.nroNinos(),
-                request.descuento(),
-                request.adelanto(),
-                request.impuesto(),
+                BigDecimal.ZERO,            // descuento: el cliente nunca aplica descuento
+                null,                       // adelanto: lo deriva el backend de la modalidad
+                null,                       // impuesto: lo recalcula el backend
+                request.modalidadPago(),
                 request.observaciones(),
                 usuarioId,
                 request.canalId(),
@@ -199,7 +218,7 @@ public class ReservaServiceImpl implements ReservaService {
                 request.forzar()
         );
 
-        return create(fullRequest);
+        return crearInterno(fullRequest, true);
     }
 
     /**
@@ -255,14 +274,16 @@ public class ReservaServiceImpl implements ReservaService {
 
             disponibilidadService.validarDisponibilidad(request.habitaciones(), fechaInicio, fechaFin, reservaId);
 
-            subtotalCalculado = calcularSubtotal(request.habitaciones(), tipos, noches);
+            // Update es staff-only (PUT /reservas): se valida el rango de tarifa pactada.
+            List<ReservaHabitacionRequest> habNormalizadas = normalizarTarifas(request.habitaciones(), tipos, false);
+            subtotalCalculado = calcularSubtotal(habNormalizadas, tipos, noches);
 
             reservaHabitacionRepository.findByReservaReservaId(reservaId)
                     .forEach(rh -> {
                         rh.setEstado(EstadoReservaHabitacion.LIBERADA);
                         reservaHabitacionRepository.save(rh);
                     });
-            reservaHabitaciones = persistirHabitaciones(request.habitaciones(), reserva, habitaciones, tipos, noches);
+            reservaHabitaciones = persistirHabitaciones(habNormalizadas, reserva, habitaciones, tipos, noches);
 
         } else if (fechasCambiaron) {
             // Caso B: solo cambian las fechas — revalidar disponibilidad y recalcular noches/subtotal
@@ -284,7 +305,17 @@ public class ReservaServiceImpl implements ReservaService {
             detalleHuespedes = detalleHuespedRepository.findByIdReservaId(reservaId);
         }
 
-        reservaMapper.updateEntity(reserva, request, canal, subtotalCalculado);
+        // Recalcular SIEMPRE los montos server-side (impuesto, total, adelanto), ignorando
+        // los montos del payload. Si no cambió el subtotal, se conserva el actual.
+        BigDecimal subtotalFinal = subtotalCalculado != null ? subtotalCalculado : reserva.getSubtotal();
+        BigDecimal descuentoReq  = request.descuento() != null ? request.descuento() : reserva.getDescuento();
+        BigDecimal descuentoFinal = normalizarDescuento(descuentoReq, subtotalFinal, false);
+        ModalidadPago modalidadFinal = request.modalidadPago() != null
+                ? request.modalidadPago()
+                : reserva.getModalidadPago();
+        ReservaMontos montos = calcularMontos(reserva.getCodReserva(), subtotalFinal, descuentoFinal, modalidadFinal);
+
+        reservaMapper.updateEntity(reserva, request, canal, montos);
         Reserva saved = reservaRepository.save(reserva);
         eventPublisher.publishUpdated(saved);
         return reservaMapper.toResponse(saved, reservaHabitaciones, detalleHuespedes);
@@ -506,6 +537,99 @@ public class ReservaServiceImpl implements ReservaService {
             total = total.add(tarifa.multiply(BigDecimal.valueOf(noches)));
         }
         return total;
+    }
+
+    /**
+     * Normaliza la tarifa pactada de cada habitación:
+     *  - Cliente: se fuerza el precio base del tipo (no puede pactar tarifa).
+     *  - Staff: si pacta tarifa, se valida que esté entre el 50% y el 200% del precio base.
+     */
+    private List<ReservaHabitacionRequest> normalizarTarifas(List<ReservaHabitacionRequest> requests,
+                                                             List<TipoHabitacion> tipos,
+                                                             boolean esCliente) {
+        java.util.ArrayList<ReservaHabitacionRequest> out = new java.util.ArrayList<>();
+        for (int i = 0; i < requests.size(); i++) {
+            ReservaHabitacionRequest req = requests.get(i);
+            TipoHabitacion tipo = tipos.get(i);
+            BigDecimal base = tipo.getPrecioBase();
+            BigDecimal tarifa;
+            if (esCliente || req.tarifaPactada() == null) {
+                tarifa = base;
+            } else {
+                tarifa = req.tarifaPactada();
+                BigDecimal min = base.multiply(TARIFA_MIN_RATIO);
+                BigDecimal max = base.multiply(TARIFA_MAX_RATIO);
+                if (tarifa.compareTo(min) < 0 || tarifa.compareTo(max) > 0) {
+                    throw new ValidationException(
+                            "La tarifa pactada no es válida para el tipo de habitación " + tipo.getNombre());
+                }
+            }
+            out.add(new ReservaHabitacionRequest(req.habitacionId(), req.tipoHabitacionId(), tarifa));
+        }
+        return out;
+    }
+
+    /**
+     * Descuento: el cliente nunca aplica descuento (=> 0). El staff puede aplicarlo,
+     * con un tope del 30% del subtotal.
+     */
+    private BigDecimal normalizarDescuento(BigDecimal descuento, BigDecimal subtotal, boolean esCliente) {
+        if (esCliente) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal d = descuento != null ? descuento : BigDecimal.ZERO;
+        BigDecimal max = subtotal.multiply(MAX_DESCUENTO_RATIO).setScale(2, RoundingMode.HALF_UP);
+        if (d.compareTo(max) > 0) {
+            throw new ValidationException("El descuento no puede superar el 30% del subtotal");
+        }
+        return d;
+    }
+
+    /**
+     * Recalcula los montos server-side (fuente de verdad):
+     *   impuesto   = subtotal × 18%
+     *   montoTotal = max(0, subtotal − descuento + impuesto)
+     *   adelanto   = TOTAL → montoTotal ; PARCIAL → 50% del montoTotal
+     */
+    private ReservaMontos calcularMontos(String codReserva, BigDecimal subtotal,
+                                         BigDecimal descuento, ModalidadPago modalidad) {
+        BigDecimal impuesto = subtotal.multiply(IGV).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal montoTotal = subtotal.subtract(descuento).add(impuesto).setScale(2, RoundingMode.HALF_UP);
+        if (montoTotal.signum() < 0) {
+            montoTotal = BigDecimal.ZERO;
+        }
+        ModalidadPago m = modalidad != null ? modalidad : ModalidadPago.PARCIAL;
+        BigDecimal adelanto = m == ModalidadPago.TOTAL
+                ? montoTotal
+                : montoTotal.multiply(PORC_ADELANTO_PARCIAL).setScale(2, RoundingMode.HALF_UP);
+        return new ReservaMontos(codReserva, subtotal, descuento, impuesto, montoTotal, adelanto, m);
+    }
+
+    /**
+     * Si el llamador provee un código no vacío, valida unicidad y lo respeta;
+     * en caso contrario genera uno server-side. El wizard (staff/cliente) envía null.
+     */
+    private String resolverCodReserva(String provisto) {
+        if (provisto != null && !provisto.isBlank()) {
+            if (reservaRepository.existsByCodReserva(provisto)) {
+                throw new ConflictException("Ya existe una reserva con código " + provisto);
+            }
+            return provisto;
+        }
+        return generarCodReserva();
+    }
+
+    /**
+     * Genera un código único con formato RSV-AAAA-NNNNNN, reintentando ante colisión.
+     */
+    private String generarCodReserva() {
+        int anio = DateTimeUtils.today().getYear();
+        String cod;
+        do {
+            int n = 100000 + RNG.nextInt(900000);
+            cod = "RSV-" + anio + "-" + n;
+        } while (reservaRepository.existsByCodReserva(cod));
+        return cod;
     }
 
     private List<ReservaHabitacion> persistirHabitaciones(List<ReservaHabitacionRequest> requests,

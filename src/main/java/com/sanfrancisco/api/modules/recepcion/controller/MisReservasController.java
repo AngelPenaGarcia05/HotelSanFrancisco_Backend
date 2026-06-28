@@ -52,14 +52,15 @@ public class MisReservasController {
             @Valid @RequestBody MisReservasCreateRequest request) {
 
         CreateReservaRequest fullRequest = new CreateReservaRequest(
-                request.codReserva(),
+                null,                       // codReserva lo genera el backend
                 request.fechaInicio(),
                 request.fechaFin(),
                 request.nroAdultos(),
                 request.nroNinos(),
-                BigDecimal.ZERO,
-                request.adelanto() != null ? request.adelanto() : BigDecimal.ZERO,
-                BigDecimal.ZERO,
+                BigDecimal.ZERO,            // descuento: el cliente nunca aplica descuento
+                null,                       // adelanto: lo deriva el backend de la modalidad
+                null,                       // impuesto: lo recalcula el backend
+                request.modalidadPago(),
                 request.observaciones(),
                 userPrincipal.userId(),
                 null,
