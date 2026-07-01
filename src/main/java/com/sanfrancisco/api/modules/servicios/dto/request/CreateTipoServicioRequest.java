@@ -19,6 +19,11 @@ public record CreateTipoServicioRequest(
         @Size(max = 2000, message = "La descripción no puede exceder 2000 caracteres")
         String descripcion,
 
+        // Opcional: tope de unidades por pedido. Si es null se aplica el default de negocio (50).
+        @Positive(message = "La cantidad máxima debe ser mayor a cero")
+        @Max(value = 99, message = "La cantidad máxima no puede exceder 99")
+        Integer cantidadMaxima,
+
         @NotNull(message = "El estado es obligatorio")
         EstadoActivo estado
 ) {

@@ -35,6 +35,16 @@ public class TipoServicio extends AuditedEntity {
     @Column(name = "descripcion", columnDefinition = "TEXT")
     private String descripcion;
 
+    /**
+     * Tope de unidades por pedido para este servicio. Nullable: si es null se aplica
+     * el default de negocio (CANTIDAD_MAXIMA_DEFAULT). El @Max(99) es coherente con
+     * el tope duro de los request de pedido/consumo.
+     */
+    @Positive
+    @Max(99)
+    @Column(name = "cantidad_maxima")
+    private Integer cantidadMaxima;
+
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "estado", nullable = false, length = 10)

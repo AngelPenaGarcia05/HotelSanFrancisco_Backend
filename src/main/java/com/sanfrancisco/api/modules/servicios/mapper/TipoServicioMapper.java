@@ -14,6 +14,7 @@ public class TipoServicioMapper {
                 .nombre(request.nombre())
                 .costoBase(request.costoBase())
                 .descripcion(request.descripcion())
+                .cantidadMaxima(request.cantidadMaxima())
                 .estado(request.estado())
                 .build();
     }
@@ -22,6 +23,7 @@ public class TipoServicioMapper {
         if (request.nombre() != null) target.setNombre(request.nombre());
         if (request.costoBase() != null) target.setCostoBase(request.costoBase());
         if (request.descripcion() != null) target.setDescripcion(request.descripcion());
+        if (request.cantidadMaxima() != null) target.setCantidadMaxima(request.cantidadMaxima());
         if (request.estado() != null) target.setEstado(request.estado());
     }
 
@@ -31,6 +33,7 @@ public class TipoServicioMapper {
                 entity.getNombre(),
                 entity.getCostoBase(),
                 entity.getDescripcion(),
+                entity.getCantidadMaxima(),
                 entity.getEstado(),
                 entity.getFechaCreacion(),
                 entity.getFechaModificacion()

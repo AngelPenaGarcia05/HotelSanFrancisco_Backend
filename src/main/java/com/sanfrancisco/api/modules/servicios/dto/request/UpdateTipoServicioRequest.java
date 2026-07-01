@@ -2,6 +2,8 @@ package com.sanfrancisco.api.modules.servicios.dto.request;
 
 import com.sanfrancisco.api.shared.enums.EstadoActivo;
 import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
@@ -18,6 +20,10 @@ public record UpdateTipoServicioRequest(
 
         @Size(max = 2000, message = "La descripción no puede exceder 2000 caracteres")
         String descripcion,
+
+        @Positive(message = "La cantidad máxima debe ser mayor a cero")
+        @Max(value = 99, message = "La cantidad máxima no puede exceder 99")
+        Integer cantidadMaxima,
 
         EstadoActivo estado
 ) {

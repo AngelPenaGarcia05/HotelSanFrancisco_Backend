@@ -87,9 +87,12 @@ public class PedidoServicioServiceImpl implements PedidoServicioService {
             throw new BusinessException("El servicio seleccionado no está disponible.");
         }
 
-        if (request.cantidad() > CANTIDAD_MAXIMA_DEFAULT) {
+        int cantidadMaxima = tipoServicio.getCantidadMaxima() != null
+                ? tipoServicio.getCantidadMaxima()
+                : CANTIDAD_MAXIMA_DEFAULT;
+        if (request.cantidad() > cantidadMaxima) {
             throw new BusinessException("La cantidad máxima para '" + tipoServicio.getNombre()
-                    + "' es " + CANTIDAD_MAXIMA_DEFAULT + ".");
+                    + "' es " + cantidadMaxima + ".");
         }
 
         PedidoServicio pedido = PedidoServicio.builder()
