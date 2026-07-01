@@ -25,8 +25,8 @@ public class Servicio extends AuditedEntity {
 
     @NotNull
     @Positive
-    @Column(name = "cantidad", nullable = false, precision = 10, scale = 2)
-    private BigDecimal cantidad;
+    @Column(name = "cantidad", nullable = false)
+    private Integer cantidad;
 
     @NotNull
     @PositiveOrZero

@@ -8,7 +8,6 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -32,8 +31,8 @@ public class PedidoServicio extends AuditedEntity {
 
     @NotNull
     @Positive
-    @Column(name = "cantidad", nullable = false, precision = 10, scale = 2)
-    private BigDecimal cantidad;
+    @Column(name = "cantidad", nullable = false)
+    private Integer cantidad;
 
     @Column(name = "observaciones", columnDefinition = "TEXT")
     private String observaciones;

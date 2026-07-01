@@ -36,6 +36,13 @@ import java.util.List;
 @Transactional
 public class PedidoServicioServiceImpl implements PedidoServicioService {
 
+    /**
+     * Tope de negocio por defecto para la cantidad de un pedido mientras el tipo de
+     * servicio no tenga un máximo propio (cantidadMaxima, fase posterior). El frontend
+     * usa este mismo valor como fallback cuando el catálogo no expone un tope.
+     */
+    private static final int CANTIDAD_MAXIMA_DEFAULT = 50;
+
     private final PedidoServicioRepository pedidoRepository;
     private final TipoServicioRepository tipoServicioRepository;
     private final EstanciaRepository estanciaRepository;
@@ -78,6 +85,11 @@ public class PedidoServicioServiceImpl implements PedidoServicioService {
                 .orElseThrow(() -> new ResourceNotFoundException("TipoServicio", request.tipoServicioId()));
         if (tipoServicio.getEstado() != EstadoActivo.ACTIVO) {
             throw new BusinessException("El servicio seleccionado no está disponible.");
+        }
+
+        if (request.cantidad() > CANTIDAD_MAXIMA_DEFAULT) {
+            throw new BusinessException("La cantidad máxima para '" + tipoServicio.getNombre()
+                    + "' es " + CANTIDAD_MAXIMA_DEFAULT + ".");
         }
 
         PedidoServicio pedido = PedidoServicio.builder()
@@ -136,7 +148,7 @@ public class PedidoServicioServiceImpl implements PedidoServicioService {
         // Aprobar genera el consumo facturable ligado a la estancia.
         TipoServicio tipo = pedido.getTipoServicio();
         BigDecimal precioAplicado = tipo.getCostoBase();
-        BigDecimal subtotal = pedido.getCantidad().multiply(precioAplicado);
+        BigDecimal subtotal = BigDecimal.valueOf(pedido.getCantidad()).multiply(precioAplicado);
 
         Servicio servicio = Servicio.builder()
                 .tipoServicio(tipo)

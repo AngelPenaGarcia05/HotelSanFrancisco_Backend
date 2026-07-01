@@ -10,7 +10,7 @@ public record PedidoServicioResponse(
         Integer tipoServicioId,
         String tipoServicioNombre,
         BigDecimal costoBase,
-        BigDecimal cantidad,
+        Integer cantidad,
         BigDecimal subtotalEstimado,
         String observaciones,
         EstadoPedidoServicio estado,

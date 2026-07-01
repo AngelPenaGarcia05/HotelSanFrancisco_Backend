@@ -8,7 +8,7 @@ public record ServicioResponse(
         Integer tipoServicioId,
         String tipoServicioNombre,
         Integer estanciaId,
-        BigDecimal cantidad,
+        Integer cantidad,
         BigDecimal precioAplicado,
         BigDecimal subtotal,
         String observaciones,

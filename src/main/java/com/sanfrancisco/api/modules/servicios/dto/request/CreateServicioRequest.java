@@ -14,9 +14,9 @@ public record CreateServicioRequest(
         Integer estanciaId,
 
         @NotNull(message = "La cantidad es obligatoria")
-        @Positive(message = "La cantidad debe ser mayor a cero")
-        @Digits(integer = 8, fraction = 2, message = "Formato de cantidad inválido")
-        BigDecimal cantidad,
+        @Min(value = 1, message = "La cantidad debe ser al menos 1")
+        @Max(value = 99, message = "La cantidad es demasiado alta")
+        Integer cantidad,
 
         @PositiveOrZero(message = "El precio aplicado no puede ser negativo")
         @Digits(integer = 10, fraction = 2, message = "Formato de precio aplicado inválido")

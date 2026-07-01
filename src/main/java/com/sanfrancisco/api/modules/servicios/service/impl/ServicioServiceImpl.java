@@ -66,7 +66,7 @@ public class ServicioServiceImpl implements ServicioService {
         if (request.observaciones() != null) servicio.setObservaciones(request.observaciones());
         if (request.fechaConsumo() != null) servicio.setFechaConsumo(request.fechaConsumo());
 
-        servicio.setSubtotal(servicio.getCantidad().multiply(servicio.getPrecioAplicado()));
+        servicio.setSubtotal(java.math.BigDecimal.valueOf(servicio.getCantidad()).multiply(servicio.getPrecioAplicado()));
 
         Servicio saved = servicioRepository.save(servicio);
         eventPublisher.publishUpdated(saved);
