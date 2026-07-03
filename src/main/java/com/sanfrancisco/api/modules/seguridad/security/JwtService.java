@@ -53,11 +53,17 @@ public class JwtService {
 
     @PostConstruct
     public void init() {
+        // Falla al arrancar antes que firmar tokens con una clave adivinable:
+        // HS256 exige >= 32 bytes y rellenar con ceros solo enmascara claves débiles.
+        if (secretKey == null || secretKey.isBlank()) {
+            throw new IllegalStateException(
+                    "JWT_SECRET_KEY no está definida. Configure una clave secreta de al menos 32 caracteres.");
+        }
         byte[] keyBytes = secretKey.getBytes(StandardCharsets.UTF_8);
         if (keyBytes.length < 32) {
-            byte[] padded = new byte[32];
-            System.arraycopy(keyBytes, 0, padded, 0, Math.min(keyBytes.length, 32));
-            keyBytes = padded;
+            throw new IllegalStateException(
+                    "JWT_SECRET_KEY es demasiado corta (" + keyBytes.length
+                            + " bytes). HS256 requiere al menos 32 bytes (32+ caracteres).");
         }
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
