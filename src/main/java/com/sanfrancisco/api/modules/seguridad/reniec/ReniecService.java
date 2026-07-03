@@ -7,7 +7,8 @@ import java.util.Optional;
 public interface ReniecService {
 
     /**
-     * Consulta los datos de identidad de un DNI en RENIEC (vía apisperu.com).
+     * Consulta los datos de identidad de un DNI en RENIEC (proveedor primario
+     * apisperu.com con respaldo automático en apis.net.pe).
      * Lanza {@code BusinessException} si el DNI es inválido, no existe o el
      * proveedor no está disponible. Pensado para el endpoint público de consulta.
      *

@@ -13,15 +13,15 @@ public class ReniecServiceImpl implements ReniecService {
 
     private static final Logger log = LoggerFactory.getLogger(ReniecServiceImpl.class);
 
-    private final ReniecClient reniecClient;
+    private final DniLookupOrchestrator orchestrator;
 
-    public ReniecServiceImpl(ReniecClient reniecClient) {
-        this.reniecClient = reniecClient;
+    public ReniecServiceImpl(DniLookupOrchestrator orchestrator) {
+        this.orchestrator = orchestrator;
     }
 
     @Override
     public ReniecConsultaResponse consultarDni(String dni) {
-        return reniecClient.fetch(normalizarDni(dni));
+        return orchestrator.fetch(normalizarDni(dni));
     }
 
     @Override
@@ -30,7 +30,7 @@ public class ReniecServiceImpl implements ReniecService {
             return Optional.empty();
         }
         try {
-            return Optional.of(reniecClient.fetch(dni.trim()));
+            return Optional.of(orchestrator.fetch(dni.trim()));
         } catch (Exception e) {
             // Degradación elegante: el registro no debe fallar si RENIEC no responde.
             log.info("Enriquecimiento RENIEC omitido para DNI {}: {}", dni, e.getMessage());
