@@ -107,6 +107,12 @@ app:
     api-url: ${RENIEC_API_URL:https://dniruc.apisperu.com/api/v1/dni}
     token: ${RENIEC_TOKEN:eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImFydGh1cjEyM2JtYkBnbWFpbC5jb20ifQ.FwX1j9OtB1qcTMSSJBK8XwUOuxNeOMSfACaqU_iUX_I}
     enabled: ${RENIEC_ENABLED:true}
+    # Proveedor de respaldo (apis.net.pe): se usa automáticamente si el primario
+    # falla o no encuentra el DNI. Con token vacío queda inactivo.
+    fallback:
+      api-url: ${RENIEC_FALLBACK_API_URL:https://api.apis.net.pe/v2/reniec/dni}
+      token: ${RENIEC_FALLBACK_TOKEN:}
+      enabled: ${RENIEC_FALLBACK_ENABLED:true}
 
   reserva:
     online:

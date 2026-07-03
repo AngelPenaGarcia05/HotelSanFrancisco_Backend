@@ -63,8 +63,9 @@ public class AuthController {
     }
 
     @Operation(summary = "Consultar DNI en RENIEC",
-            description = "Devuelve nombres y apellidos del DNI (8 dígitos) vía apisperu.com para "
-                    + "autocompletar el formulario de registro. El resultado se cachea por DNI.")
+            description = "Devuelve nombres y apellidos del DNI (8 dígitos) para autocompletar el "
+                    + "formulario de registro. Consulta al proveedor primario (apisperu.com) y, si este "
+                    + "falla o no encuentra el DNI, al de respaldo (apis.net.pe). El resultado se cachea por DNI.")
     @GetMapping("/reniec/dni/{dni}")
     public ResponseEntity<ApiResponse<ReniecConsultaResponse>> consultarDni(@PathVariable String dni) {
         ReniecConsultaResponse response = reniecService.consultarDni(dni);

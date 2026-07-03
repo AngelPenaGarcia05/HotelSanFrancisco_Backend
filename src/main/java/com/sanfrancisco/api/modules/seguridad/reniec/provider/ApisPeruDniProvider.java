@@ -1,12 +1,11 @@
-package com.sanfrancisco.api.modules.seguridad.reniec;
+package com.sanfrancisco.api.modules.seguridad.reniec.provider;
 
-import com.sanfrancisco.api.exception.BusinessException;
 import com.sanfrancisco.api.modules.seguridad.dto.response.ReniecConsultaResponse;
 import com.sanfrancisco.api.modules.seguridad.reniec.dto.ReniecApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.Cacheable;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -14,25 +13,23 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import java.time.Duration;
+import java.util.Optional;
 
 /**
- * Cliente HTTP hacia el proveedor RENIEC (apisperu.com).
- * <p>
- * Se aísla en un bean propio para que el cache {@code @Cacheable} opere a través
- * del proxy de Spring incluso cuando {@link ReniecServiceImpl} invoca la consulta
- * desde sus distintos métodos (la auto-invocación dentro del mismo bean omitiría
- * el cache). El token se inyecta como variable de entorno y nunca se loguea.
+ * Proveedor primario: apisperu.com ({@code GET /api/v1/dni/{dni}?token=...}).
+ * El token se inyecta como variable de entorno y nunca se loguea.
  */
 @Component
-public class ReniecClient {
+@Order(1)
+public class ApisPeruDniProvider implements DniProvider {
 
-    private static final Logger log = LoggerFactory.getLogger(ReniecClient.class);
+    private static final Logger log = LoggerFactory.getLogger(ApisPeruDniProvider.class);
 
     private final RestClient restClient;
     private final String token;
     private final boolean enabled;
 
-    public ReniecClient(
+    public ApisPeruDniProvider(
             @Value("${app.reniec.api-url:https://dniruc.apisperu.com/api/v1/dni}") String apiUrl,
             @Value("${app.reniec.token:}") String token,
             @Value("${app.reniec.enabled:true}") boolean enabled) {
@@ -49,23 +46,25 @@ public class ReniecClient {
                 .build();
     }
 
-    /**
-     * Realiza la consulta al proveedor. El resultado se cachea por DNI (Caffeine,
-     * cache {@code reniecDni}). Solo se cachean consultas exitosas: cualquier fallo
-     * lanza {@link BusinessException} y no se almacena.
-     *
-     * @param dni DNI ya validado (8 dígitos)
-     */
-    @Cacheable(value = "reniecDni", key = "#dni")
-    public ReniecConsultaResponse fetch(String dni) {
+    @Override
+    public String nombre() {
+        return "apisperu";
+    }
+
+    @Override
+    public boolean disponible() {
         if (!enabled) {
-            throw new BusinessException("La integración con RENIEC está deshabilitada.");
+            return false;
         }
         if (token == null || token.isBlank()) {
-            log.error("Consulta RENIEC solicitada pero el token (app.reniec.token) no está configurado.");
-            throw new BusinessException("El servicio de consulta RENIEC no está disponible en este momento.");
+            log.warn("Proveedor apisperu habilitado pero sin token (app.reniec.token); se omite.");
+            return false;
         }
+        return true;
+    }
 
+    @Override
+    public Optional<ReniecConsultaResponse> consultar(String dni) {
         try {
             ReniecApiResponse resp = restClient.get()
                     .uri(uriBuilder -> uriBuilder
@@ -76,25 +75,21 @@ public class ReniecClient {
                     .body(ReniecApiResponse.class);
 
             if (resp == null || resp.nombres() == null || resp.nombres().isBlank()) {
-                throw new BusinessException("No se encontraron datos para el DNI " + dni + " en RENIEC.");
+                return Optional.empty();
             }
-
-            return toResponse(dni, resp);
+            return Optional.of(toResponse(dni, resp));
 
         } catch (HttpClientErrorException e) {
             int status = e.getStatusCode().value();
             if (status == 404 || status == 422) {
-                throw new BusinessException("No se encontraron datos para el DNI " + dni + " en RENIEC.");
+                return Optional.empty();
             }
             if (status == 401 || status == 403) {
-                log.error("Token RENIEC inválido o sin autorización (HTTP {}).", status);
-                throw new BusinessException("El servicio de consulta RENIEC no está disponible en este momento.");
+                throw new DniProviderException("token inválido o sin autorización (HTTP " + status + ")", e);
             }
-            log.warn("Respuesta de error de RENIEC (HTTP {}) para DNI {}.", status, dni);
-            throw new BusinessException("No se pudo consultar el DNI en RENIEC.");
+            throw new DniProviderException("respuesta de error HTTP " + status, e);
         } catch (RestClientException e) {
-            log.warn("Fallo de comunicación con RENIEC para DNI {}: {}", dni, e.getMessage());
-            throw new BusinessException("El servicio de consulta RENIEC no está disponible en este momento.");
+            throw new DniProviderException("fallo de comunicación: " + e.getMessage(), e);
         }
     }
 

@@ -35,6 +35,7 @@ Guía para desplegar el backend del Hotel San Francisco en [Railway](https://rai
    APP_CORS_ALLOWED_ORIGINS=https://tu-frontend.com
    APP_FRONTEND_URL=https://tu-frontend.com
    RENIEC_TOKEN=<token-de-apisperu>
+   RENIEC_FALLBACK_TOKEN=<token-de-apis.net.pe (respaldo; vacío = inactivo)>
    APP_TIMEZONE=America/Lima
    ```
 
