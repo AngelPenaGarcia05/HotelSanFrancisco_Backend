@@ -12,7 +12,7 @@ public record ServicioEventPayload(
         Integer servicioId,
         Integer tipoServicioId,
         Integer estanciaId,
-        BigDecimal cantidad,
+        Integer cantidad,
         BigDecimal subtotal,
         LocalDateTime fechaConsumo
 ) {

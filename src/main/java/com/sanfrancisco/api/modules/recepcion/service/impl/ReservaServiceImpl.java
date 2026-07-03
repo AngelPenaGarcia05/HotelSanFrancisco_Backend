@@ -212,7 +212,7 @@ public class ReservaServiceImpl implements ReservaService {
                 request.modalidadPago(),
                 request.observaciones(),
                 usuarioId,
-                request.canalId(),
+                3,                          // canal Online: siempre forzado para reservas de cliente
                 request.habitaciones(),
                 huespedes,
                 request.forzar()

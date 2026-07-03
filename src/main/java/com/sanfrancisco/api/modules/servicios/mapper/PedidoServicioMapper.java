@@ -22,7 +22,7 @@ public class PedidoServicioMapper {
 
         BigDecimal costoBase = t != null ? t.getCostoBase() : null;
         BigDecimal subtotalEstimado = (costoBase != null && p.getCantidad() != null)
-                ? p.getCantidad().multiply(costoBase)
+                ? BigDecimal.valueOf(p.getCantidad()).multiply(costoBase)
                 : null;
 
         return new PedidoServicioResponse(

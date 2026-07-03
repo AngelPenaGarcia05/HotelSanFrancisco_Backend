@@ -10,6 +10,7 @@ public record TipoServicioResponse(
         String nombre,
         BigDecimal costoBase,
         String descripcion,
+        Integer cantidadMaxima,
         EstadoActivo estado,
         LocalDateTime fechaCreacion,
         LocalDateTime fechaModificacion

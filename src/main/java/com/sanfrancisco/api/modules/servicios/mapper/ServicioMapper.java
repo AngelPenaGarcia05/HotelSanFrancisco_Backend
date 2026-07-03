@@ -20,7 +20,7 @@ public class ServicioMapper {
 
     public Servicio toEntity(CreateServicioRequest request, TipoServicio tipoServicio, Estancia estancia) {
         BigDecimal precioAplicado = Optional.ofNullable(request.precioAplicado()).orElse(tipoServicio.getCostoBase());
-        BigDecimal subtotal = request.cantidad().multiply(precioAplicado);
+        BigDecimal subtotal = BigDecimal.valueOf(request.cantidad()).multiply(precioAplicado);
         return Servicio.builder()
                 .tipoServicio(tipoServicio)
                 .estancia(estancia)
