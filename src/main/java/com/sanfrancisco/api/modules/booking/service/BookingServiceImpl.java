@@ -121,7 +121,7 @@ public class BookingServiceImpl implements BookingService {
                 habitacion.getHabitacionId(), req.fechaInicio(), req.fechaFin(),
                 Set.of(EstadoReserva.CANCELADA, EstadoReserva.NO_SHOW), null);
         if (ocupada) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
+            throw new com.sanfrancisco.api.shared.exception.ConflictException(
                     "La habitación ya no está disponible para las fechas seleccionadas");
         }
 

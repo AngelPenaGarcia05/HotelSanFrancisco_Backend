@@ -163,6 +163,12 @@ management:
       probes:
         enabled: true
       show-details: never
+  health:
+    # El correo es una función opcional (MAIL_ENABLED); sin credenciales SMTP el
+    # indicador falla y tumba el health global (DOWN), rompiendo el healthcheck
+    # de Railway aunque la API esté perfectamente operativa.
+    mail:
+      enabled: false
 
 logging:
   level:
