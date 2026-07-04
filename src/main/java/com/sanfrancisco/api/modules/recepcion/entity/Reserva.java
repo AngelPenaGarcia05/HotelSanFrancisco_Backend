@@ -80,7 +80,7 @@ public class Reserva extends AuditedEntity {
     private BigDecimal impuesto;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "tipo_pago", length = 10)
+    @Column(name = "tipo_pago", nullable = false, length = 10)
     private ModalidadPago modalidadPago;
 
     @Column(name = "observaciones", columnDefinition = "TEXT")
