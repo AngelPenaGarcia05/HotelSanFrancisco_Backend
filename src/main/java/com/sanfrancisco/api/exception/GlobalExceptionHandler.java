@@ -132,6 +132,21 @@ public class GlobalExceptionHandler {
         return ResponseEntity.notFound().build();
     }
 
+    /**
+     * Sin este handler, el genérico de {@code Exception} interceptaba las
+     * ResponseStatusException (usadas p.ej. en el módulo booking) y convertía
+     * cualquier 404/409/400 intencional en un 500.
+     */
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatus(
+            org.springframework.web.server.ResponseStatusException ex, HttpServletRequest req) {
+        HttpStatus status = HttpStatus.resolve(ex.getStatusCode().value());
+        String code = status != null ? status.name() : "ERROR";
+        String message = ex.getReason() != null ? ex.getReason() : "Error en la solicitud";
+        return ResponseEntity.status(ex.getStatusCode())
+                .body(ErrorResponse.of(code, message, req.getRequestURI()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneric(Exception ex, HttpServletRequest req) {
         log.error("Error no controlado en {}", req.getRequestURI(), ex);

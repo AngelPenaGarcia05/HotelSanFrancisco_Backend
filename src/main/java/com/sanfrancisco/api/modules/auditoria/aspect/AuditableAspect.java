@@ -73,10 +73,6 @@ public class AuditableAspect {
     }
 
     private String extraerIp(HttpServletRequest request) {
-        String xfHeader = request.getHeader("X-Forwarded-For");
-        if (xfHeader == null || xfHeader.isBlank()) {
-            return request.getRemoteAddr();
-        }
-        return xfHeader.split(",")[0].trim();
+        return com.sanfrancisco.api.shared.utils.ClientIpResolver.resolve(request);
     }
 }

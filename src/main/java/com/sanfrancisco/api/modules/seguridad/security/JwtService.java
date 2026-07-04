@@ -53,11 +53,17 @@ public class JwtService {
 
     @PostConstruct
     public void init() {
+        // Falla al arrancar antes que firmar tokens con una clave adivinable:
+        // HS256 exige >= 32 bytes y rellenar con ceros solo enmascara claves débiles.
+        if (secretKey == null || secretKey.isBlank()) {
+            throw new IllegalStateException(
+                    "JWT_SECRET_KEY no está definida. Configure una clave secreta de al menos 32 caracteres.");
+        }
         byte[] keyBytes = secretKey.getBytes(StandardCharsets.UTF_8);
         if (keyBytes.length < 32) {
-            byte[] padded = new byte[32];
-            System.arraycopy(keyBytes, 0, padded, 0, Math.min(keyBytes.length, 32));
-            keyBytes = padded;
+            throw new IllegalStateException(
+                    "JWT_SECRET_KEY es demasiado corta (" + keyBytes.length
+                            + " bytes). HS256 requiere al menos 32 bytes (32+ caracteres).");
         }
         this.key = Keys.hmacShaKeyFor(keyBytes);
     }
@@ -177,6 +183,35 @@ public class JwtService {
         } catch (Exception e) {
             log.warn("No se pudo añadir el token a la blacklist: {}", e.getMessage());
         }
+    }
+
+    /**
+     * Revoca todos los access tokens vigentes de un usuario (cambio/reset de
+     * contraseña, logout global). El filtro rechaza cualquier token emitido antes
+     * de este instante; sin esto, un access token robado sigue siendo válido hasta
+     * 15 minutos después de que el usuario cambió su contraseña.
+     */
+    public void revokeUserTokens(Integer userId) {
+        if (userId == null) {
+            return;
+        }
+        Cache cache = cacheManager.getCache("revokedUsers");
+        if (cache != null) {
+            cache.put(userId, System.currentTimeMillis());
+            log.debug("Access tokens revocados para usuarioId={}", userId);
+        }
+    }
+
+    public boolean isUserTokenRevoked(Integer userId, Date issuedAt) {
+        if (userId == null || issuedAt == null) {
+            return false;
+        }
+        Cache cache = cacheManager.getCache("revokedUsers");
+        if (cache == null) {
+            return false;
+        }
+        Long revokedAt = cache.get(userId, Long.class);
+        return revokedAt != null && issuedAt.getTime() <= revokedAt;
     }
 
     public boolean isTokenBlacklisted(String token) {

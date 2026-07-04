@@ -2,8 +2,10 @@ package com.sanfrancisco.api.modules.recepcion.repository;
 
 import com.sanfrancisco.api.modules.recepcion.entity.Habitacion;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoHabitacion;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -30,6 +32,17 @@ public interface HabitacionRepository extends JpaRepository<Habitacion, Integer>
     List<Habitacion> findByPisoAndEstado(Integer piso, EstadoHabitacion estado);
 
     List<Habitacion> findAllByOrderByPisoAscNumeroAsc();
+
+    /**
+     * Carga las habitaciones con lock pesimista (SELECT ... FOR UPDATE) para
+     * serializar reservas concurrentes sobre las mismas habitaciones: la segunda
+     * transacción espera aquí hasta el commit de la primera y luego su validación
+     * de solapamiento ya ve la reserva recién creada. El ORDER BY por id fija un
+     * orden de adquisición de locks consistente y evita deadlocks cruzados.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT h FROM Habitacion h WHERE h.habitacionId IN :ids ORDER BY h.habitacionId")
+    List<Habitacion> findAllByIdForUpdate(@Param("ids") Collection<Integer> ids);
 
     @Query("SELECT h FROM Habitacion h " +
            "LEFT JOIN FETCH h.tipoHabitacion t " +

@@ -172,7 +172,7 @@ class ReservaServiceTest {
 
             when(reservaRepository.existsByCodReserva("RES-001")).thenReturn(false);
             when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
-            when(habitacionRepository.findById(10)).thenReturn(Optional.of(habitacion));
+            when(habitacionRepository.findAllByIdForUpdate(List.of(10))).thenReturn(List.of(habitacion));
             when(tipoHabitacionRepository.findById(3)).thenReturn(Optional.of(tipo));
             when(reservaRepository.findSolapadasPorHuespedPrincipal(eq(20), any(), any(), any()))
                     .thenReturn(Collections.emptyList());
@@ -215,7 +215,7 @@ class ReservaServiceTest {
 
             when(reservaRepository.existsByCodReserva("RES-001")).thenReturn(false);
             when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
-            when(habitacionRepository.findById(10)).thenReturn(Optional.of(habitacion));
+            when(habitacionRepository.findAllByIdForUpdate(List.of(10))).thenReturn(List.of(habitacion));
             when(tipoHabitacionRepository.findById(3)).thenReturn(Optional.of(tipo));
             when(reservaRepository.findSolapadasPorHuespedPrincipal(eq(20), any(), any(), any()))
                     .thenReturn(Collections.emptyList());
@@ -305,7 +305,7 @@ class ReservaServiceTest {
 
             when(reservaRepository.existsByCodReserva("RES-001")).thenReturn(false);
             when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
-            when(habitacionRepository.findById(10)).thenReturn(Optional.of(habitacion));
+            when(habitacionRepository.findAllByIdForUpdate(List.of(10))).thenReturn(List.of(habitacion));
 
             assertThatThrownBy(() -> service.create(buildCreate(null)))
                     .isInstanceOf(BusinessException.class)
@@ -319,7 +319,7 @@ class ReservaServiceTest {
 
             when(reservaRepository.existsByCodReserva("RES-001")).thenReturn(false);
             when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
-            when(habitacionRepository.findById(10)).thenReturn(Optional.of(habitacion));
+            when(habitacionRepository.findAllByIdForUpdate(List.of(10))).thenReturn(List.of(habitacion));
 
             assertThatThrownBy(() -> service.create(buildCreate(null)))
                     .isInstanceOf(BusinessException.class)
@@ -331,7 +331,7 @@ class ReservaServiceTest {
         void create_falla_duplicadoDetectado_lanzaConflict() {
             when(reservaRepository.existsByCodReserva("RES-001")).thenReturn(false);
             when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
-            when(habitacionRepository.findById(10)).thenReturn(Optional.of(habitacion));
+            when(habitacionRepository.findAllByIdForUpdate(List.of(10))).thenReturn(List.of(habitacion));
             when(tipoHabitacionRepository.findById(3)).thenReturn(Optional.of(tipo));
             when(reservaRepository.findSolapadasPorHuespedPrincipal(eq(20), any(), any(), any()))
                     .thenReturn(List.of(reserva));
@@ -348,7 +348,7 @@ class ReservaServiceTest {
 
             when(reservaRepository.existsByCodReserva("RES-001")).thenReturn(false);
             when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
-            when(habitacionRepository.findById(10)).thenReturn(Optional.of(habitacion));
+            when(habitacionRepository.findAllByIdForUpdate(List.of(10))).thenReturn(List.of(habitacion));
             when(tipoHabitacionRepository.findById(3)).thenReturn(Optional.of(tipo));
             when(reservaMapper.toEntity(any(), any(), any(), any())).thenReturn(reserva);
             when(reservaRepository.save(any())).thenReturn(reserva);
@@ -376,7 +376,7 @@ class ReservaServiceTest {
 
             when(reservaRepository.existsByCodReserva("RES-001")).thenReturn(false);
             when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
-            when(habitacionRepository.findById(10)).thenReturn(Optional.of(habitacion));
+            when(habitacionRepository.findAllByIdForUpdate(List.of(10))).thenReturn(List.of(habitacion));
             when(tipoHabitacionRepository.findById(3)).thenReturn(Optional.of(tipo));
             when(reservaRepository.findSolapadasPorHuespedPrincipal(eq(20), any(), any(), any()))
                     .thenReturn(Collections.emptyList());
@@ -413,7 +413,7 @@ class ReservaServiceTest {
 
             when(reservaRepository.existsByCodReserva("RES-001")).thenReturn(false);
             when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
-            when(habitacionRepository.findById(10)).thenReturn(Optional.of(habitacion));
+            when(habitacionRepository.findAllByIdForUpdate(List.of(10))).thenReturn(List.of(habitacion));
             when(tipoHabitacionRepository.findById(3)).thenReturn(Optional.of(tipo));
             when(reservaRepository.findSolapadasPorHuespedPrincipal(eq(20), any(), any(), any()))
                     .thenReturn(Collections.emptyList());
@@ -436,7 +436,9 @@ class ReservaServiceTest {
 
             when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
             when(reservaRepository.existsByCodReserva(any())).thenReturn(false);
-            when(habitacionRepository.findById(10)).thenReturn(Optional.of(habitacion));
+            // createParaCliente fuerza canalId=3 (Online); sin este stub el alta falla con 404
+            when(canalRepository.findById(3)).thenReturn(Optional.of(mock(Canal.class)));
+            when(habitacionRepository.findAllByIdForUpdate(List.of(10))).thenReturn(List.of(habitacion));
             when(tipoHabitacionRepository.findById(3)).thenReturn(Optional.of(tipo));
             when(reservaRepository.findSolapadasPorHuespedPrincipal(eq(20), any(), any(), any()))
                     .thenReturn(Collections.emptyList());

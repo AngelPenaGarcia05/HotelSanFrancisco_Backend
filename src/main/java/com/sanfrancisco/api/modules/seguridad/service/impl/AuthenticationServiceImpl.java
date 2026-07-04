@@ -3,7 +3,6 @@ package com.sanfrancisco.api.modules.seguridad.service.impl;
 import com.sanfrancisco.api.exception.BusinessException;
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
 import com.sanfrancisco.api.modules.notificaciones.service.interfaces.NotificationService;
-import com.sanfrancisco.api.modules.pagos.entity.Pago;
 import com.sanfrancisco.api.modules.pagos.enums.TipoPago;
 import com.sanfrancisco.api.modules.pagos.repository.PagoRepository;
 import com.sanfrancisco.api.modules.recepcion.entity.Huesped;
@@ -28,6 +27,7 @@ import com.sanfrancisco.api.modules.seguridad.entity.TokenRecuperacion;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
 import com.sanfrancisco.api.modules.seguridad.enums.EstadoSesion;
 import com.sanfrancisco.api.modules.seguridad.enums.EstadoUsuario;
+import com.sanfrancisco.api.shared.utils.ClientIpResolver;
 import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.modules.seguridad.exception.SesionExpiradaException;
 import com.sanfrancisco.api.modules.seguridad.exception.UsuarioInactivoException;
@@ -69,7 +69,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -79,10 +81,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private static final Logger log = LoggerFactory.getLogger(AuthenticationServiceImpl.class);
 
     private static final String CLIENTE_ROL = "CLIENTE";
-    private static final int RESET_TOKEN_EXPIRY_MINUTES = 30;
 
     @Value("${app.frontend-url:http://localhost:4200}")
     private String frontendUrl;
+
+    @Value("${app.security.reset-token-expiry-minutes:30}")
+    private int resetTokenExpiryMinutes;
 
     private final CustomUserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
@@ -99,6 +103,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final ReniecService reniecService;
     private final ReservaRepository reservaRepository;
     private final PagoRepository pagoRepository;
+    private final SessionRevocationService sessionRevocationService;
 
     public AuthenticationServiceImpl(CustomUserDetailsService userDetailsService,
                                      PasswordEncoder passwordEncoder,
@@ -114,7 +119,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                                      NotificationService notificationService,
                                      ReniecService reniecService,
                                      ReservaRepository reservaRepository,
-                                     PagoRepository pagoRepository) {
+                                     PagoRepository pagoRepository,
+                                     SessionRevocationService sessionRevocationService) {
         this.userDetailsService = userDetailsService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -130,6 +136,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         this.reniecService = reniecService;
         this.reservaRepository = reservaRepository;
         this.pagoRepository = pagoRepository;
+        this.sessionRevocationService = sessionRevocationService;
     }
 
     @Override
@@ -463,17 +470,19 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public void logoutAll(HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getPrincipal() instanceof UserPrincipal principal) {
-            List<Sesion> activeSessions = sesionRepository.findByUsuarioUsuarioIdAndEstado(principal.userId(), EstadoSesion.ACTIVA);
-            for (Sesion s : activeSessions) {
-                s.setEstado(EstadoSesion.CERRADA);
-                s.setFechaCierre(LocalDateTime.now());
-                sesionRepository.save(s);
-            }
+            sessionRevocationService.revokeAllActive(principal.userId());
         }
 
         String accessToken = jwtService.extractTokenFromCookie(httpRequest, JwtService.ACCESS_TOKEN_COOKIE);
         if (accessToken != null && !accessToken.isBlank()) {
             jwtService.blacklistToken(accessToken);
+        }
+
+        // Revoca también los access tokens de las demás sesiones del usuario,
+        // no solo el de esta (la blacklist anterior cubre únicamente esta cookie).
+        Authentication authActual = SecurityContextHolder.getContext().getAuthentication();
+        if (authActual != null && authActual.getPrincipal() instanceof UserPrincipal p) {
+            jwtService.revokeUserTokens(p.userId());
         }
 
         jwtService.clearTokenCookies(httpResponse);
@@ -483,7 +492,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Transactional(readOnly = true)
     public AuthUserResponse getCurrentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() instanceof String && "anonymousUser".equals(auth.getPrincipal())) {
+        if (auth == null || !auth.isAuthenticated()
+                || (auth.getPrincipal() instanceof String s && "anonymousUser".equals(s))) {
             throw new BadCredentialsException("No autenticado");
         }
 
@@ -578,13 +588,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         usuario.setContrasenaHash(passwordEncoder.encode(request.nuevaContrasena()));
         usuarioRepository.save(usuario);
 
-        // Invalidate all active sessions for security (including this one, forcing a relogin)
-        List<Sesion> activeSessions = sesionRepository.findByUsuarioUsuarioIdAndEstado(usuario.getUsuarioId(), EstadoSesion.ACTIVA);
-        for (Sesion s : activeSessions) {
-            s.setEstado(EstadoSesion.CERRADA);
-            s.setFechaCierre(LocalDateTime.now());
-            sesionRepository.save(s);
-        }
+        // Invalida todas las sesiones y access tokens vigentes (fuerza relogin)
+        sessionRevocationService.revokeAllActive(usuario.getUsuarioId());
 
         log.info("Contraseña cambiada exitosamente para usuario: {}. Todas las sesiones cerradas.", usuario.getCorreo());
     }
@@ -610,7 +615,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             TokenRecuperacion tokenRecuperacion = TokenRecuperacion.builder()
                     .usuario(usuario)
                     .tokenHash(tokenHash)
-                    .fechaExpiracion(LocalDateTime.now().plusMinutes(RESET_TOKEN_EXPIRY_MINUTES))
+                    .fechaExpiracion(LocalDateTime.now().plusMinutes(resetTokenExpiryMinutes))
                     .usado(false)
                     .fechaCreacion(LocalDateTime.now())
                     .build();
@@ -651,35 +656,20 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         tokenRecuperacion.setUsado(true);
         tokenRecuperacionRepository.save(tokenRecuperacion);
 
-        // Revocar todas las sesiones activas
-        List<Sesion> activeSessions = sesionRepository.findByUsuarioUsuarioIdAndEstado(
-                usuario.getUsuarioId(), EstadoSesion.ACTIVA);
-        for (Sesion s : activeSessions) {
-            s.setEstado(EstadoSesion.CERRADA);
-            s.setFechaCierre(LocalDateTime.now());
-            sesionRepository.save(s);
-        }
+        // El reset suele responder a una cuenta comprometida: se revocan sesiones
+        // (refresh tokens) y access tokens que el atacante pudiera tener.
+        sessionRevocationService.revokeAllActive(usuario.getUsuarioId());
 
         log.info("Contraseña restablecida exitosamente para usuario: {}. Sesiones revocadas.", usuario.getCorreo());
     }
 
     private void revokeAllSessionsForUserByEmail(String email) {
-        usuarioRepository.findByCorreo(email).ifPresent(user -> {
-            List<Sesion> activeSessions = sesionRepository.findByUsuarioUsuarioIdAndEstado(user.getUsuarioId(), EstadoSesion.ACTIVA);
-            for (Sesion s : activeSessions) {
-                s.setEstado(EstadoSesion.CERRADA);
-                s.setFechaCierre(LocalDateTime.now());
-                sesionRepository.save(s);
-            }
-        });
+        usuarioRepository.findByCorreo(email)
+                .ifPresent(user -> sessionRevocationService.revokeAllActive(user.getUsuarioId()));
     }
 
     private String getClientIp(HttpServletRequest httpRequest) {
-        String xfHeader = httpRequest.getHeader("X-Forwarded-For");
-        if (xfHeader == null) {
-            return httpRequest.getRemoteAddr();
-        }
-        return xfHeader.split(",")[0].trim();
+        return ClientIpResolver.resolve(httpRequest);
     }
 
     @Override
@@ -700,16 +690,23 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         // Deuda: saldo de reservas activas, calculado contra los pagos reales
         // (consistente con el cálculo de la página "Mis pagos").
+        List<Reserva> reservasActivas = reservas.stream()
+                .filter(r -> r.getEstado() != EstadoReserva.CANCELADA && r.getEstado() != EstadoReserva.NO_SHOW)
+                .toList();
+
+        // Una sola query agregada para todos los pagos (antes: una query por reserva).
+        Map<Integer, BigDecimal> pagadoPorReserva = new HashMap<>();
+        if (!reservasActivas.isEmpty()) {
+            List<Integer> ids = reservasActivas.stream().map(Reserva::getReservaId).toList();
+            for (Object[] fila : pagoRepository.sumMontoPorReserva(ids, TipoPago.REEMBOLSO)) {
+                pagadoPorReserva.put((Integer) fila[0], (BigDecimal) fila[1]);
+            }
+        }
+
         long pagosPendientes = 0;
         BigDecimal montoDeuda = BigDecimal.ZERO;
-        for (Reserva r : reservas) {
-            if (r.getEstado() == EstadoReserva.CANCELADA || r.getEstado() == EstadoReserva.NO_SHOW) {
-                continue;
-            }
-            BigDecimal pagado = pagoRepository.findByReservaReservaId(r.getReservaId()).stream()
-                    .filter(p -> p.getTipoPago() != TipoPago.REEMBOLSO)
-                    .map(Pago::getMonto)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        for (Reserva r : reservasActivas) {
+            BigDecimal pagado = pagadoPorReserva.getOrDefault(r.getReservaId(), BigDecimal.ZERO);
             BigDecimal saldo = r.getMontoTotal().subtract(pagado);
             if (saldo.compareTo(BigDecimal.ZERO) > 0) {
                 pagosPendientes++;

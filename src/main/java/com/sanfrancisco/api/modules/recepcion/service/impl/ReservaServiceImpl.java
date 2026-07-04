@@ -288,6 +288,9 @@ public class ReservaServiceImpl implements ReservaService {
         } else if (fechasCambiaron) {
             // Caso B: solo cambian las fechas — revalidar disponibilidad y recalcular noches/subtotal
             List<ReservaHabitacion> existentes = reservaHabitacionRepository.findByReservaReservaId(reservaId);
+            // Lock pesimista sobre las habitaciones afectadas antes de revalidar el solape
+            habitacionRepository.findAllByIdForUpdate(
+                    existentes.stream().map(rh -> rh.getHabitacion().getHabitacionId()).toList());
             validarDisponibilidadExistentes(existentes, fechaInicio, fechaFin, reservaId);
             subtotalCalculado = recalcularHabitacionesExistentes(existentes, fechaInicio, fechaFin);
             reservaHabitaciones = existentes;
@@ -509,9 +512,19 @@ public class ReservaServiceImpl implements ReservaService {
     }
 
     private List<Habitacion> cargarYValidarHabitaciones(List<ReservaHabitacionRequest> requests) {
+        // Carga con lock pesimista: la validación de solapamiento posterior solo es
+        // fiable si ninguna otra transacción puede reservar estas habitaciones hasta
+        // el commit. Sin el lock, dos requests concurrentes pasan ambos la validación
+        // y se produce una doble reserva.
+        List<Integer> ids = requests.stream().map(ReservaHabitacionRequest::habitacionId).toList();
+        Map<Integer, Habitacion> porId = habitacionRepository.findAllByIdForUpdate(ids).stream()
+                .collect(Collectors.toMap(Habitacion::getHabitacionId, h -> h));
+
         return requests.stream().map(req -> {
-            Habitacion h = habitacionRepository.findById(req.habitacionId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Habitación no encontrada: " + req.habitacionId()));
+            Habitacion h = porId.get(req.habitacionId());
+            if (h == null) {
+                throw new ResourceNotFoundException("Habitación no encontrada: " + req.habitacionId());
+            }
             if (h.getEstado() == EstadoHabitacion.MANTENIMIENTO || h.getEstado() == EstadoHabitacion.BLOQUEADA) {
                 throw new BusinessException("La habitación " + h.getNumero() + " no está disponible para reservas (estado: " + h.getEstado() + ")");
             }

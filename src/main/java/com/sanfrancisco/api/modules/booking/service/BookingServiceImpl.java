@@ -27,6 +27,7 @@ import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class BookingServiceImpl implements BookingService {
@@ -105,12 +106,23 @@ public class BookingServiceImpl implements BookingService {
                     "La fecha de salida debe ser posterior a la fecha de entrada");
         }
 
-        Habitacion habitacion = habitacionRepository.findById(req.habitacionId())
+        // Lock pesimista: serializa reservas concurrentes sobre la misma habitación para
+        // que la validación de solapamiento siguiente sea fiable hasta el commit.
+        Habitacion habitacion = habitacionRepository.findAllByIdForUpdate(List.of(req.habitacionId())).stream()
+                .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Habitación no encontrada"));
 
         TipoHabitacion tipo = habitacion.getTipoHabitacion();
         if (tipo == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La habitación no tiene tipo asignado");
+        }
+
+        boolean ocupada = reservaHabitacionRepository.existeSolapamiento(
+                habitacion.getHabitacionId(), req.fechaInicio(), req.fechaFin(),
+                Set.of(EstadoReserva.CANCELADA, EstadoReserva.NO_SHOW), null);
+        if (ocupada) {
+            throw new com.sanfrancisco.api.shared.exception.ConflictException(
+                    "La habitación ya no está disponible para las fechas seleccionadas");
         }
 
         MetodoPago metodoPago = metodoPagoRepository.findById(req.metodoPagoId())

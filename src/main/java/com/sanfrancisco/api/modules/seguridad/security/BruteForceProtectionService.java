@@ -10,7 +10,9 @@ import org.springframework.stereotype.Service;
 public class BruteForceProtectionService {
 
     private static final Logger log = LoggerFactory.getLogger(BruteForceProtectionService.class);
-    private static final int MAX_ATTEMPTS = 5;
+
+    @org.springframework.beans.factory.annotation.Value("${app.security.brute-force.max-attempts:5}")
+    private int maxAttempts;
 
     private final CacheManager cacheManager;
 
@@ -43,7 +45,7 @@ public class BruteForceProtectionService {
         if (cache == null) return false;
 
         Integer attempts = cache.get(key, Integer.class);
-        if (attempts != null && attempts >= MAX_ATTEMPTS) {
+        if (attempts != null && attempts >= maxAttempts) {
             log.warn("El acceso para {} está bloqueado temporalmente por exceso de intentos fallidos", key);
             return true;
         }

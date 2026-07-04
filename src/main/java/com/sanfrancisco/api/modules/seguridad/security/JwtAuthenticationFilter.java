@@ -63,6 +63,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 Integer userId = safeInteger(claims.get("userId"));
 
+                // Token emitido antes de una revocación global del usuario
+                // (cambio/reset de contraseña, logout-all): no se autentica.
+                if (jwtService.isUserTokenRevoked(userId, claims.getIssuedAt())) {
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+
                 Collection<GrantedAuthority> authorities = resolveAuthorities(claims, email);
 
                 UserPrincipal principal = new UserPrincipal(userId, email, authorities);

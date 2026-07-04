@@ -2,6 +2,7 @@ package com.sanfrancisco.api.modules.seguridad.security;
 
 import tools.jackson.databind.ObjectMapper;
 import com.sanfrancisco.api.shared.api.ErrorResponse;
+import com.sanfrancisco.api.shared.utils.ClientIpResolver;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,7 +20,15 @@ import java.time.Instant;
 @Component
 public class RateLimitingFilter extends OncePerRequestFilter {
 
-    private static final int MAX_REQUESTS_PER_MINUTE = 120;
+    private static final String RENIEC_PATH_PREFIX = "/auth/reniec/";
+
+    @org.springframework.beans.factory.annotation.Value("${app.security.rate-limit.per-minute:120}")
+    private int maxRequestsPerMinute;
+
+    // La consulta RENIEC es pública y devuelve datos personales (nombres por DNI):
+    // un límite propio y estricto evita que se use para enumerar el padrón.
+    @org.springframework.beans.factory.annotation.Value("${app.security.rate-limit.reniec-per-minute:10}")
+    private int maxReniecPerMinute;
 
     private final CacheManager cacheManager;
     private final ObjectMapper objectMapper;
@@ -42,17 +51,20 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             return;
         }
 
-        String clientIp = getClientIp(request);
-        String cacheKey = "rate_limit:" + clientIp + ":" + (Instant.now().getEpochSecond() / 60);
+        String clientIp = ClientIpResolver.resolve(request);
+        boolean esReniec = path.startsWith(RENIEC_PATH_PREFIX);
+        int limite = esReniec ? maxReniecPerMinute : maxRequestsPerMinute;
+        String cacheKey = "rate_limit:" + (esReniec ? "reniec:" : "") + clientIp
+                + ":" + (Instant.now().getEpochSecond() / 60);
 
-        Cache cache = cacheManager.getCache("bruteForce");
+        Cache cache = cacheManager.getCache("rateLimit");
         if (cache != null) {
             Integer count = cache.get(cacheKey, Integer.class);
             if (count == null) {
                 count = 0;
             }
 
-            if (count >= MAX_REQUESTS_PER_MINUTE) {
+            if (count >= limite) {
                 response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                 response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
 
@@ -75,13 +87,5 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
-    }
-
-    private String getClientIp(HttpServletRequest request) {
-        String xfHeader = request.getHeader("X-Forwarded-For");
-        if (xfHeader == null) {
-            return request.getRemoteAddr();
-        }
-        return xfHeader.split(",")[0].trim();
     }
 }
