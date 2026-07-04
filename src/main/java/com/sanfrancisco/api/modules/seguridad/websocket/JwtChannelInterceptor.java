@@ -92,6 +92,16 @@ public class JwtChannelInterceptor implements ChannelInterceptor {
                     log.warn("Rechazando conexión WebSocket/STOMP: JWT inválido o ausente");
                     throw new MessageDeliveryException("Acceso denegado - Credenciales inválidas para WebSocket");
                 }
+            } else if (StompCommand.SEND.equals(command) || StompCommand.MESSAGE.equals(command)) {
+                // Solo el servidor publica eventos (SimpMessagingTemplate -> brokerChannel).
+                // No existe ningún @MessageMapping, así que ningún cliente legítimo hace SEND:
+                // sin este bloqueo, cualquier usuario autenticado podía inyectar eventos
+                // falsos en /topic/** y el broker los retransmitía a todos los suscriptores.
+                String destination = accessor.getDestination();
+                Principal user = accessor.getUser();
+                log.warn("SEND rechazado desde el cliente {} hacia {}",
+                        user != null ? user.getName() : "anónimo", destination);
+                throw new MessageDeliveryException("No se permite publicar mensajes desde el cliente");
             } else if (StompCommand.SUBSCRIBE.equals(command)) {
                 String destination = accessor.getDestination();
                 Principal user = accessor.getUser();
