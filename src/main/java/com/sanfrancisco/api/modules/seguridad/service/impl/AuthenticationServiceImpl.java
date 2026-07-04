@@ -3,7 +3,6 @@ package com.sanfrancisco.api.modules.seguridad.service.impl;
 import com.sanfrancisco.api.exception.BusinessException;
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
 import com.sanfrancisco.api.modules.notificaciones.service.interfaces.NotificationService;
-import com.sanfrancisco.api.modules.pagos.entity.Pago;
 import com.sanfrancisco.api.modules.pagos.enums.TipoPago;
 import com.sanfrancisco.api.modules.pagos.repository.PagoRepository;
 import com.sanfrancisco.api.modules.recepcion.entity.Huesped;
@@ -70,7 +69,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -493,7 +494,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Transactional(readOnly = true)
     public AuthUserResponse getCurrentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal() instanceof String && "anonymousUser".equals(auth.getPrincipal())) {
+        if (auth == null || !auth.isAuthenticated()
+                || (auth.getPrincipal() instanceof String s && "anonymousUser".equals(s))) {
             throw new BadCredentialsException("No autenticado");
         }
 
@@ -714,16 +716,23 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         // Deuda: saldo de reservas activas, calculado contra los pagos reales
         // (consistente con el cálculo de la página "Mis pagos").
+        List<Reserva> reservasActivas = reservas.stream()
+                .filter(r -> r.getEstado() != EstadoReserva.CANCELADA && r.getEstado() != EstadoReserva.NO_SHOW)
+                .toList();
+
+        // Una sola query agregada para todos los pagos (antes: una query por reserva).
+        Map<Integer, BigDecimal> pagadoPorReserva = new HashMap<>();
+        if (!reservasActivas.isEmpty()) {
+            List<Integer> ids = reservasActivas.stream().map(Reserva::getReservaId).toList();
+            for (Object[] fila : pagoRepository.sumMontoPorReserva(ids, TipoPago.REEMBOLSO)) {
+                pagadoPorReserva.put((Integer) fila[0], (BigDecimal) fila[1]);
+            }
+        }
+
         long pagosPendientes = 0;
         BigDecimal montoDeuda = BigDecimal.ZERO;
-        for (Reserva r : reservas) {
-            if (r.getEstado() == EstadoReserva.CANCELADA || r.getEstado() == EstadoReserva.NO_SHOW) {
-                continue;
-            }
-            BigDecimal pagado = pagoRepository.findByReservaReservaId(r.getReservaId()).stream()
-                    .filter(p -> p.getTipoPago() != TipoPago.REEMBOLSO)
-                    .map(Pago::getMonto)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        for (Reserva r : reservasActivas) {
+            BigDecimal pagado = pagadoPorReserva.getOrDefault(r.getReservaId(), BigDecimal.ZERO);
             BigDecimal saldo = r.getMontoTotal().subtract(pagado);
             if (saldo.compareTo(BigDecimal.ZERO) > 0) {
                 pagosPendientes++;
