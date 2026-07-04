@@ -94,6 +94,12 @@ app:
     # exige X-Requested-With en mutaciones autenticadas por cookie. Activar solo
     # cuando el frontend envíe ese header en cada request (interceptor Angular).
     csrf-header-enabled: ${APP_CSRF_HEADER_ENABLED:false}
+    rate-limit:
+      per-minute: ${RATE_LIMIT_PER_MINUTE:120}
+      reniec-per-minute: ${RATE_LIMIT_RENIEC_PER_MINUTE:10}
+    brute-force:
+      max-attempts: ${BRUTE_FORCE_MAX_ATTEMPTS:5}
+    reset-token-expiry-minutes: ${RESET_TOKEN_EXPIRY_MINUTES:30}
   cors:
     # Orígenes permitidos separados por coma. En producción: dominio del frontend.
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200,http://127.0.0.1:4200}

@@ -20,12 +20,15 @@ import java.time.Instant;
 @Component
 public class RateLimitingFilter extends OncePerRequestFilter {
 
-    private static final int MAX_REQUESTS_PER_MINUTE = 120;
+    private static final String RENIEC_PATH_PREFIX = "/auth/reniec/";
+
+    @org.springframework.beans.factory.annotation.Value("${app.security.rate-limit.per-minute:120}")
+    private int maxRequestsPerMinute;
 
     // La consulta RENIEC es pública y devuelve datos personales (nombres por DNI):
     // un límite propio y estricto evita que se use para enumerar el padrón.
-    private static final int MAX_RENIEC_PER_MINUTE = 10;
-    private static final String RENIEC_PATH_PREFIX = "/auth/reniec/";
+    @org.springframework.beans.factory.annotation.Value("${app.security.rate-limit.reniec-per-minute:10}")
+    private int maxReniecPerMinute;
 
     private final CacheManager cacheManager;
     private final ObjectMapper objectMapper;
@@ -50,7 +53,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
         String clientIp = ClientIpResolver.resolve(request);
         boolean esReniec = path.startsWith(RENIEC_PATH_PREFIX);
-        int limite = esReniec ? MAX_RENIEC_PER_MINUTE : MAX_REQUESTS_PER_MINUTE;
+        int limite = esReniec ? maxReniecPerMinute : maxRequestsPerMinute;
         String cacheKey = "rate_limit:" + (esReniec ? "reniec:" : "") + clientIp
                 + ":" + (Instant.now().getEpochSecond() / 60);
 

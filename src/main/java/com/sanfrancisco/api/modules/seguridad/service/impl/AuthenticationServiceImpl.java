@@ -81,10 +81,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private static final Logger log = LoggerFactory.getLogger(AuthenticationServiceImpl.class);
 
     private static final String CLIENTE_ROL = "CLIENTE";
-    private static final int RESET_TOKEN_EXPIRY_MINUTES = 30;
 
     @Value("${app.frontend-url:http://localhost:4200}")
     private String frontendUrl;
+
+    @Value("${app.security.reset-token-expiry-minutes:30}")
+    private int resetTokenExpiryMinutes;
 
     private final CustomUserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
@@ -101,6 +103,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final ReniecService reniecService;
     private final ReservaRepository reservaRepository;
     private final PagoRepository pagoRepository;
+    private final SessionRevocationService sessionRevocationService;
 
     public AuthenticationServiceImpl(CustomUserDetailsService userDetailsService,
                                      PasswordEncoder passwordEncoder,
@@ -116,7 +119,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                                      NotificationService notificationService,
                                      ReniecService reniecService,
                                      ReservaRepository reservaRepository,
-                                     PagoRepository pagoRepository) {
+                                     PagoRepository pagoRepository,
+                                     SessionRevocationService sessionRevocationService) {
         this.userDetailsService = userDetailsService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -132,6 +136,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         this.reniecService = reniecService;
         this.reservaRepository = reservaRepository;
         this.pagoRepository = pagoRepository;
+        this.sessionRevocationService = sessionRevocationService;
     }
 
     @Override
@@ -465,14 +470,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     public void logoutAll(HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getPrincipal() instanceof UserPrincipal principal) {
-            List<Sesion> activeSessions = sesionRepository.findByUsuarioUsuarioIdAndEstado(principal.userId(), EstadoSesion.ACTIVA);
-            for (Sesion s : activeSessions) {
-                s.setEstado(EstadoSesion.CERRADA);
-                s.setFechaCierre(LocalDateTime.now());
-                sesionRepository.save(s);
-            }
-            // Invalida también los access tokens vigentes de todas esas sesiones.
-            jwtService.revokeUserTokens(principal.userId());
+            sessionRevocationService.revokeAllActive(principal.userId());
         }
 
         String accessToken = jwtService.extractTokenFromCookie(httpRequest, JwtService.ACCESS_TOKEN_COOKIE);
@@ -590,17 +588,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         usuario.setContrasenaHash(passwordEncoder.encode(request.nuevaContrasena()));
         usuarioRepository.save(usuario);
 
-        // Invalidate all active sessions for security (including this one, forcing a relogin)
-        List<Sesion> activeSessions = sesionRepository.findByUsuarioUsuarioIdAndEstado(usuario.getUsuarioId(), EstadoSesion.ACTIVA);
-        for (Sesion s : activeSessions) {
-            s.setEstado(EstadoSesion.CERRADA);
-            s.setFechaCierre(LocalDateTime.now());
-            sesionRepository.save(s);
-        }
-
-        // Cerrar las sesiones solo invalida los refresh tokens; los access tokens ya
-        // emitidos seguirían siendo válidos hasta 15 min. Se revocan explícitamente.
-        jwtService.revokeUserTokens(usuario.getUsuarioId());
+        // Invalida todas las sesiones y access tokens vigentes (fuerza relogin)
+        sessionRevocationService.revokeAllActive(usuario.getUsuarioId());
 
         log.info("Contraseña cambiada exitosamente para usuario: {}. Todas las sesiones cerradas.", usuario.getCorreo());
     }
@@ -626,7 +615,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             TokenRecuperacion tokenRecuperacion = TokenRecuperacion.builder()
                     .usuario(usuario)
                     .tokenHash(tokenHash)
-                    .fechaExpiracion(LocalDateTime.now().plusMinutes(RESET_TOKEN_EXPIRY_MINUTES))
+                    .fechaExpiracion(LocalDateTime.now().plusMinutes(resetTokenExpiryMinutes))
                     .usado(false)
                     .fechaCreacion(LocalDateTime.now())
                     .build();
@@ -667,31 +656,16 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         tokenRecuperacion.setUsado(true);
         tokenRecuperacionRepository.save(tokenRecuperacion);
 
-        // Revocar todas las sesiones activas
-        List<Sesion> activeSessions = sesionRepository.findByUsuarioUsuarioIdAndEstado(
-                usuario.getUsuarioId(), EstadoSesion.ACTIVA);
-        for (Sesion s : activeSessions) {
-            s.setEstado(EstadoSesion.CERRADA);
-            s.setFechaCierre(LocalDateTime.now());
-            sesionRepository.save(s);
-        }
-
-        // El reset suele responder a una cuenta comprometida: además de los refresh
-        // tokens (sesiones), se revocan los access tokens que el atacante pudiera tener.
-        jwtService.revokeUserTokens(usuario.getUsuarioId());
+        // El reset suele responder a una cuenta comprometida: se revocan sesiones
+        // (refresh tokens) y access tokens que el atacante pudiera tener.
+        sessionRevocationService.revokeAllActive(usuario.getUsuarioId());
 
         log.info("Contraseña restablecida exitosamente para usuario: {}. Sesiones revocadas.", usuario.getCorreo());
     }
 
     private void revokeAllSessionsForUserByEmail(String email) {
-        usuarioRepository.findByCorreo(email).ifPresent(user -> {
-            List<Sesion> activeSessions = sesionRepository.findByUsuarioUsuarioIdAndEstado(user.getUsuarioId(), EstadoSesion.ACTIVA);
-            for (Sesion s : activeSessions) {
-                s.setEstado(EstadoSesion.CERRADA);
-                s.setFechaCierre(LocalDateTime.now());
-                sesionRepository.save(s);
-            }
-        });
+        usuarioRepository.findByCorreo(email)
+                .ifPresent(user -> sessionRevocationService.revokeAllActive(user.getUsuarioId()));
     }
 
     private String getClientIp(HttpServletRequest httpRequest) {
