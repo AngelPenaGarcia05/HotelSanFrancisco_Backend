@@ -28,8 +28,35 @@ public class CacheConfig {
         manager.setCacheNames(java.util.List.of(
                 "tiposHabitacion", "habitaciones", "canales", "tiposDocumento",
                 "metodosPago", "tiposServicio", "categoriasProducto", "horarios",
-                "proveedores", "jwtBlacklist", "bruteForce", "reniecDni"
+                "proveedores", "reniecDni"
         ));
+
+        // Caches de seguridad con política propia, separados de los catálogos:
+        // si compartieran el maximumSize(1000) global, bastaría con llenar el cache
+        // para desalojar entradas y que un token revocado vuelva a ser válido o un
+        // bloqueo de fuerza bruta se libere.
+        //
+        // jwtBlacklist / revokedUsers: TTL = vida del access token (15 min); pasada
+        // esa ventana el token expira por sí solo y la entrada ya no hace falta.
+        manager.registerCustomCache("jwtBlacklist", Caffeine.newBuilder()
+                .expireAfterWrite(Duration.ofMinutes(15))
+                .maximumSize(100_000)
+                .build());
+        manager.registerCustomCache("revokedUsers", Caffeine.newBuilder()
+                .expireAfterWrite(Duration.ofMinutes(15))
+                .maximumSize(100_000)
+                .build());
+        // bruteForce: ventana de 15 min desde el último intento fallido.
+        manager.registerCustomCache("bruteForce", Caffeine.newBuilder()
+                .expireAfterWrite(Duration.ofMinutes(15))
+                .maximumSize(100_000)
+                .build());
+        // rateLimit: las claves son por minuto; 2 min de TTL basta para purgarlas.
+        manager.registerCustomCache("rateLimit", Caffeine.newBuilder()
+                .expireAfterWrite(Duration.ofMinutes(2))
+                .maximumSize(200_000)
+                .build());
+
         manager.setAsyncCacheMode(false);
         return manager;
     }

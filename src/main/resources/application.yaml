@@ -89,6 +89,11 @@ app:
     # usar None (requiere secure=true) para que las cookies viajen cross-site.
     same-site: ${APP_COOKIE_SAMESITE:Lax}
   frontend-url: ${APP_FRONTEND_URL:http://localhost:4200}
+  security:
+    # Protección CSRF para cookies SameSite=None (frontend en otro dominio):
+    # exige X-Requested-With en mutaciones autenticadas por cookie. Activar solo
+    # cuando el frontend envíe ese header en cada request (interceptor Angular).
+    csrf-header-enabled: ${APP_CSRF_HEADER_ENABLED:false}
   cors:
     # Orígenes permitidos separados por coma. En producción: dominio del frontend.
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200,http://127.0.0.1:4200}
@@ -122,6 +127,10 @@ app:
 server:
   # Railway (y otros PaaS) inyectan el puerto a usar vía la variable PORT.
   port: ${PORT:8080}
+
+  # Spring resuelve X-Forwarded-For/-Proto del proxy (Railway) de forma segura:
+  # getRemoteAddr() devuelve la IP real del cliente y no se pueden suplantar IPs.
+  forward-headers-strategy: framework
 
   servlet:
     encoding:

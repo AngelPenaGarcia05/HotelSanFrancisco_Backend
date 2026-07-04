@@ -2,6 +2,7 @@ package com.sanfrancisco.api.config;
 
 import com.sanfrancisco.api.config.security.EndpointPaths;
 import com.sanfrancisco.api.config.security.Permissions;
+import com.sanfrancisco.api.modules.seguridad.security.CsrfHeaderFilter;
 import com.sanfrancisco.api.modules.seguridad.security.HttpAccessDeniedHandler;
 import com.sanfrancisco.api.modules.seguridad.security.HttpAuthenticationEntryPoint;
 import com.sanfrancisco.api.modules.seguridad.security.JwtAuthenticationFilter;
@@ -34,6 +35,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final RateLimitingFilter rateLimitingFilter;
+    private final CsrfHeaderFilter csrfHeaderFilter;
     private final HttpAuthenticationEntryPoint authenticationEntryPoint;
     private final HttpAccessDeniedHandler accessDeniedHandler;
 
@@ -42,10 +44,12 @@ public class SecurityConfig {
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
                           RateLimitingFilter rateLimitingFilter,
+                          CsrfHeaderFilter csrfHeaderFilter,
                           HttpAuthenticationEntryPoint authenticationEntryPoint,
                           HttpAccessDeniedHandler accessDeniedHandler) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.rateLimitingFilter = rateLimitingFilter;
+        this.csrfHeaderFilter = csrfHeaderFilter;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
     }
@@ -525,6 +529,7 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(csrfHeaderFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -539,7 +544,7 @@ public class SecurityConfig {
                 .toList();
         config.setAllowedOrigins(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-XSRF-TOKEN", "Cache-Control"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-XSRF-TOKEN", "Cache-Control", "X-Requested-With"));
         config.setExposedHeaders(List.of("Set-Cookie"));
         config.setAllowCredentials(true);
 

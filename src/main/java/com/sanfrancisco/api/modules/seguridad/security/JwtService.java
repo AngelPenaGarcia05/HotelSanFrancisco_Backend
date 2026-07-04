@@ -185,6 +185,35 @@ public class JwtService {
         }
     }
 
+    /**
+     * Revoca todos los access tokens vigentes de un usuario (cambio/reset de
+     * contraseña, logout global). El filtro rechaza cualquier token emitido antes
+     * de este instante; sin esto, un access token robado sigue siendo válido hasta
+     * 15 minutos después de que el usuario cambió su contraseña.
+     */
+    public void revokeUserTokens(Integer userId) {
+        if (userId == null) {
+            return;
+        }
+        Cache cache = cacheManager.getCache("revokedUsers");
+        if (cache != null) {
+            cache.put(userId, System.currentTimeMillis());
+            log.debug("Access tokens revocados para usuarioId={}", userId);
+        }
+    }
+
+    public boolean isUserTokenRevoked(Integer userId, Date issuedAt) {
+        if (userId == null || issuedAt == null) {
+            return false;
+        }
+        Cache cache = cacheManager.getCache("revokedUsers");
+        if (cache == null) {
+            return false;
+        }
+        Long revokedAt = cache.get(userId, Long.class);
+        return revokedAt != null && issuedAt.getTime() <= revokedAt;
+    }
+
     public boolean isTokenBlacklisted(String token) {
         Cache blacklistCache = cacheManager.getCache("jwtBlacklist");
         if (blacklistCache != null) {

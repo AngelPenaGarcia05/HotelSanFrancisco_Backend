@@ -28,6 +28,7 @@ import com.sanfrancisco.api.modules.seguridad.entity.TokenRecuperacion;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
 import com.sanfrancisco.api.modules.seguridad.enums.EstadoSesion;
 import com.sanfrancisco.api.modules.seguridad.enums.EstadoUsuario;
+import com.sanfrancisco.api.shared.utils.ClientIpResolver;
 import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.modules.seguridad.exception.SesionExpiradaException;
 import com.sanfrancisco.api.modules.seguridad.exception.UsuarioInactivoException;
@@ -469,11 +470,20 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 s.setFechaCierre(LocalDateTime.now());
                 sesionRepository.save(s);
             }
+            // Invalida también los access tokens vigentes de todas esas sesiones.
+            jwtService.revokeUserTokens(principal.userId());
         }
 
         String accessToken = jwtService.extractTokenFromCookie(httpRequest, JwtService.ACCESS_TOKEN_COOKIE);
         if (accessToken != null && !accessToken.isBlank()) {
             jwtService.blacklistToken(accessToken);
+        }
+
+        // Revoca también los access tokens de las demás sesiones del usuario,
+        // no solo el de esta (la blacklist anterior cubre únicamente esta cookie).
+        Authentication authActual = SecurityContextHolder.getContext().getAuthentication();
+        if (authActual != null && authActual.getPrincipal() instanceof UserPrincipal p) {
+            jwtService.revokeUserTokens(p.userId());
         }
 
         jwtService.clearTokenCookies(httpResponse);
@@ -586,6 +596,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             sesionRepository.save(s);
         }
 
+        // Cerrar las sesiones solo invalida los refresh tokens; los access tokens ya
+        // emitidos seguirían siendo válidos hasta 15 min. Se revocan explícitamente.
+        jwtService.revokeUserTokens(usuario.getUsuarioId());
+
         log.info("Contraseña cambiada exitosamente para usuario: {}. Todas las sesiones cerradas.", usuario.getCorreo());
     }
 
@@ -660,6 +674,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             sesionRepository.save(s);
         }
 
+        // El reset suele responder a una cuenta comprometida: además de los refresh
+        // tokens (sesiones), se revocan los access tokens que el atacante pudiera tener.
+        jwtService.revokeUserTokens(usuario.getUsuarioId());
+
         log.info("Contraseña restablecida exitosamente para usuario: {}. Sesiones revocadas.", usuario.getCorreo());
     }
 
@@ -675,11 +693,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     private String getClientIp(HttpServletRequest httpRequest) {
-        String xfHeader = httpRequest.getHeader("X-Forwarded-For");
-        if (xfHeader == null) {
-            return httpRequest.getRemoteAddr();
-        }
-        return xfHeader.split(",")[0].trim();
+        return ClientIpResolver.resolve(httpRequest);
     }
 
     @Override
