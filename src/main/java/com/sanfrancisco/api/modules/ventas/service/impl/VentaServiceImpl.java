@@ -246,27 +246,51 @@ public class VentaServiceImpl implements VentaService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
+    /**
+     * Descuenta stock con un UPDATE atómico condicionado (stock >= cantidad en
+     * el propio UPDATE): dos ventas concurrentes del mismo producto ya no
+     * pueden pasar ambas la validación (lost update). Si algún producto no
+     * alcanza, la transacción completa se revierte, incluidos los descuentos
+     * de los detalles anteriores.
+     */
     private void descontarStock(Venta venta) {
-        List<DetalleVenta> detalles = detalleVentaRepository.findByIdVentaId(venta.getVentaId());
-        for (DetalleVenta d : detalles) {
-            Producto producto = d.getProducto();
-            BigDecimal nuevoStock = producto.getStockActual().subtract(d.getCantidad());
-            if (nuevoStock.signum() < 0) {
-                throw new BusinessException("Stock insuficiente para el producto: " + producto.getNombre());
+        // Materializar id/nombre/cantidad ANTES de los UPDATEs: clearAutomatically
+        // desconecta las entidades y un proxy lazy desconectado ya no puede
+        // inicializarse (LazyInitializationException).
+        for (MovimientoStock m : movimientosDe(venta)) {
+            int actualizados = productoRepository.descontarStockAtomico(m.productoId(), m.cantidad());
+            if (actualizados == 0) {
+                throw new BusinessException("Stock insuficiente para el producto: " + m.nombre());
             }
-            producto.setStockActual(nuevoStock);
-            productoRepository.save(producto);
-            productoEventPublisher.publishStockChanged(producto);
+            publicarStockActualizado(m.productoId());
         }
     }
 
     private void revertirStock(Venta venta) {
-        List<DetalleVenta> detalles = detalleVentaRepository.findByIdVentaId(venta.getVentaId());
-        for (DetalleVenta d : detalles) {
-            Producto producto = d.getProducto();
-            producto.setStockActual(producto.getStockActual().add(d.getCantidad()));
-            productoRepository.save(producto);
-            productoEventPublisher.publishStockChanged(producto);
+        for (MovimientoStock m : movimientosDe(venta)) {
+            productoRepository.reponerStockAtomico(m.productoId(), m.cantidad());
+            publicarStockActualizado(m.productoId());
         }
+    }
+
+    private record MovimientoStock(Integer productoId, String nombre, BigDecimal cantidad) {
+    }
+
+    private List<MovimientoStock> movimientosDe(Venta venta) {
+        return detalleVentaRepository.findByIdVentaId(venta.getVentaId()).stream()
+                .map(d -> new MovimientoStock(
+                        d.getProducto().getProductoId(),
+                        d.getProducto().getNombre(),
+                        d.getCantidad()))
+                .toList();
+    }
+
+    /**
+     * Relee el producto tras el UPDATE atómico (el contexto de persistencia se
+     * limpió) para que el evento WebSocket lleve el stock real y no el cacheado.
+     */
+    private void publicarStockActualizado(Integer productoId) {
+        productoRepository.findById(productoId)
+                .ifPresent(productoEventPublisher::publishStockChanged);
     }
 }

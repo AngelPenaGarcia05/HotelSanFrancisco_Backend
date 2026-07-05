@@ -94,27 +94,36 @@ public class ProductoServiceImpl implements ProductoService {
                 .toList();
     }
 
+    /**
+     * INGRESO y SALIDA se aplican con UPDATEs atómicos en BD (la condición de
+     * stock suficiente forma parte del propio UPDATE) para que ajustes
+     * concurrentes no se pisen entre sí ni con el descuento de stock de
+     * ventas. AJUSTE fija un valor absoluto (operación admin, "último gana").
+     */
     @Override
     public ProductoResponse ajustarStock(Integer productoId, AjustarStockRequest request) {
         Producto producto = obtenerOFallar(productoId);
-        BigDecimal stockActual = producto.getStockActual();
         BigDecimal cantidad = request.cantidad();
-        BigDecimal nuevoStock;
 
         switch (request.tipoAjuste()) {
-            case INGRESO -> nuevoStock = stockActual.add(cantidad);
+            case INGRESO -> productoRepository.reponerStockAtomico(productoId, cantidad);
             case SALIDA -> {
-                nuevoStock = stockActual.subtract(cantidad);
-                if (nuevoStock.signum() < 0) {
-                    throw new BusinessException("Stock insuficiente. Stock actual: " + stockActual);
+                int actualizados = productoRepository.descontarStockAtomico(productoId, cantidad);
+                if (actualizados == 0) {
+                    BigDecimal stockVigente = obtenerOFallar(productoId).getStockActual();
+                    throw new BusinessException("Stock insuficiente. Stock actual: " + stockVigente);
                 }
             }
-            case AJUSTE -> nuevoStock = cantidad;
+            case AJUSTE -> {
+                producto.setStockActual(cantidad);
+                productoRepository.save(producto);
+            }
             default -> throw new BusinessException("Tipo de ajuste no soportado: " + request.tipoAjuste());
         }
 
-        producto.setStockActual(nuevoStock);
-        Producto saved = productoRepository.save(producto);
+        // Relectura post-UPDATE: el contexto de persistencia quedó limpio, así
+        // el response y el evento WebSocket llevan el stock realmente guardado.
+        Producto saved = obtenerOFallar(productoId);
         eventPublisher.publishStockChanged(saved);
         return productoMapper.toResponse(saved);
     }
