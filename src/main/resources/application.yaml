@@ -125,6 +125,16 @@ app:
       token: ${RENIEC_FALLBACK_TOKEN:}
       enabled: ${RENIEC_FALLBACK_ENABLED:true}
 
+  # Purga diaria de datos históricos (DataRetentionJob, 03:30). Ventanas en días;
+  # RETENTION_ENABLED=false desactiva el job sin redeploy de código.
+  retention:
+    enabled: ${RETENTION_ENABLED:true}
+    cron: ${RETENTION_CRON:0 30 3 * * *}
+    sesiones-dias: ${RETENTION_SESIONES_DIAS:30}
+    tokens-dias: ${RETENTION_TOKENS_DIAS:7}
+    log-correos-dias: ${RETENTION_LOG_CORREOS_DIAS:90}
+    auditoria-dias: ${RETENTION_AUDITORIA_DIAS:365}
+
   reserva:
     online:
       usuario-sistema-id: ${RESERVA_ONLINE_USUARIO_ID:1}
