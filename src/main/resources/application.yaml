@@ -42,6 +42,9 @@ spring:
     baseline-on-migrate: false
     validate-on-migrate: true
     out-of-order: false
+    # Explícito para que el checksum de las migraciones (con tildes/eñes) sea
+    # idéntico en cualquier máquina, sin depender de la configuración regional.
+    encoding: UTF-8
 
   cache:
     type: caffeine
