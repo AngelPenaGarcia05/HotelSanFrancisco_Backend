@@ -32,6 +32,7 @@ Guía para desplegar el backend del Hotel San Francisco en [Railway](https://rai
    SMTP_CIPHER_KEY=<clave-estable-para-cifrar-credenciales-smtp>
    APP_COOKIE_SECURE=true
    APP_COOKIE_SAMESITE=None
+   APP_CSRF_HEADER_ENABLED=true
    APP_CORS_ALLOWED_ORIGINS=https://tu-frontend.com
    APP_FRONTEND_URL=https://tu-frontend.com
    RENIEC_TOKEN=<token-de-apisperu>
@@ -54,6 +55,19 @@ Guía para desplegar el backend del Hotel San Francisco en [Railway](https://rai
   las cookies de sesión necesitan `APP_COOKIE_SAMESITE=None` **y**
   `APP_COOKIE_SECURE=true` (solo viajan sobre HTTPS). Para mismo dominio, deja
   `SameSite=Lax`.
+- **CSRF**: con `SameSite=None` desaparece la protección CSRF que da `Lax` (los
+  POST cross-site vuelven a viajar con la cookie), así que
+  `APP_CSRF_HEADER_ENABLED=true` pasa a ser **obligatorio** en ese escenario. El
+  filtro `CsrfHeaderFilter` exige el header `X-Requested-With: XMLHttpRequest` en
+  toda mutación (POST/PUT/PATCH/DELETE) autenticada por cookie; el frontend
+  Angular ya lo envía en todas las peticiones (interceptor HTTP). Regla:
+  `SameSite=None` ⟹ `CSRF_HEADER_ENABLED=true`. Requisitos para que funcione:
+  (1) el frontend debe mandar el header, y (2) el origen del frontend debe estar
+  en `APP_CORS_ALLOWED_ORIGINS` (si no, el preflight bloquea toda mutación **antes**
+  de llegar al backend). Orden seguro al desplegar: configurar CORS → smoke test
+  sin el flag → activar el flag → re-test. Rollback: poner el flag en `false` y
+  reiniciar. Nota: Swagger/Postman con cookie darán `403 CSRF_HEADER_MISSING`
+  salvo que añadan el header a mano o usen `Authorization: Bearer`.
 - **CORS**: `APP_CORS_ALLOWED_ORIGINS` debe listar exactamente el/los dominios
   del frontend (sin barra final), separados por coma. `allowCredentials` está
   activo, por lo que no se permite `*`.
