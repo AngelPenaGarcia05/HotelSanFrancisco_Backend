@@ -24,4 +24,6 @@ public interface IncidenciaRepository extends JpaRepository<Incidencia, Integer>
     List<Incidencia> findByReservaHabitacionHabitacionHabitacionId(Integer habitacionId);
 
     List<Incidencia> findByEstadoAndPrioridad(EstadoIncidencia estado, PrioridadIncidencia prioridad);
+
+    long countByEstado(EstadoIncidencia estado);
 }

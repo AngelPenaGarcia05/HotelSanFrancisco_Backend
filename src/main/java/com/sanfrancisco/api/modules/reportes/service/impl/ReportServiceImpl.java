@@ -184,9 +184,7 @@ public class ReportServiceImpl implements ReportService {
         long totalHabitaciones = Math.max(1, habitacionRepository.count());
         long dias = Math.max(1, ChronoUnit.DAYS.between(desde, hasta) + 1);
 
-        List<ReservaHabitacion> ocupaciones = reservaHabitacionRepository.findAll().stream()
-                .filter(rh -> seSuperponeConRango(rh, desde, hasta))
-                .toList();
+        List<ReservaHabitacion> ocupaciones = reservaHabitacionRepository.findSolapadasConRango(desde, hasta);
 
         // Serie diaria: para cada día del rango, cuántas habitaciones están ocupadas
         List<OccupancyReportResponse.OccupancyPoint> serie = Stream.iterate(desde, d -> d.plusDays(1))
@@ -269,13 +267,11 @@ public class ReportServiceImpl implements ReportService {
         BigDecimal variacionOcupacion = variacionPorcentual(
                 ocupacionMesAnterior.ocupacionPromedio(), ocupacionMesActual.ocupacionPromedio());
 
-        long reservasActivas = reservaRepository.findByEstado(EstadoReserva.CONFIRMADA).size()
-                + reservaRepository.findByEstado(EstadoReserva.CHECK_IN).size();
+        long reservasActivas = reservaRepository.countByEstadoIn(
+                List.of(EstadoReserva.CONFIRMADA, EstadoReserva.CHECK_IN));
 
-        long reservasPendientesPago = reservaRepository.findAll().stream()
-                .filter(r -> r.getEstado() != EstadoReserva.CANCELADA && r.getEstado() != EstadoReserva.NO_SHOW)
-                .filter(r -> r.getAdelanto().compareTo(r.getMontoTotal()) < 0)
-                .count();
+        long reservasPendientesPago = reservaRepository.countPendientesDePago(
+                List.of(EstadoReserva.CANCELADA, EstadoReserva.NO_SHOW));
 
         ManagementDashboardResponse.ManagementKpis kpis = new ManagementDashboardResponse.ManagementKpis(
                 ingresosMesActual.totalIngresos(),
@@ -441,17 +437,7 @@ public class ReportServiceImpl implements ReportService {
     private List<Reserva> reservasCreadasEnRango(LocalDate desde, LocalDate hasta) {
         LocalDateTime inicio = desde.atStartOfDay();
         LocalDateTime fin = hasta.atTime(23, 59, 59);
-        return reservaRepository.findAll().stream()
-                .filter(r -> !r.getFechaCreacion().isBefore(inicio) && !r.getFechaCreacion().isAfter(fin))
-                .toList();
-    }
-
-    private boolean seSuperponeConRango(ReservaHabitacion rh, LocalDate desde, LocalDate hasta) {
-        Reserva reserva = rh.getReserva();
-        if (reserva == null) return false;
-        LocalDate inicioEstancia = reserva.getFechaInicio();
-        LocalDate finEstancia = reserva.getFechaFin();
-        return !finEstancia.isBefore(desde) && !inicioEstancia.isAfter(hasta);
+        return reservaRepository.findByFechaCreacionBetween(inicio, fin);
     }
 
     private boolean diaDentroDeEstancia(ReservaHabitacion rh, LocalDate dia) {

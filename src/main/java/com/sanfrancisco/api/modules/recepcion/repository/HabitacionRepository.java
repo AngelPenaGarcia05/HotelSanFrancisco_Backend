@@ -25,6 +25,8 @@ public interface HabitacionRepository extends JpaRepository<Habitacion, Integer>
 
     List<Habitacion> findByEstado(EstadoHabitacion estado);
 
+    long countByEstado(EstadoHabitacion estado);
+
     List<Habitacion> findByEstadoIn(Collection<EstadoHabitacion> estados);
 
     List<Habitacion> findByPiso(Integer piso);

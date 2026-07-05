@@ -23,6 +23,11 @@ public interface ProductoRepository extends JpaRepository<Producto, Integer>,
     @Query("SELECT p FROM Producto p WHERE p.stockActual <= p.stockMinimo AND p.estado = 'ACTIVO'")
     List<Producto> findProductosBajoStock();
 
+    long countByEstado(EstadoActivo estado);
+
+    @Query("SELECT COUNT(p) FROM Producto p WHERE p.stockActual <= p.stockMinimo AND p.estado = 'ACTIVO'")
+    long countProductosBajoStock();
+
     List<Producto> findByPrecioVentaBetween(BigDecimal min, BigDecimal max);
 
     /**
