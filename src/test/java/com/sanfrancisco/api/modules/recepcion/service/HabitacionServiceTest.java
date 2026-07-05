@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.recepcion.service;
 
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.exception.BusinessException;
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CheckInRequest;
@@ -82,8 +83,8 @@ class HabitacionServiceTest {
         reserva = Reserva.builder()
                 .reservaId(5)
                 .codReserva("RES-001")
-                .fechaInicio(LocalDate.now())
-                .fechaFin(LocalDate.now().plusDays(2))
+                .fechaInicio(DateTimeUtils.today())
+                .fechaFin(DateTimeUtils.today().plusDays(2))
                 .estado(EstadoReserva.CONFIRMADA)
                 .subtotal(new BigDecimal("200.00"))
                 .descuento(BigDecimal.ZERO)
@@ -188,7 +189,7 @@ class HabitacionServiceTest {
         void checkOut_exitoso_conConsumos() {
             Estancia estancia = Estancia.builder()
                     .estanciaId(1)
-                    .fechaCheckin(LocalDateTime.now().minusDays(2))
+                    .fechaCheckin(DateTimeUtils.now().minusDays(2))
                     .reserva(reserva)
                     .usuarioCheckin(usuario)
                     .build();
