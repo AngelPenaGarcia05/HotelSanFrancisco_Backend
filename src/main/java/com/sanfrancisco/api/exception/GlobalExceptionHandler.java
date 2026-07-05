@@ -97,10 +97,19 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest req) {
-        log.warn("Violación de integridad en {}: {}", req.getRequestURI(), ex.getMostSpecificCause().getMessage());
+        String causa = ex.getMostSpecificCause().getMessage();
+        log.warn("Violación de integridad en {}: {}", req.getRequestURI(), causa);
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ErrorResponse.of("DATA_INTEGRITY_VIOLATION",
-                        "La operación viola restricciones de integridad de datos", req.getRequestURI()));
+                        mensajeIntegridad(causa), req.getRequestURI()));
+    }
+
+    /** Traduce los constraints de negocio conocidos a un mensaje entendible para el usuario. */
+    private String mensajeIntegridad(String causa) {
+        if (causa != null && (causa.contains("uk_huespedes_documento") || causa.contains("uk_usuarios_documento"))) {
+            return "El número de documento ya está registrado";
+        }
+        return "La operación viola restricciones de integridad de datos";
     }
 
     @ExceptionHandler(org.springframework.security.authentication.BadCredentialsException.class)
