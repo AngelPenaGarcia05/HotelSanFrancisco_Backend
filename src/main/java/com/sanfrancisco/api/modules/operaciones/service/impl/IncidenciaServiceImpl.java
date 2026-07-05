@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.operaciones.service.impl;
 
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.exception.BusinessException;
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
 import com.sanfrancisco.api.modules.operaciones.dto.request.CambiarEstadoIncidenciaRequest;
@@ -144,7 +145,7 @@ public class IncidenciaServiceImpl implements IncidenciaService {
                 incidencia.setSolucion(request.solucion());
             }
             if (incidencia.getFechaResolucion() == null) {
-                incidencia.setFechaResolucion(LocalDateTime.now());
+                incidencia.setFechaResolucion(DateTimeUtils.now());
             }
         }
 

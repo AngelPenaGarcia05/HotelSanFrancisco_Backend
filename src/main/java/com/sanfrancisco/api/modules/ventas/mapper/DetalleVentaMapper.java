@@ -16,7 +16,9 @@ public class DetalleVentaMapper {
 
     public DetalleVenta toEntity(CreateDetalleVentaRequest request, Venta venta, Producto producto) {
         BigDecimal descuento = Optional.ofNullable(request.descuentoUnitario()).orElse(BigDecimal.ZERO);
-        BigDecimal precioNeto = request.precioUnitario().subtract(descuento);
+        // Precio autoritativo: el del catálogo, no el que envía el cliente del API
+        BigDecimal precioCatalogo = producto.getPrecioVenta();
+        BigDecimal precioNeto = precioCatalogo.subtract(descuento);
         BigDecimal subtotal = precioNeto.multiply(request.cantidad());
         DetalleVentaPK pk = new DetalleVentaPK(venta.getVentaId(), producto.getProductoId());
         return DetalleVenta.builder()
@@ -24,7 +26,7 @@ public class DetalleVentaMapper {
                 .venta(venta)
                 .producto(producto)
                 .cantidad(request.cantidad())
-                .precioUnitario(request.precioUnitario())
+                .precioUnitario(precioCatalogo)
                 .descuentoUnitario(descuento)
                 .subtotal(subtotal)
                 .build();

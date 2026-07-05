@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.shared.jobs;
 
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.modules.auditoria.repository.RegistroAuditoriaRepository;
 import com.sanfrancisco.api.modules.notificaciones.repository.LogCorreoRepository;
 import com.sanfrancisco.api.modules.seguridad.repository.SesionRepository;
@@ -67,7 +68,7 @@ public class DataRetentionJob {
         if (!enabled) {
             return;
         }
-        LocalDateTime ahora = LocalDateTime.now();
+        LocalDateTime ahora = DateTimeUtils.now();
 
         int sesiones = sesionRepository.deleteExpiradasAntesDe(ahora.minusDays(retencionSesionesDias));
         int tokens = tokenRecuperacionRepository.deleteAgotadosAntesDe(ahora.minusDays(retencionTokensDias));

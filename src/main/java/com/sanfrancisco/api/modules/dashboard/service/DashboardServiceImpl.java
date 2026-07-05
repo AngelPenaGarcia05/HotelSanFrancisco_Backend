@@ -102,7 +102,7 @@ public class DashboardServiceImpl implements DashboardService {
         LocalDate finMesAnterior = inicioMes.minusDays(1);
 
         return new DashboardResponse(
-                LocalDateTime.now(),
+                DateTimeUtils.now(),
                 buildUsuarioInfo(usuario, permisos),
                 permisos.contains(Permissions.RESERVA_READ) ? buildReservas(inicioMes, hoy) : null,
                 permisos.contains(Permissions.HABITACION_READ) ? buildOcupacion() : null,
@@ -175,7 +175,7 @@ public class DashboardServiceImpl implements DashboardService {
 
     private DashboardResponse.VentasCard buildVentas(LocalDate inicioMes) {
         List<Venta> ventasMes = ventaRepository.findByFechaVentaBetween(
-                inicioMes.atStartOfDay(), LocalDateTime.now());
+                inicioMes.atStartOfDay(), DateTimeUtils.now());
 
         long ventasMesCount = ventasMes.stream()
                 .filter(v -> v.getEstado() != EstadoVenta.ANULADA)

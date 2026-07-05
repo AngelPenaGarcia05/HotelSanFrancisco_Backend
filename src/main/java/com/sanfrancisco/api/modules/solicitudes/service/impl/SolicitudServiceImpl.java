@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.solicitudes.service.impl;
 
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.config.security.Permissions;
 import com.sanfrancisco.api.exception.BusinessException;
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
@@ -274,7 +275,7 @@ public class SolicitudServiceImpl implements SolicitudService {
             solicitud.setObservaciones(request.observacion());
         }
         if (nuevo == EstadoSolicitud.CERRADA) {
-            solicitud.setFechaCierre(LocalDateTime.now());
+            solicitud.setFechaCierre(DateTimeUtils.now());
         }
 
         solicitud.addSeguimiento(buildSeguimiento(
@@ -387,7 +388,7 @@ public class SolicitudServiceImpl implements SolicitudService {
                                                   String observacion,
                                                   Usuario responsable) {
         return SeguimientoSolicitud.builder()
-                .fechaAccion(LocalDateTime.now())
+                .fechaAccion(DateTimeUtils.now())
                 .accion(accion)
                 .estadoAnterior(anterior)
                 .estadoNuevo(nuevo)
@@ -408,7 +409,7 @@ public class SolicitudServiceImpl implements SolicitudService {
     /** Genera un código tipo SOL-2026-001 (INFORMACION) o ACC-2026-001 (ACCESO). */
     private String generarCodigo(TipoSolicitud tipo) {
         String prefijo = tipo == TipoSolicitud.ACCESO ? "ACC" : "SOL";
-        int anio = LocalDate.now().getYear();
+        int anio = DateTimeUtils.today().getYear();
         LocalDateTime inicioAnio = LocalDate.of(anio, 1, 1).atStartOfDay();
         LocalDateTime finAnio = LocalDate.of(anio, 12, 31).atTime(LocalTime.MAX);
 

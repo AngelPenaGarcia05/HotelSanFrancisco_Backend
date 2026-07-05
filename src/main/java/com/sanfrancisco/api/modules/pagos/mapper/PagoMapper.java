@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.pagos.mapper;
 
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.modules.pagos.dto.request.CreatePagoRequest;
 import com.sanfrancisco.api.modules.pagos.dto.request.UpdatePagoRequest;
 import com.sanfrancisco.api.modules.pagos.dto.response.PagoResponse;
@@ -23,7 +24,7 @@ public class PagoMapper {
         return Pago.builder()
                 .metodoPago(metodoPago)
                 .tipoPago(request.tipoPago())
-                .fecha(Optional.ofNullable(request.fecha()).orElse(LocalDateTime.now()))
+                .fecha(Optional.ofNullable(request.fecha()).orElse(DateTimeUtils.now()))
                 .monto(request.monto())
                 .comprobante(request.comprobante())
                 .venta(venta)

@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.auditoria.service;
 
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.modules.auditoria.dto.request.AuditoriaFilterRequest;
 import com.sanfrancisco.api.modules.auditoria.dto.response.RegistroAuditoriaResponse;
 import com.sanfrancisco.api.modules.auditoria.entity.RegistroAuditoria;
@@ -41,7 +42,7 @@ public class AuditoriaServiceImpl implements AuditoriaService {
                     .ipOrigen(command.ipOrigen())
                     .resultado(command.resultado())
                     .detalleError(truncar(command.detalleError(), 500))
-                    .fecha(LocalDateTime.now())
+                    .fecha(DateTimeUtils.now())
                     .build();
             repository.save(registro);
         } catch (Exception e) {

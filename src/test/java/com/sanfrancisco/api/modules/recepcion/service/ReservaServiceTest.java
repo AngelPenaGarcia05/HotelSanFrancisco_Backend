@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.recepcion.service;
 
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.exception.BusinessException;
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
 import com.sanfrancisco.api.modules.recepcion.dto.ReservaMontos;
@@ -85,8 +86,8 @@ class ReservaServiceTest {
 
     @BeforeEach
     void setUp() {
-        INICIO = LocalDate.now().plusDays(10);
-        FIN    = LocalDate.now().plusDays(12); // 2 noches
+        INICIO = DateTimeUtils.today().plusDays(10);
+        FIN    = DateTimeUtils.today().plusDays(12); // 2 noches
 
         usuario = new Usuario();
         usuario.setUsuarioId(1);
@@ -594,7 +595,7 @@ class ReservaServiceTest {
         @Test
         @DisplayName("Exitoso: 1-2 días de anticipación → penalización del 50% del adelanto")
         void cancelar_exitoso_penalizacion50Porciento() {
-            reserva.setFechaInicio(LocalDate.now().plusDays(2)); // 2 días → 50%
+            reserva.setFechaInicio(DateTimeUtils.today().plusDays(2)); // 2 días → 50%
             when(reservaRepository.findById(5)).thenReturn(Optional.of(reserva));
             when(reservaHabitacionRepository.findByReservaReservaId(5))
                     .thenReturn(List.of(reservaHabitacion));
@@ -615,7 +616,7 @@ class ReservaServiceTest {
         @Test
         @DisplayName("Exitoso: aplicarPenalizacion=false exonera la penalización sin importar la anticipación")
         void cancelar_exitoso_exonerado_sinPenalizacion() {
-            reserva.setFechaInicio(LocalDate.now()); // misma fecha → normalmente 100%
+            reserva.setFechaInicio(DateTimeUtils.today()); // misma fecha → normalmente 100%
             when(reservaRepository.findById(5)).thenReturn(Optional.of(reserva));
             when(reservaHabitacionRepository.findByReservaReservaId(5))
                     .thenReturn(List.of(reservaHabitacion));

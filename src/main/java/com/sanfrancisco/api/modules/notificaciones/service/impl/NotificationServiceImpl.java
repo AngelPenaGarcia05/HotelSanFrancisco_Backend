@@ -136,10 +136,10 @@ public class NotificationServiceImpl implements NotificationService {
                     "Correo de prueba — Hotel San Francisco",
                     "<p>Este es un correo de prueba de la configuración SMTP del Hotel San Francisco.</p>"
             );
-            return new SmtpTestResultResponse(true, "Correo de prueba enviado correctamente.", LocalDateTime.now());
+            return new SmtpTestResultResponse(true, "Correo de prueba enviado correctamente.", DateTimeUtils.now());
         } catch (Exception e) {
             log.warn("Fallo al enviar correo de prueba SMTP: {}", e.getMessage());
-            return new SmtpTestResultResponse(false, "No se pudo enviar el correo de prueba: " + e.getMessage(), LocalDateTime.now());
+            return new SmtpTestResultResponse(false, "No se pudo enviar el correo de prueba: " + e.getMessage(), DateTimeUtils.now());
         }
     }
 
@@ -368,7 +368,7 @@ public class NotificationServiceImpl implements NotificationService {
             entry.setError(truncar(e.getMessage(), 500));
         }
         entry.setIntentos(entry.getIntentos() + 1);
-        entry.setEnviadoEn(LocalDateTime.now());
+        entry.setEnviadoEn(DateTimeUtils.now());
 
         return mapper.toResponse(logCorreoRepository.save(entry));
     }
@@ -399,7 +399,7 @@ public class NotificationServiceImpl implements NotificationService {
                 .plantillaClave(key)
                 .reserva(reserva)
                 .pago(pago)
-                .enviadoEn(LocalDateTime.now())
+                .enviadoEn(DateTimeUtils.now())
                 .intentos(1);
 
         LogCorreo entry;

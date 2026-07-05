@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.reportes.Controller;
 
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.modules.reportes.dto.request.ExportReporteRequest;
 import com.sanfrancisco.api.modules.reportes.dto.request.ReportRangeRequest;
 import com.sanfrancisco.api.modules.reportes.dto.response.ManagementDashboardResponse;
@@ -50,7 +51,7 @@ public class ReportController {
     public ResponseEntity<byte[]> exportar(@RequestBody ExportReporteRequest request) {
         byte[] csv = reportService.exportar(request);
         String filename = "reporte-" + (request.tipo() != null ? request.tipo() : "general")
-                + "-" + LocalDate.now() + ".csv";
+                + "-" + DateTimeUtils.today() + ".csv";
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType("text/csv; charset=UTF-8"));
         headers.setContentDisposition(ContentDisposition.attachment().filename(filename).build());

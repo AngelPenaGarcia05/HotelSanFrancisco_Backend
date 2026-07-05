@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.solicitudes.mapper;
 
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
 import com.sanfrancisco.api.modules.solicitudes.dto.request.CreateSolicitudRequest;
 import com.sanfrancisco.api.modules.solicitudes.dto.response.SolicitudResponse;
@@ -21,7 +22,7 @@ public class SolicitudMapper {
     public Solicitud toEntity(CreateSolicitudRequest request, Usuario solicitante, String codigo) {
         return Solicitud.builder()
                 .codigoSolicitud(codigo)
-                .fechaRegistro(LocalDateTime.now())
+                .fechaRegistro(DateTimeUtils.now())
                 .tipoSolicitud(request.tipoSolicitud())
                 .asunto(request.asunto())
                 .descripcion(request.descripcion())

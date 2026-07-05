@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.seguridad.service.impl;
 
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.modules.seguridad.entity.Sesion;
 import com.sanfrancisco.api.modules.seguridad.enums.EstadoSesion;
 import com.sanfrancisco.api.modules.seguridad.repository.SesionRepository;
@@ -31,7 +32,7 @@ public class SessionRevocationService {
         List<Sesion> activas = sesionRepository.findByUsuarioUsuarioIdAndEstado(usuarioId, EstadoSesion.ACTIVA);
         for (Sesion s : activas) {
             s.setEstado(EstadoSesion.CERRADA);
-            s.setFechaCierre(LocalDateTime.now());
+            s.setFechaCierre(DateTimeUtils.now());
             sesionRepository.save(s);
         }
         jwtService.revokeUserTokens(usuarioId);
