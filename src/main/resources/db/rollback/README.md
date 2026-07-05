@@ -39,6 +39,7 @@ backend puede arrancar con la versión anterior del código.
 | Migración | Rollback | Notas |
 |---|---|---|
 | V31__indices_fk_y_constraints.sql | V31_rollback.sql | La limpieza de `smtp_config.password_cifrado` es irreversible (valor no conservado; el correo no depende de él). |
+| V32__unique_numero_documento.sql | V32_rollback.sql | Reversión completa; los constraints no alteran datos. |
 
 Las migraciones V1–V30 son anteriores a esta convención y no tienen rollback
 escrito; de necesitarse, derivarlo del propio archivo de migración.
