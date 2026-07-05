@@ -237,7 +237,8 @@ public class HabitacionServiceImpl implements HabitacionService {
 
         reserva.setEstado(EstadoReserva.CHECK_IN);
         if (request.observaciones() != null && !request.observaciones().isBlank()) {
-            reserva.setObservaciones(request.observaciones());
+            reserva.setObservaciones(anexarObservacion(reserva.getObservaciones(),
+                    "[CHECK-IN] " + request.observaciones()));
         }
         reservaRepository.save(reserva);
 
@@ -310,7 +311,8 @@ public class HabitacionServiceImpl implements HabitacionService {
         // Actualizar estado de la reserva
         reserva.setEstado(EstadoReserva.CHECK_OUT);
         if (request.observaciones() != null && !request.observaciones().isBlank()) {
-            reserva.setObservaciones(request.observaciones());
+            reserva.setObservaciones(anexarObservacion(reserva.getObservaciones(),
+                    "[CHECK-OUT] " + request.observaciones()));
         }
 
         // Liquidación: agregar consumos adicionales al monto total
@@ -436,6 +438,10 @@ public class HabitacionServiceImpl implements HabitacionService {
                     );
                 })
                 .toList();
+    }
+
+    private String anexarObservacion(String existente, String nueva) {
+        return existente == null || existente.isBlank() ? nueva : existente + "\n" + nueva;
     }
 
     private void registrarHistorial(Reserva reserva, EstadoReserva anterior, EstadoReserva nuevo, String motivo) {

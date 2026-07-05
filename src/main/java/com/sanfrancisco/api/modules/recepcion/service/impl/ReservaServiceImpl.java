@@ -416,7 +416,7 @@ public class ReservaServiceImpl implements ReservaService {
         boolean aplicar = !Boolean.FALSE.equals(request.aplicarPenalizacion());
         PoliticaCancelacion politica = calcularPolitica(reserva.getFechaInicio(), aplicar);
 
-        BigDecimal adelanto    = reserva.getAdelanto();
+        BigDecimal adelanto    = reserva.getAdelanto() != null ? reserva.getAdelanto() : BigDecimal.ZERO;
         BigDecimal penalizacion = adelanto
                 .multiply(BigDecimal.valueOf(politica.porcentaje()))
                 .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
