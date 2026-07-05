@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.servicios.mapper;
 
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.modules.recepcion.entity.Estancia;
 import com.sanfrancisco.api.modules.servicios.dto.request.CreateServicioRequest;
 import com.sanfrancisco.api.modules.servicios.dto.response.ServicioResponse;
@@ -28,7 +29,7 @@ public class ServicioMapper {
                 .precioAplicado(precioAplicado)
                 .subtotal(subtotal)
                 .observaciones(request.observaciones())
-                .fechaConsumo(Optional.ofNullable(request.fechaConsumo()).orElse(LocalDateTime.now()))
+                .fechaConsumo(Optional.ofNullable(request.fechaConsumo()).orElse(DateTimeUtils.now()))
                 .build();
     }
 

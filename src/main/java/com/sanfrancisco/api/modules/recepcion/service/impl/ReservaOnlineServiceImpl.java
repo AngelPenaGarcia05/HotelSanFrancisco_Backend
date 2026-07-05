@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.recepcion.service.impl;
 
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CreateReservaRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.ReservaOnlineRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.response.ReservaResponse;
@@ -67,7 +68,7 @@ public class ReservaOnlineServiceImpl implements ReservaOnlineService {
     }
 
     private String generarCodigo() {
-        String fecha = LocalDate.now().format(FECHA_FORMATTER);
+        String fecha = DateTimeUtils.today().format(FECHA_FORMATTER);
         String sufijo = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
         return "ON-" + fecha + "-" + sufijo;
     }

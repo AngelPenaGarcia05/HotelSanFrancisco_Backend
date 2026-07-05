@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.seguridad.service.impl;
 
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
 import com.sanfrancisco.api.modules.seguridad.dto.request.CambiarEstadoUsuarioRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.CambiarRolUsuarioRequest;
@@ -194,7 +195,7 @@ public class UsuarioServiceImpl implements UsuarioService {
                 sesionRepository.findByUsuarioUsuarioIdAndEstado(usuarioId, EstadoSesion.ACTIVA);
         for (Sesion s : activeSessions) {
             s.setEstado(EstadoSesion.CERRADA);
-            s.setFechaCierre(LocalDateTime.now());
+            s.setFechaCierre(DateTimeUtils.now());
             sesionRepository.save(s);
         }
     }

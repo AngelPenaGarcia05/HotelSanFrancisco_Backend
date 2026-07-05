@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.servicios.service.impl;
 
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.exception.BusinessException;
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
 import com.sanfrancisco.api.modules.recepcion.entity.Estancia;
@@ -127,7 +128,7 @@ public class PedidoServicioServiceImpl implements PedidoServicioService {
             throw new BusinessException("Solo puedes cancelar un pedido que siga pendiente.");
         }
         pedido.setEstado(EstadoPedidoServicio.CANCELADO);
-        pedido.setFechaRespuesta(LocalDateTime.now());
+        pedido.setFechaRespuesta(DateTimeUtils.now());
         return mapper.toResponse(pedidoRepository.save(pedido));
     }
 
@@ -160,14 +161,14 @@ public class PedidoServicioServiceImpl implements PedidoServicioService {
                 .precioAplicado(precioAplicado)
                 .subtotal(subtotal)
                 .observaciones(pedido.getObservaciones())
-                .fechaConsumo(LocalDateTime.now())
+                .fechaConsumo(DateTimeUtils.now())
                 .build();
         servicio = servicioRepository.save(servicio);
 
         pedido.setEstado(EstadoPedidoServicio.APROBADO);
         pedido.setServicio(servicio);
         pedido.setUsuarioRespuesta(usuarioActual());
-        pedido.setFechaRespuesta(LocalDateTime.now());
+        pedido.setFechaRespuesta(DateTimeUtils.now());
         return mapper.toResponse(pedidoRepository.save(pedido));
     }
 
@@ -177,7 +178,7 @@ public class PedidoServicioServiceImpl implements PedidoServicioService {
         pedido.setEstado(EstadoPedidoServicio.RECHAZADO);
         pedido.setMotivoRespuesta(request.motivo());
         pedido.setUsuarioRespuesta(usuarioActual());
-        pedido.setFechaRespuesta(LocalDateTime.now());
+        pedido.setFechaRespuesta(DateTimeUtils.now());
         return mapper.toResponse(pedidoRepository.save(pedido));
     }
 

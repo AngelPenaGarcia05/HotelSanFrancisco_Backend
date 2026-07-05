@@ -198,8 +198,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .tokenHash(hashSha256(refreshToken))
                 .ipOrigen(clientIp)
                 .userAgent(httpRequest.getHeader("User-Agent"))
-                .fechaInicio(LocalDateTime.now())
-                .fechaExpiracion(LocalDateTime.now().plusNanos(jwtService.getRefreshTokenExpirationMs() * 1_000_000L))
+                .fechaInicio(DateTimeUtils.now())
+                .fechaExpiracion(DateTimeUtils.now().plusNanos(jwtService.getRefreshTokenExpirationMs() * 1_000_000L))
                 .estado(EstadoSesion.ACTIVA)
                 .usuario(usuario)
                 .build();
@@ -313,8 +313,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .tokenHash(hashSha256(refreshToken))
                 .ipOrigen(getClientIp(httpRequest))
                 .userAgent(httpRequest.getHeader("User-Agent"))
-                .fechaInicio(LocalDateTime.now())
-                .fechaExpiracion(LocalDateTime.now().plusNanos(jwtService.getRefreshTokenExpirationMs() * 1_000_000L))
+                .fechaInicio(DateTimeUtils.now())
+                .fechaExpiracion(DateTimeUtils.now().plusNanos(jwtService.getRefreshTokenExpirationMs() * 1_000_000L))
                 .estado(EstadoSesion.ACTIVA)
                 .usuario(usuario)
                 .build();
@@ -375,7 +375,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         Sesion sesion = sesionRepository.findByTokenHash(currentHash)
                 .orElse(null);
 
-        if (sesion == null || sesion.getEstado() != EstadoSesion.ACTIVA || sesion.getFechaExpiracion().isBefore(LocalDateTime.now())) {
+        if (sesion == null || sesion.getEstado() != EstadoSesion.ACTIVA || sesion.getFechaExpiracion().isBefore(DateTimeUtils.now())) {
             // Check for potential Token Reuse Attack!
             if (sesion != null && sesion.getEstado() == EstadoSesion.CERRADA) {
                 log.warn("¡Posible ataque de reutilización de refresh token detectado para el correo: {}! Revocando todas las sesiones activas del usuario.", email);
@@ -393,7 +393,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         // Close old session (Token Rotation)
         sesion.setEstado(EstadoSesion.CERRADA);
-        sesion.setFechaCierre(LocalDateTime.now());
+        sesion.setFechaCierre(DateTimeUtils.now());
         sesionRepository.save(sesion);
 
         // Generate new Access and Refresh tokens
@@ -417,8 +417,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .tokenHash(hashSha256(newRefreshToken))
                 .ipOrigen(getClientIp(httpRequest))
                 .userAgent(httpRequest.getHeader("User-Agent"))
-                .fechaInicio(LocalDateTime.now())
-                .fechaExpiracion(LocalDateTime.now().plusNanos(jwtService.getRefreshTokenExpirationMs() * 1_000_000L))
+                .fechaInicio(DateTimeUtils.now())
+                .fechaExpiracion(DateTimeUtils.now().plusNanos(jwtService.getRefreshTokenExpirationMs() * 1_000_000L))
                 .estado(EstadoSesion.ACTIVA)
                 .usuario(usuario)
                 .build();
@@ -453,7 +453,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             String hash = hashSha256(refreshToken);
             sesionRepository.findByTokenHash(hash).ifPresent(sesion -> {
                 sesion.setEstado(EstadoSesion.CERRADA);
-                sesion.setFechaCierre(LocalDateTime.now());
+                sesion.setFechaCierre(DateTimeUtils.now());
                 sesionRepository.save(sesion);
             });
         }
@@ -615,9 +615,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             TokenRecuperacion tokenRecuperacion = TokenRecuperacion.builder()
                     .usuario(usuario)
                     .tokenHash(tokenHash)
-                    .fechaExpiracion(LocalDateTime.now().plusMinutes(resetTokenExpiryMinutes))
+                    .fechaExpiracion(DateTimeUtils.now().plusMinutes(resetTokenExpiryMinutes))
                     .usado(false)
-                    .fechaCreacion(LocalDateTime.now())
+                    .fechaCreacion(DateTimeUtils.now())
                     .build();
             tokenRecuperacionRepository.save(tokenRecuperacion);
 
@@ -639,7 +639,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         if (tokenRecuperacion.isUsado()) {
             throw new BusinessException("Este enlace de recuperación ya fue utilizado.");
         }
-        if (tokenRecuperacion.getFechaExpiracion().isBefore(LocalDateTime.now())) {
+        if (tokenRecuperacion.getFechaExpiracion().isBefore(DateTimeUtils.now())) {
             throw new BusinessException("El enlace de recuperación ha expirado. Solicita uno nuevo.");
         }
 

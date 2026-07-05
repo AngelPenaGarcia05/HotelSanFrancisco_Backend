@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.booking.service;
 
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.modules.booking.dto.BookingConfirmationResponse;
 import com.sanfrancisco.api.modules.booking.dto.CreateBookingRequest;
 import com.sanfrancisco.api.modules.booking.dto.HabitacionDisponibleResponse;
@@ -209,7 +210,7 @@ public class BookingServiceImpl implements BookingService {
                 .metodoPago(metodoPago)
                 .tipoPago(req.tipoPago())
                 .monto(adelanto)
-                .fecha(LocalDateTime.now())
+                .fecha(DateTimeUtils.now())
                 .build();
         pagoRepository.save(pago);
 

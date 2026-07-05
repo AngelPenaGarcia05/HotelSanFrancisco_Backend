@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.operaciones.mapper;
 
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.modules.operaciones.dto.request.CreateIncidenciaRequest;
 import com.sanfrancisco.api.modules.operaciones.dto.request.UpdateIncidenciaRequest;
 import com.sanfrancisco.api.modules.operaciones.dto.response.IncidenciaResponse;
@@ -22,7 +23,7 @@ public class IncidenciaMapper {
     public Incidencia toEntity(CreateIncidenciaRequest request, Usuario usuario, ReservaHabitacion reservaHabitacion) {
         return Incidencia.builder()
                 .descripcion(request.descripcion())
-                .fechaReporte(Optional.ofNullable(request.fechaReporte()).orElse(LocalDateTime.now()))
+                .fechaReporte(Optional.ofNullable(request.fechaReporte()).orElse(DateTimeUtils.now()))
                 .prioridad(request.prioridad())
                 .estado(EstadoIncidencia.ABIERTA)
                 .usuario(usuario)
