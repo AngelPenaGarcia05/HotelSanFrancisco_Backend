@@ -240,11 +240,9 @@ public class BookingServiceImpl implements BookingService {
 
     private Usuario getSistemaUser() {
         return usuarioRepository.findByCorreo(SYSTEM_USER_EMAIL)
-                .orElseGet(() -> usuarioRepository.findAll().stream()
-                        .filter(u -> u.getRol() != null && "ADMIN".equals(u.getRol().getNombre()))
-                        .findFirst()
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                                "No se encontró usuario del sistema para procesar la reserva")));
+                .or(() -> usuarioRepository.findFirstByRolNombreOrderByUsuarioIdAsc("ADMIN"))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                        "No se encontró usuario del sistema para procesar la reserva"));
     }
 
     private String generarCodReservaUnico() {

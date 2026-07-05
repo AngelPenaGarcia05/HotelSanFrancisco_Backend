@@ -26,4 +26,10 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Integer>,
     boolean existsByCodigoEmpleado(String codigoEmpleado);
 
     boolean existsByCodigoEmpleadoAndUsuarioIdNot(String codigoEmpleado, Integer usuarioId);
+
+    long countByEstado(EstadoUsuario estado);
+
+    long countByRolNombreIgnoreCase(String nombreRol);
+
+    Optional<Usuario> findFirstByRolNombreOrderByUsuarioIdAsc(String nombreRol);
 }

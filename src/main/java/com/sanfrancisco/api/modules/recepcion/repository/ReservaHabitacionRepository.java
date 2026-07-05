@@ -55,6 +55,20 @@ public interface ReservaHabitacionRepository extends JpaRepository<ReservaHabita
             @Param("estadosLibera") Collection<EstadoReserva> estadosLibera,
             @Param("excluirReservaId") Integer excluirReservaId);
 
+    /**
+     * Asignaciones cuya estancia se solapa con el rango dado, sin filtrar por
+     * estado (mismas semánticas que el filtro en memoria del reporte de
+     * ocupación: fechaFin >= desde y fechaInicio <= hasta).
+     */
+    @Query("""
+            SELECT rh FROM ReservaHabitacion rh
+            WHERE rh.reserva.fechaFin    >= :desde
+              AND rh.reserva.fechaInicio <= :hasta
+            """)
+    List<ReservaHabitacion> findSolapadasConRango(
+            @Param("desde") LocalDate desde,
+            @Param("hasta") LocalDate hasta);
+
     /** Todas las asignaciones cuya reserva se solapa con el rango dado (para el calendario). */
     @Query("""
             SELECT rh FROM ReservaHabitacion rh

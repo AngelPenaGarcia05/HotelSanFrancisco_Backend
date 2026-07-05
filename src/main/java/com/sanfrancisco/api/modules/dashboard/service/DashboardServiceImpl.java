@@ -131,13 +131,11 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     private DashboardResponse.ReservasCard buildReservas(LocalDate inicioMes, LocalDate hoy) {
-        long activas = reservaRepository.findByEstado(EstadoReserva.CONFIRMADA).size()
-                + reservaRepository.findByEstado(EstadoReserva.CHECK_IN).size();
+        long activas = reservaRepository.countByEstadoIn(
+                List.of(EstadoReserva.CONFIRMADA, EstadoReserva.CHECK_IN));
 
-        long pendientesPago = reservaRepository.findAll().stream()
-                .filter(r -> r.getEstado() != EstadoReserva.CANCELADA && r.getEstado() != EstadoReserva.NO_SHOW)
-                .filter(r -> r.getAdelanto().compareTo(r.getMontoTotal()) < 0)
-                .count();
+        long pendientesPago = reservaRepository.countPendientesDePago(
+                List.of(EstadoReserva.CANCELADA, EstadoReserva.NO_SHOW));
 
         ReservationsReportResponse reservasMes = reportService.buildReservationsReport(
                 new ReportRangeRequest("CUSTOM", "DAY", inicioMes, hoy));
@@ -148,10 +146,10 @@ public class DashboardServiceImpl implements DashboardService {
 
     private DashboardResponse.OcupacionCard buildOcupacion() {
         long totales = habitacionRepository.count();
-        long ocupadas = habitacionRepository.findByEstado(EstadoHabitacion.OCUPADA).size();
-        long disponibles = habitacionRepository.findByEstado(EstadoHabitacion.DISPONIBLE).size();
-        long limpieza = habitacionRepository.findByEstado(EstadoHabitacion.LIMPIEZA).size();
-        long mantenimiento = habitacionRepository.findByEstado(EstadoHabitacion.MANTENIMIENTO).size();
+        long ocupadas = habitacionRepository.countByEstado(EstadoHabitacion.OCUPADA);
+        long disponibles = habitacionRepository.countByEstado(EstadoHabitacion.DISPONIBLE);
+        long limpieza = habitacionRepository.countByEstado(EstadoHabitacion.LIMPIEZA);
+        long mantenimiento = habitacionRepository.countByEstado(EstadoHabitacion.MANTENIMIENTO);
 
         BigDecimal pctOcupacion = totales == 0
                 ? BigDecimal.ZERO
@@ -188,31 +186,28 @@ public class DashboardServiceImpl implements DashboardService {
                 .map(Venta::getMontoTotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        long pendientes = ventaRepository.findByEstado(EstadoVenta.PENDIENTE).size();
+        long pendientes = ventaRepository.countByEstado(EstadoVenta.PENDIENTE);
 
         return new DashboardResponse.VentasCard(ventasMesCount, montoVentasMes, pendientes);
     }
 
     private DashboardResponse.InventarioCard buildInventario() {
-        long activos = productoRepository.findByEstado(EstadoActivo.ACTIVO).size();
-        long bajoStock = productoRepository.findProductosBajoStock().size();
+        long activos = productoRepository.countByEstado(EstadoActivo.ACTIVO);
+        long bajoStock = productoRepository.countProductosBajoStock();
         return new DashboardResponse.InventarioCard(activos, bajoStock);
     }
 
     private DashboardResponse.IncidenciasCard buildIncidencias() {
-        long abiertas = incidenciaRepository.findByEstado(EstadoIncidencia.ABIERTA).size();
-        long enProceso = incidenciaRepository.findByEstado(EstadoIncidencia.EN_PROCESO).size();
+        long abiertas = incidenciaRepository.countByEstado(EstadoIncidencia.ABIERTA);
+        long enProceso = incidenciaRepository.countByEstado(EstadoIncidencia.EN_PROCESO);
         long total = incidenciaRepository.count();
         return new DashboardResponse.IncidenciasCard(abiertas, enProceso, total);
     }
 
     private DashboardResponse.UsuariosCard buildUsuarios() {
-        List<Usuario> todos = usuarioRepository.findAll();
-        long total = todos.size();
-        long activos = todos.stream().filter(u -> u.getEstado() == EstadoUsuario.ACTIVO).count();
-        long clientes = todos.stream()
-                .filter(u -> u.getRol() != null && ROL_CLIENTE.equalsIgnoreCase(u.getRol().getNombre()))
-                .count();
+        long total = usuarioRepository.count();
+        long activos = usuarioRepository.countByEstado(EstadoUsuario.ACTIVO);
+        long clientes = usuarioRepository.countByRolNombreIgnoreCase(ROL_CLIENTE);
         long empleados = total - clientes;
         return new DashboardResponse.UsuariosCard(total, activos, empleados, clientes);
     }

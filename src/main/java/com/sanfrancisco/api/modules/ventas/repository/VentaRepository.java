@@ -23,4 +23,6 @@ public interface VentaRepository extends JpaRepository<Venta, Integer>,
     List<Venta> findByFechaVentaBetween(LocalDateTime inicio, LocalDateTime fin);
 
     List<Venta> findByEstanciaEstanciaId(Integer estanciaId);
+
+    long countByEstado(EstadoVenta estado);
 }

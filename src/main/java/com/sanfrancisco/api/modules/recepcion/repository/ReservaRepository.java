@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -26,6 +27,24 @@ public interface ReservaRepository extends JpaRepository<Reserva, Integer>,
     List<Reserva> findByEstado(EstadoReserva estado);
 
     List<Reserva> findByFechaInicioBetween(LocalDate inicio, LocalDate fin);
+
+    List<Reserva> findByFechaCreacionBetween(LocalDateTime inicio, LocalDateTime fin);
+
+    List<Reserva> findByEstadoAndFechaInicioBetween(EstadoReserva estado, LocalDate inicio, LocalDate fin);
+
+    long countByEstadoIn(Collection<EstadoReserva> estados);
+
+    /**
+     * Reservas con saldo pendiente (adelanto < monto total), excluyendo los
+     * estados que liberan la deuda. Sustituye al conteo en memoria del
+     * dashboard/reporte gerencial, que cargaba la tabla completa.
+     */
+    @Query("""
+            SELECT COUNT(r) FROM Reserva r
+            WHERE r.estado NOT IN :estadosExcluidos
+              AND r.adelanto < r.montoTotal
+            """)
+    long countPendientesDePago(@Param("estadosExcluidos") Collection<EstadoReserva> estadosExcluidos);
 
     List<Reserva> findByUsuarioUsuarioId(Integer usuarioId);
 

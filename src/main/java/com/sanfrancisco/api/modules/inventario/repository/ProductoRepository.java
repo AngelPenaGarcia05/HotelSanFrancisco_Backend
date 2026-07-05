@@ -4,7 +4,9 @@ import com.sanfrancisco.api.modules.inventario.entity.Producto;
 import com.sanfrancisco.api.shared.enums.EstadoActivo;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
@@ -21,5 +23,33 @@ public interface ProductoRepository extends JpaRepository<Producto, Integer>,
     @Query("SELECT p FROM Producto p WHERE p.stockActual <= p.stockMinimo AND p.estado = 'ACTIVO'")
     List<Producto> findProductosBajoStock();
 
+    long countByEstado(EstadoActivo estado);
+
+    @Query("SELECT COUNT(p) FROM Producto p WHERE p.stockActual <= p.stockMinimo AND p.estado = 'ACTIVO'")
+    long countProductosBajoStock();
+
     List<Producto> findByPrecioVentaBetween(BigDecimal min, BigDecimal max);
+
+    /**
+     * Descuento atómico de stock: la condición stockActual >= cantidad forma
+     * parte del mismo UPDATE, por lo que dos transacciones concurrentes no
+     * pueden pasar ambas la validación con el mismo stock (elimina el lost
+     * update del patrón leer-calcular-guardar). Devuelve 0 si no había stock
+     * suficiente; el llamador debe tratarlo como "stock insuficiente".
+     * clearAutomatically: invalida las entidades cacheadas en el contexto de
+     * persistencia para que la relectura posterior vea el stock real.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Producto p SET p.stockActual = p.stockActual - :cantidad " +
+           "WHERE p.productoId = :id AND p.stockActual >= :cantidad")
+    int descontarStockAtomico(@Param("id") Integer id, @Param("cantidad") BigDecimal cantidad);
+
+    /**
+     * Reposición atómica de stock (anulación de venta completada, ingreso de
+     * inventario). Devuelve 0 solo si el producto no existe.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Producto p SET p.stockActual = p.stockActual + :cantidad " +
+           "WHERE p.productoId = :id")
+    int reponerStockAtomico(@Param("id") Integer id, @Param("cantidad") BigDecimal cantidad);
 }

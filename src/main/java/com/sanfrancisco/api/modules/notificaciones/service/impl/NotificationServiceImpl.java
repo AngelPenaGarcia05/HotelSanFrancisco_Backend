@@ -301,10 +301,8 @@ public class NotificationServiceImpl implements NotificationService {
         LocalDate limite = DateTimeUtils.today().plusDays(
                 Math.max(1, config.getHorasAntesCheckin() / 24 + (config.getHorasAntesCheckin() % 24 > 0 ? 1 : 0)));
 
-        List<Reserva> proximasLlegadas = reservaRepository.findAll().stream()
-                .filter(r -> !r.getFechaInicio().isBefore(DateTimeUtils.today()) && !r.getFechaInicio().isAfter(limite))
-                .filter(r -> r.getEstado() == EstadoReserva.CONFIRMADA)
-                .toList();
+        List<Reserva> proximasLlegadas = reservaRepository.findByEstadoAndFechaInicioBetween(
+                EstadoReserva.CONFIRMADA, DateTimeUtils.today(), limite);
 
         int enviados = 0;
         for (Reserva reserva : proximasLlegadas) {
