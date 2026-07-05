@@ -39,6 +39,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -111,16 +112,22 @@ public class VentaServiceImpl implements VentaService {
         }
 
         validarDetallesUnicos(request.detalles());
-        BigDecimal montoTotal = calcularMontoTotal(request.detalles());
+
+        // El precio lo dicta el catálogo, no el request
+        Map<Integer, Producto> productos = new LinkedHashMap<>();
+        for (CreateDetalleVentaRequest item : request.detalles()) {
+            Producto producto = productoRepository.findById(item.productoId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado: " + item.productoId()));
+            productos.put(item.productoId(), producto);
+        }
+        BigDecimal montoTotal = calcularMontoTotal(request.detalles(), productos);
 
         Venta venta = ventaMapper.toEntity(request, usuario, estancia, huesped, montoTotal);
         Venta saved = ventaRepository.save(venta);
 
         List<DetalleVenta> detalles = new ArrayList<>();
         for (CreateDetalleVentaRequest item : request.detalles()) {
-            Producto producto = productoRepository.findById(item.productoId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Producto no encontrado: " + item.productoId()));
-            detalles.add(detalleVentaMapper.toEntity(item, saved, producto));
+            detalles.add(detalleVentaMapper.toEntity(item, saved, productos.get(item.productoId())));
         }
         detalleVentaRepository.saveAll(detalles);
 
@@ -237,11 +244,18 @@ public class VentaServiceImpl implements VentaService {
         }
     }
 
-    private BigDecimal calcularMontoTotal(List<CreateDetalleVentaRequest> detalles) {
+    private BigDecimal calcularMontoTotal(List<CreateDetalleVentaRequest> detalles, Map<Integer, Producto> productos) {
         return detalles.stream()
                 .map(d -> {
+                    Producto producto = productos.get(d.productoId());
+                    BigDecimal precio = producto.getPrecioVenta();
                     BigDecimal descuento = Optional.ofNullable(d.descuentoUnitario()).orElse(BigDecimal.ZERO);
-                    return d.precioUnitario().subtract(descuento).multiply(d.cantidad());
+                    if (descuento.compareTo(precio) > 0) {
+                        throw new ValidationException("El descuento unitario (S/ " + descuento
+                                + ") no puede superar el precio del producto " + producto.getNombre()
+                                + " (S/ " + precio + ")");
+                    }
+                    return precio.subtract(descuento).multiply(d.cantidad());
                 })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
