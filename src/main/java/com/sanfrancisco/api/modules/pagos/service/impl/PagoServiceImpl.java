@@ -25,6 +25,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -79,6 +80,15 @@ public class PagoServiceImpl implements PagoService {
         if (request.reservaId() != null) {
             reserva = reservaRepository.findById(request.reservaId())
                     .orElseThrow(() -> new ResourceNotFoundException("Reserva no encontrada: " + request.reservaId()));
+        }
+
+        if (venta != null) {
+            validarSaldo(request.monto(), venta.getMontoTotal(),
+                    pagoRepository.findByVentaVentaId(venta.getVentaId()), "la venta");
+        }
+        if (reserva != null) {
+            validarSaldo(request.monto(), reserva.getMontoTotal(),
+                    pagoRepository.findByReservaReservaId(reserva.getReservaId()), "la reserva");
         }
 
         Pago saved = pagoRepository.save(pagoMapper.toEntity(request, metodoPago, venta, reserva));
@@ -152,6 +162,20 @@ public class PagoServiceImpl implements PagoService {
         Pago pago = obtenerOFallar(pagoId);
         pagoRepository.delete(pago);
         eventPublisher.publishDeleted(pago.getPagoId());
+    }
+
+    private void validarSaldo(BigDecimal nuevoMonto, BigDecimal montoTotal, List<Pago> pagosPrevios, String entidad) {
+        if (montoTotal == null) {
+            return;
+        }
+        BigDecimal pagado = pagosPrevios.stream()
+                .map(Pago::getMonto)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal saldo = montoTotal.subtract(pagado);
+        if (nuevoMonto.compareTo(saldo) > 0) {
+            throw new ValidationException("El pago de S/ " + nuevoMonto + " excede el saldo pendiente de "
+                    + entidad + ": S/ " + saldo.max(BigDecimal.ZERO));
+        }
     }
 
     private Pago obtenerOFallar(Integer pagoId) {
