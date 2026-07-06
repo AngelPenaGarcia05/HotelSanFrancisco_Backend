@@ -8,6 +8,7 @@ import com.sanfrancisco.api.modules.booking.dto.MetodoPagoPublicoResponse;
 import com.sanfrancisco.api.modules.pagos.entity.MetodoPago;
 import com.sanfrancisco.api.modules.pagos.entity.Pago;
 import com.sanfrancisco.api.modules.pagos.enums.TipoPago;
+import com.sanfrancisco.api.modules.recepcion.enums.ModalidadPago;
 import com.sanfrancisco.api.modules.pagos.repository.MetodoPagoRepository;
 import com.sanfrancisco.api.modules.pagos.repository.PagoRepository;
 import com.sanfrancisco.api.modules.recepcion.entity.*;
@@ -175,6 +176,9 @@ public class BookingServiceImpl implements BookingService {
                 .impuesto(impuesto)
                 .montoTotal(montoTotal)
                 .adelanto(adelanto)
+                // Derivada del tipo de pago público: TOTAL paga todo, el resto es 50% (PARCIAL).
+                // Columna NOT NULL desde los montos server-side; sin esto el INSERT falla (409).
+                .modalidadPago(req.tipoPago() == TipoPago.TOTAL ? ModalidadPago.TOTAL : ModalidadPago.PARCIAL)
                 .estado(EstadoReserva.CONFIRMADA)
                 .observaciones(req.serviciosAdicionales())
                 .usuario(sistemaUser)
