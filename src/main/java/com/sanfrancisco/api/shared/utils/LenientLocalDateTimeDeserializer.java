@@ -1,11 +1,9 @@
 package com.sanfrancisco.api.shared.utils;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonDeserializer;
-import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+import tools.jackson.core.JsonParser;
+import tools.jackson.databind.DeserializationContext;
+import tools.jackson.databind.ValueDeserializer;
 
-import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
@@ -19,15 +17,18 @@ import java.time.format.DateTimeParseException;
  *
  * Motivo: varios campos de creación (ventas.fechaVenta, servicios.fechaConsumo,
  * pagos.fecha) son LocalDateTime que el cliente sí elige legítimamente. Sin esto,
- * enviar una fecha sola provoca un 500 de Jackson ("could not be parsed at index 10").
+ * enviar una fecha sola provoca un error de Jackson ("could not be parsed at index 10").
  *
- * Si el texto no es ni fecha-hora ni fecha válida, se relanza el error original
- * para no ocultar entradas realmente inválidas.
+ * Escrito contra la API de Jackson 3 (tools.jackson), que es la que Spring Boot 4
+ * usa para los bodies HTTP; una versión Jackson 2 (com.fasterxml) nunca se registraría.
+ *
+ * Si el texto no es ni fecha-hora ni fecha válida, se reporta el valor como
+ * inválido (400) para no ocultar entradas realmente erróneas.
  */
-public class LenientLocalDateTimeDeserializer extends JsonDeserializer<LocalDateTime> {
+public class LenientLocalDateTimeDeserializer extends ValueDeserializer<LocalDateTime> {
 
     @Override
-    public LocalDateTime deserialize(JsonParser parser, DeserializationContext context) throws IOException {
+    public LocalDateTime deserialize(JsonParser parser, DeserializationContext context) {
         String value = parser.getValueAsString();
         if (value == null || value.isBlank()) {
             return null;
@@ -39,9 +40,8 @@ public class LenientLocalDateTimeDeserializer extends JsonDeserializer<LocalDate
             try {
                 return LocalDate.parse(text).atStartOfDay();
             } catch (DateTimeParseException dateError) {
-                throw new InvalidFormatException(parser,
-                        "No se pudo interpretar '" + text + "' como fecha-hora ni como fecha (esperado ISO, p.ej. 2026-07-06 o 2026-07-06T10:30:00)",
-                        text, LocalDateTime.class);
+                return (LocalDateTime) context.handleWeirdStringValue(LocalDateTime.class, text,
+                        "No se pudo interpretar el valor como fecha-hora ni como fecha (esperado ISO, p.ej. 2026-07-06 o 2026-07-06T10:30:00)");
             }
         }
     }
