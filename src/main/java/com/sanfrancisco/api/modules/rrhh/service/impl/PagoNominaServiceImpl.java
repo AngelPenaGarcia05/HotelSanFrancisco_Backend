@@ -94,6 +94,7 @@ public class PagoNominaServiceImpl implements PagoNominaService {
             throw new BusinessException("No se puede eliminar un pago que ya fue realizado");
         }
         pagoNominaRepository.delete(pago);
+        eventPublisher.publishDeleted(pago.getPagoNominaId());
     }
 
     private PagoNomina obtenerOFallar(Integer pagoNominaId) {

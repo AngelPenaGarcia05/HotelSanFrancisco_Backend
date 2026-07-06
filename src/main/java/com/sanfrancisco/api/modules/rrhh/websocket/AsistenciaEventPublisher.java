@@ -12,6 +12,7 @@ public class AsistenciaEventPublisher {
 
     public static final String EVENT_CREATED = "ASISTENCIA_CREADA";
     public static final String EVENT_UPDATED = "ASISTENCIA_ACTUALIZADA";
+    public static final String EVENT_DELETED = "ASISTENCIA_ELIMINADA";
 
     private static final String ENTITY = "asistencia";
 
@@ -27,6 +28,13 @@ public class AsistenciaEventPublisher {
 
     public void publishUpdated(Asistencia asistencia) {
         publish(EVENT_UPDATED, asistencia);
+    }
+
+    public void publishDeleted(Integer asistenciaId) {
+        AsistenciaEventPayload payload = new AsistenciaEventPayload(
+                asistenciaId, null, null, null, null, null, null);
+        publisher.broadcast(WebSocketChannels.TOPIC_ASISTENCIA,
+                WebSocketEvent.of(EVENT_DELETED, ENTITY, payload));
     }
 
     private void publish(String eventType, Asistencia asistencia) {

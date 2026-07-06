@@ -12,6 +12,7 @@ public class PagoNominaEventPublisher {
 
     public static final String EVENT_CREATED = "NOMINA_CREADA";
     public static final String EVENT_STATE_CHANGED = "NOMINA_CAMBIO_ESTADO";
+    public static final String EVENT_DELETED = "NOMINA_ELIMINADA";
 
     private static final String ENTITY = "nomina";
 
@@ -27,6 +28,13 @@ public class PagoNominaEventPublisher {
 
     public void publishStateChanged(PagoNomina pago) {
         publish(EVENT_STATE_CHANGED, pago);
+    }
+
+    public void publishDeleted(Integer pagoNominaId) {
+        PagoNominaEventPayload payload = new PagoNominaEventPayload(
+                pagoNominaId, null, null, null, null, null, null);
+        publisher.broadcast(WebSocketChannels.TOPIC_NOMINA,
+                WebSocketEvent.of(EVENT_DELETED, ENTITY, payload));
     }
 
     private void publish(String eventType, PagoNomina pago) {
