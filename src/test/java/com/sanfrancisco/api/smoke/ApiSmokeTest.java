@@ -210,8 +210,18 @@ class ApiSmokeTest {
     @Test
     @DisplayName("POST /ventas acepta fechaVenta como fecha sola (deserializador tolerante)")
     void ventaConFechaSolaFunciona() {
-        int productoId = json(get("/api/v1/productos?size=1"))
-                .path("data").path("content").path(0).path("productoId").asInt();
+        // Autosuficiente: la BD del CI nace vacía (Flyway no siembra productos),
+        // así que el test crea su propia categoría y producto.
+        ResponseEntity<String> cat = post("/api/v1/categorias-producto", """
+                {"nombre":"SMOKE-CAT-%d","descripcion":"smoke","estado":"ACTIVO"}""".formatted(RUN));
+        assertThat(cat.getStatusCode().value()).as("categoría: %s", cat.getBody()).isEqualTo(201);
+        int categoriaId = json(cat).path("data").path("categoriaProductoId").asInt();
+
+        ResponseEntity<String> prod = post("/api/v1/productos", """
+                {"nombre":"SMOKE-PROD-%d","precioVenta":1.00,"stockActual":100,"stockMinimo":1,
+                 "estado":"ACTIVO","categoriaProductoId":%d}""".formatted(RUN, categoriaId));
+        assertThat(prod.getStatusCode().value()).as("producto: %s", prod.getBody()).isEqualTo(201);
+        int productoId = json(prod).path("data").path("productoId").asInt();
         Integer adminId = usuarioRepository.findByCorreo(SMOKE_ADMIN_CORREO).orElseThrow().getUsuarioId();
         String body = """
                 {"codigoVenta":"SMOKE-%d","tipoVenta":"DIRECTA","fechaVenta":"%s","usuarioId":%d,
@@ -220,7 +230,10 @@ class ApiSmokeTest {
         ResponseEntity<String> res = post("/api/v1/ventas", body);
         assertThat(res.getStatusCode().value()).as("venta con fecha sola: %s", res.getBody()).isEqualTo(201);
         assertThat(json(res).path("data").path("fechaVenta").asString()).startsWith(LocalDate.now().toString());
+        // Orden de borrado (respeta FKs): venta → producto → categoría.
         creadosParaLimpiar.add("/api/v1/ventas/" + json(res).path("data").path("ventaId").asInt());
+        creadosParaLimpiar.add("/api/v1/productos/" + productoId);
+        creadosParaLimpiar.add("/api/v1/categorias-producto/" + categoriaId);
     }
 
     @Test
