@@ -50,3 +50,6 @@ jobs:
           DATABASE_URL: jdbc:postgresql://localhost:5432/hotel_sf
           DATABASE_USERNAME: postgres
           DATABASE_PASSWORD: "1234"
+          # Clave dummy solo para el entorno efímero del CI (JwtService exige
+          # >= 32 caracteres y no tiene default por diseño de seguridad).
+          JWT_SECRET_KEY: ci-only-dummy-jwt-secret-key-0123456789abcdef
