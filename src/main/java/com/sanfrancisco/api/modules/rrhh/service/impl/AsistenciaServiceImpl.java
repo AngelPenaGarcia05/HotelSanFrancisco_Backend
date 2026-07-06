@@ -83,6 +83,7 @@ public class AsistenciaServiceImpl implements AsistenciaService {
     public void deleteById(Integer asistenciaId) {
         Asistencia asistencia = obtenerOFallar(asistenciaId);
         asistenciaRepository.delete(asistencia);
+        eventPublisher.publishDeleted(asistencia.getAsistenciaId());
     }
 
     private Asistencia obtenerOFallar(Integer asistenciaId) {

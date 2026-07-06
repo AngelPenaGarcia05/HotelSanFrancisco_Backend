@@ -5,6 +5,7 @@ import com.sanfrancisco.api.modules.notificacionescliente.entity.NotificacionHue
 import com.sanfrancisco.api.modules.notificacionescliente.enums.TipoNotificacionHuesped;
 import com.sanfrancisco.api.modules.notificacionescliente.repository.NotificacionHuespedRepository;
 import com.sanfrancisco.api.modules.notificacionescliente.service.interfaces.NotificacionClienteService;
+import com.sanfrancisco.api.modules.notificacionescliente.websocket.NotificacionEventPublisher;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
 import com.sanfrancisco.api.modules.seguridad.repository.UsuarioRepository;
 import com.sanfrancisco.api.modules.seguridad.security.UserPrincipal;
@@ -26,11 +27,14 @@ public class NotificacionClienteServiceImpl implements NotificacionClienteServic
 
     private final NotificacionHuespedRepository repository;
     private final UsuarioRepository usuarioRepository;
+    private final NotificacionEventPublisher eventPublisher;
 
     public NotificacionClienteServiceImpl(NotificacionHuespedRepository repository,
-                                          UsuarioRepository usuarioRepository) {
+                                          UsuarioRepository usuarioRepository,
+                                          NotificacionEventPublisher eventPublisher) {
         this.repository = repository;
         this.usuarioRepository = usuarioRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -71,6 +75,7 @@ public class NotificacionClienteServiceImpl implements NotificacionClienteServic
                     .leida(false)
                     .build();
             repository.save(notificacion);
+            eventPublisher.publishCreated(usuario.getCorreo(), notificacion);
         } catch (Exception e) {
             log.error("Error al registrar notificación in-app para usuario {}: {}", usuarioId, e.getMessage());
         }
