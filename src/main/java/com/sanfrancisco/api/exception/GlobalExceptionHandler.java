@@ -88,6 +88,52 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.validation("Restricciones de validación incumplidas", req.getRequestURI(), errors));
     }
 
+    /**
+     * Bodies JSON ilegibles (sintaxis rota, enum inexistente, tipo incorrecto,
+     * fecha con formato inválido...). Sin este handler caían en el genérico de
+     * {@code Exception} y se reportaban como 500 INTERNAL_ERROR, cuando son
+     * errores del cliente (400). El detalle técnico va al log; al cliente se le
+     * da un mensaje accionable sin filtrar internals.
+     */
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleUnreadableBody(
+            org.springframework.http.converter.HttpMessageNotReadableException ex, HttpServletRequest req) {
+        log.warn("Body ilegible en {}: {}", req.getRequestURI(), ex.getMostSpecificCause().getMessage());
+        String message = "El cuerpo de la petición es inválido: revise el formato de los campos enviados";
+        if (ex.getCause() instanceof tools.jackson.databind.exc.InvalidFormatException ife) {
+            message = "Valor inválido '" + ife.getValue() + "' en el cuerpo de la petición";
+        }
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.of("MALFORMED_BODY", message, req.getRequestURI()));
+    }
+
+    /** Método HTTP no soportado por la ruta (p.ej. GET sobre un endpoint solo-POST). */
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotSupported(
+            org.springframework.web.HttpRequestMethodNotSupportedException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .body(ErrorResponse.of("METHOD_NOT_ALLOWED",
+                        "Método " + ex.getMethod() + " no soportado para esta ruta", req.getRequestURI()));
+    }
+
+    /** Content-Type no soportado (p.ej. form-data o XML donde se espera JSON). */
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMediaTypeNotSupported(
+            org.springframework.web.HttpMediaTypeNotSupportedException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(ErrorResponse.of("UNSUPPORTED_MEDIA_TYPE",
+                        "Content-Type no soportado; se espera application/json", req.getRequestURI()));
+    }
+
+    /** Query param requerido ausente. */
+    @ExceptionHandler(org.springframework.web.bind.MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParameter(
+            org.springframework.web.bind.MissingServletRequestParameterException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorResponse.of("MISSING_PARAMETER",
+                        "Falta el parámetro requerido '" + ex.getParameterName() + "'", req.getRequestURI()));
+    }
+
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest req) {
         String msg = "Parámetro '" + ex.getName() + "' con valor inválido";

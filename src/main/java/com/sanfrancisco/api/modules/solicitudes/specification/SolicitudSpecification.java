@@ -20,7 +20,7 @@ public final class SolicitudSpecification {
                 SpecificationUtils.<Solicitud>equalsIfPresent("moduloReferido", filter.moduloReferido()),
                 SpecificationUtils.<Solicitud>equalsIfPresent("solicitante.usuarioId", filter.solicitanteId()),
                 SpecificationUtils.<Solicitud>equalsIfPresent("responsable.usuarioId", filter.responsableId()),
-                SpecificationUtils.<Solicitud>dateTimeBetween("fechaRegistro", filter.fechaRegistroDesde(), filter.fechaRegistroHasta())
+                SpecificationUtils.<Solicitud>dateTimeInDayRange("fechaRegistro", filter.fechaRegistroDesde(), filter.fechaRegistroHasta())
         );
     }
 

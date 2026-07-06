@@ -18,7 +18,7 @@ public final class IncidenciaSpecification {
                 SpecificationUtils.<Incidencia>equalsIfPresent("prioridad", filter.prioridad()),
                 SpecificationUtils.<Incidencia>equalsIfPresent("usuario.usuarioId", filter.usuarioId()),
                 SpecificationUtils.<Incidencia>equalsIfPresent("reservaHabitacion.reservaHabitacionId", filter.reservaHabitacionId()),
-                SpecificationUtils.<Incidencia>dateTimeBetween("fechaReporte", filter.fechaReporteDesde(), filter.fechaReporteHasta())
+                SpecificationUtils.<Incidencia>dateTimeInDayRange("fechaReporte", filter.fechaReporteDesde(), filter.fechaReporteHasta())
         );
     }
 }

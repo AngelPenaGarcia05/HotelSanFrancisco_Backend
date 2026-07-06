@@ -9,13 +9,10 @@ import com.sanfrancisco.api.modules.operaciones.enums.EstadoIncidencia;
 import com.sanfrancisco.api.modules.recepcion.entity.ReservaHabitacion;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
 import org.springframework.stereotype.Component;
-
-import java.time.LocalDateTime;
-import java.util.Optional;
-
 /**
  * Mapper manual. El estado inicial al crear es ABIERTA; las transiciones de estado
- * se gestionan en el service. Si no se envía fechaReporte se usa el instante actual.
+ * se gestionan en el service. La fechaReporte siempre la fija el servidor (instante actual):
+ * es un timestamp autoritativo, no un dato que envíe el cliente.
  */
 @Component
 public class IncidenciaMapper {
@@ -23,7 +20,7 @@ public class IncidenciaMapper {
     public Incidencia toEntity(CreateIncidenciaRequest request, Usuario usuario, ReservaHabitacion reservaHabitacion) {
         return Incidencia.builder()
                 .descripcion(request.descripcion())
-                .fechaReporte(Optional.ofNullable(request.fechaReporte()).orElse(DateTimeUtils.now()))
+                .fechaReporte(DateTimeUtils.now())
                 .prioridad(request.prioridad())
                 .estado(EstadoIncidencia.ABIERTA)
                 .usuario(usuario)

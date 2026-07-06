@@ -48,6 +48,26 @@ public final class SpecificationUtils {
         };
     }
 
+    /**
+     * Rango de días de calendario sobre un atributo LocalDateTime.
+     * El servidor fija los límites: desde las 00:00:00 de {@code from} (inclusive)
+     * hasta el inicio del día siguiente a {@code to} (exclusivo). El límite superior
+     * exclusivo evita el hueco clásico de "hasta 23:59:59", que deja fuera los
+     * registros con fracción de segundo (p.ej. 23:59:59.500).
+     */
+    public static <T> Specification<T> dateTimeInDayRange(String attribute, LocalDate from, LocalDate to) {
+        if (from == null && to == null) return Specification.unrestricted();
+        LocalDateTime desde = from != null ? from.atStartOfDay() : null;
+        LocalDateTime hastaExclusivo = to != null ? to.plusDays(1).atStartOfDay() : null;
+        return (root, query, cb) -> {
+            Path<LocalDateTime> path = resolve(root, attribute);
+            if (desde != null && hastaExclusivo != null)
+                return cb.and(cb.greaterThanOrEqualTo(path, desde), cb.lessThan(path, hastaExclusivo));
+            if (desde != null) return cb.greaterThanOrEqualTo(path, desde);
+            return cb.lessThan(path, hastaExclusivo);
+        };
+    }
+
     public static <T, V extends Comparable<? super V>> Specification<T> greaterOrEqual(String attribute, V value) {
         if (value == null) return Specification.unrestricted();
         return (root, query, cb) -> cb.greaterThanOrEqualTo(resolve(root, attribute), value);

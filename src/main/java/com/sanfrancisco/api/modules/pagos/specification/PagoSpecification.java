@@ -19,7 +19,7 @@ public final class PagoSpecification {
                 SpecificationUtils.<Pago>equalsIfPresent("venta.ventaId", filter.ventaId()),
                 SpecificationUtils.<Pago>equalsIfPresent("reserva.reservaId", filter.reservaId()),
                 SpecificationUtils.<Pago>likeIfPresent("comprobante", filter.comprobante()),
-                SpecificationUtils.<Pago>dateTimeBetween("fecha", filter.fechaDesde(), filter.fechaHasta()),
+                SpecificationUtils.<Pago>dateTimeInDayRange("fecha", filter.fechaDesde(), filter.fechaHasta()),
                 SpecificationUtils.<Pago, java.math.BigDecimal>greaterOrEqual("monto", filter.montoMin()),
                 SpecificationUtils.<Pago, java.math.BigDecimal>lessOrEqual("monto", filter.montoMax())
         );
