@@ -24,6 +24,7 @@ import com.sanfrancisco.api.modules.compras.specification.CompraSpecification;
 import com.sanfrancisco.api.modules.compras.websocket.CompraEventPublisher;
 import com.sanfrancisco.api.modules.inventario.entity.Producto;
 import com.sanfrancisco.api.modules.inventario.repository.ProductoRepository;
+import com.sanfrancisco.api.modules.inventario.websocket.ProductoEventPublisher;
 import com.sanfrancisco.api.shared.exception.ValidationException;
 import com.sanfrancisco.api.shared.specification.SpecificationUtils;
 import jakarta.persistence.EntityManager;
@@ -64,6 +65,7 @@ public class CompraServiceImpl implements CompraService {
     private final CompraMapper compraMapper;
     private final DetalleCompraMapper detalleCompraMapper;
     private final CompraEventPublisher eventPublisher;
+    private final ProductoEventPublisher productoEventPublisher;
     private final EntityManager entityManager;
 
     public CompraServiceImpl(CompraRepository compraRepository,
@@ -73,6 +75,7 @@ public class CompraServiceImpl implements CompraService {
                              CompraMapper compraMapper,
                              DetalleCompraMapper detalleCompraMapper,
                              CompraEventPublisher eventPublisher,
+                             ProductoEventPublisher productoEventPublisher,
                              EntityManager entityManager) {
         this.compraRepository = compraRepository;
         this.detalleCompraRepository = detalleCompraRepository;
@@ -81,6 +84,7 @@ public class CompraServiceImpl implements CompraService {
         this.compraMapper = compraMapper;
         this.detalleCompraMapper = detalleCompraMapper;
         this.eventPublisher = eventPublisher;
+        this.productoEventPublisher = productoEventPublisher;
         this.entityManager = entityManager;
     }
 
@@ -253,7 +257,10 @@ public class CompraServiceImpl implements CompraService {
         for (DetalleCompra d : detalles) {
             Producto producto = d.getProducto();
             producto.setStockActual(producto.getStockActual().add(d.getCantidad()));
-            productoRepository.save(producto);
+            Producto saved = productoRepository.save(producto);
+            // Espeja el patrón de ventas: publicar por cada producto afectado para
+            // que /topic/inventario refresque el stock tras recibir la compra.
+            productoEventPublisher.publishStockChanged(saved);
         }
     }
 }
