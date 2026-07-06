@@ -16,7 +16,7 @@ public final class ServicioSpecification {
         return Specification.allOf(
                 SpecificationUtils.<Servicio>equalsIfPresent("tipoServicio.tipoServicioId", filter.tipoServicioId()),
                 SpecificationUtils.<Servicio>equalsIfPresent("estancia.estanciaId", filter.estanciaId()),
-                SpecificationUtils.<Servicio>dateTimeBetween("fechaConsumo", filter.fechaConsumoDesde(), filter.fechaConsumoHasta()),
+                SpecificationUtils.<Servicio>dateTimeInDayRange("fechaConsumo", filter.fechaConsumoDesde(), filter.fechaConsumoHasta()),
                 SpecificationUtils.<Servicio, java.math.BigDecimal>greaterOrEqual("subtotal", filter.subtotalMin()),
                 SpecificationUtils.<Servicio, java.math.BigDecimal>lessOrEqual("subtotal", filter.subtotalMax())
         );

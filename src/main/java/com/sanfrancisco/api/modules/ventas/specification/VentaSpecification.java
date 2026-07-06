@@ -20,7 +20,7 @@ public final class VentaSpecification {
                 SpecificationUtils.<Venta>equalsIfPresent("usuario.usuarioId", filter.usuarioId()),
                 SpecificationUtils.<Venta>equalsIfPresent("estancia.estanciaId", filter.estanciaId()),
                 SpecificationUtils.<Venta>equalsIfPresent("huesped.huespedId", filter.huespedId()),
-                SpecificationUtils.<Venta>dateTimeBetween("fechaVenta", filter.fechaVentaDesde(), filter.fechaVentaHasta()),
+                SpecificationUtils.<Venta>dateTimeInDayRange("fechaVenta", filter.fechaVentaDesde(), filter.fechaVentaHasta()),
                 SpecificationUtils.<Venta, java.math.BigDecimal>greaterOrEqual("montoTotal", filter.montoTotalMin()),
                 SpecificationUtils.<Venta, java.math.BigDecimal>lessOrEqual("montoTotal", filter.montoTotalMax())
         );
