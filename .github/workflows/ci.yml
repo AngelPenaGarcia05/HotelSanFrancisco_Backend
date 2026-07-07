@@ -1,0 +1,55 @@
+# CI del backend: compila y corre la suite completa de tests (unitarios +
+# smoke test de integración) contra un Postgres efímero.
+#
+# Se dispara en cada push (cualquier rama) y en cada PR hacia main.
+# El smoke test (ApiSmokeTest) necesita una BD real: el service container
+# de Postgres se crea vacío y Flyway aplica todas las migraciones al arrancar.
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: hotel_sf
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: "1234"
+        ports:
+          - 5432:5432
+        # Espera a que la BD acepte conexiones antes de correr los tests
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Tests (unitarios + smoke)
+        # chmod: el repo se creó en Windows y mvnw quedó sin bit de ejecución
+        run: chmod +x mvnw && ./mvnw --batch-mode test
+        env:
+          # Mismos defaults que application.yaml; explícitos por claridad
+          DATABASE_URL: jdbc:postgresql://localhost:5432/hotel_sf
+          DATABASE_USERNAME: postgres
+          DATABASE_PASSWORD: "1234"
+          # Clave dummy solo para el entorno efímero del CI (JwtService exige
+          # >= 32 caracteres y no tiene default por diseño de seguridad).
+          JWT_SECRET_KEY: ci-only-dummy-jwt-secret-key-0123456789abcdef
