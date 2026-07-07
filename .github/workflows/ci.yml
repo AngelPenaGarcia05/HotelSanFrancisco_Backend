@@ -42,9 +42,11 @@ jobs:
           java-version: "21"
           cache: maven
 
-      - name: Tests (unitarios + smoke)
-        # chmod: el repo se creó en Windows y mvnw quedó sin bit de ejecución
-        run: chmod +x mvnw && ./mvnw --batch-mode test
+      - name: Tests + empaquetado (unitarios + smoke + jar desplegable)
+        # package: además de los tests, verifica que el jar se construya
+        # (atrapa errores de empaquetado antes de que el deploy falle).
+        # chmod: el repo se creó en Windows y mvnw quedó sin bit de ejecución.
+        run: chmod +x mvnw && ./mvnw --batch-mode package
         env:
           # Mismos defaults que application.yaml; explícitos por claridad
           DATABASE_URL: jdbc:postgresql://localhost:5432/hotel_sf
