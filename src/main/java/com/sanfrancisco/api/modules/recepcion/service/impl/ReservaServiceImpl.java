@@ -331,7 +331,20 @@ public class ReservaServiceImpl implements ReservaService {
         reservaMapper.updateEntity(reserva, request, canal, montos);
         Reserva saved = reservaRepository.save(reserva);
         eventPublisher.publishUpdated(saved);
+
+        if (fechasCambiaron) {
+            notificarReservaReprogramada(saved);
+        }
+
         return reservaMapper.toResponse(saved, reservaHabitaciones, detalleHuespedes);
+    }
+
+    private void notificarReservaReprogramada(Reserva reserva) {
+        try {
+            notificationService.sendReservationRescheduled(reserva.getReservaId());
+        } catch (Exception e) {
+            log.warn("No se pudo enviar el correo de reprogramación de la reserva {}: {}", reserva.getReservaId(), e.getMessage());
+        }
     }
 
     @Override

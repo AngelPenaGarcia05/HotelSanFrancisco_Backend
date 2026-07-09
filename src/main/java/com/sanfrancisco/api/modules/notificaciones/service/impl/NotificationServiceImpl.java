@@ -229,6 +229,27 @@ public class NotificationServiceImpl implements NotificationService {
         return enviarPorPlantilla(EmailTemplateKey.RESERVATION_CANCELLATION, destinatario, variables, reserva, null);
     }
 
+    @Override
+    public EmailLogResponse sendReservationRescheduled(Integer reservaId) {
+        Reserva reserva = reservaRepository.findById(reservaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Reserva", reservaId));
+
+        DetalleHuesped titular = detalleHuespedRepository
+                .findByIdReservaIdAndEsPrincipalTrue(reserva.getReservaId())
+                .orElse(null);
+
+        Map<String, String> variables = Map.of(
+                "nombreHuesped", titular != null ? titular.getHuesped().getNombre() : "Huésped",
+                "codReserva", reserva.getCodReserva(),
+                "fechaInicio", reserva.getFechaInicio().format(FECHA_FMT),
+                "fechaFin", reserva.getFechaFin().format(FECHA_FMT),
+                "montoTotal", reserva.getMontoTotal().toString()
+        );
+
+        String destinatario = titular != null ? titular.getHuesped().getCorreo() : null;
+        return enviarPorPlantilla(EmailTemplateKey.RESERVATION_RESCHEDULED, destinatario, variables, reserva, null);
+    }
+
     // =====================================================================
     // Auth — recuperación de contraseña
     // =====================================================================

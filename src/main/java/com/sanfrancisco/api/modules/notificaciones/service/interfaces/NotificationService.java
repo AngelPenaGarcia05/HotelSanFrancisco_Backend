@@ -29,6 +29,9 @@ public interface NotificationService {
 
     EmailLogResponse sendCancellation(SendCancellationRequest request);
 
+    // Reprogramación (cambio de fechas) — invocado internamente desde el flujo de reservas
+    EmailLogResponse sendReservationRescheduled(Integer reservaId);
+
     // Recordatorios
     ReminderSettingsResponse getReminderSettings();
 
