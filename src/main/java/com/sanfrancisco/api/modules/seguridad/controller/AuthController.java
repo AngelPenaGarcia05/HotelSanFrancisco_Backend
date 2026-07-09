@@ -4,8 +4,10 @@ import com.sanfrancisco.api.modules.seguridad.dto.request.ChangePasswordRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.ForgotPasswordRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.LoginRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.RegisterRequest;
+import com.sanfrancisco.api.modules.seguridad.dto.request.ResendVerificationRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.ResetPasswordRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.request.UpdatePerfilRequest;
+import com.sanfrancisco.api.modules.seguridad.dto.request.VerifyEmailRequest;
 import com.sanfrancisco.api.modules.seguridad.dto.response.AuthUserResponse;
 import com.sanfrancisco.api.modules.seguridad.dto.response.DashboardClienteResponse;
 import com.sanfrancisco.api.modules.seguridad.dto.response.LoginResponse;
@@ -41,8 +43,10 @@ public class AuthController {
     }
 
     @Operation(summary = "Registro público de cliente",
-            description = "Crea un usuario con rol CLIENTE y su huésped vinculado, e inicia sesión "
-                    + "(emite cookies). Si el documento es DNI, intenta enriquecer el apellido materno vía RENIEC.")
+            description = "Crea un usuario con rol CLIENTE y su huésped vinculado, y envía un código de "
+                    + "verificación al correo. La cuenta queda sin verificar hasta confirmarla "
+                    + "(POST /auth/verify-email); NO inicia sesión. Si el documento es DNI, intenta "
+                    + "enriquecer el apellido materno vía RENIEC.")
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<LoginResponse>> register(
             @Valid @RequestBody RegisterRequest request,
@@ -170,6 +174,29 @@ public class AuthController {
     ) {
         authenticationService.resetPassword(request);
         return ResponseEntity.ok(ApiResponse.message("Contraseña restablecida exitosamente. Ya puedes iniciar sesión."));
+    }
+
+    @Operation(summary = "Verificar correo de la cuenta",
+            description = "Activa la cuenta con el código de 6 dígitos enviado al correo tras el registro. "
+                    + "Una vez verificada, el usuario puede iniciar sesión.")
+    @PostMapping("/verify-email")
+    public ResponseEntity<ApiResponse<Void>> verifyEmail(
+            @Valid @RequestBody VerifyEmailRequest request
+    ) {
+        authenticationService.verificarCorreo(request.correo(), request.codigo());
+        return ResponseEntity.ok(ApiResponse.message("Correo verificado exitosamente. Ya puedes iniciar sesión."));
+    }
+
+    @Operation(summary = "Reenviar código de verificación",
+            description = "Envía un nuevo código de verificación al correo. Siempre responde 200 sin revelar "
+                    + "si el correo existe o si ya está verificado. El código expira en 15 minutos.")
+    @PostMapping("/resend-verification")
+    public ResponseEntity<ApiResponse<Void>> resendVerification(
+            @Valid @RequestBody ResendVerificationRequest request
+    ) {
+        authenticationService.reenviarCodigoVerificacion(request.correo());
+        return ResponseEntity.ok(ApiResponse.message(
+                "Si existe una cuenta sin verificar con ese correo, recibirás un nuevo código."));
     }
 
     @Operation(summary = "Dashboard del cliente",

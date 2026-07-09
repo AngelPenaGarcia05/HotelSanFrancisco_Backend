@@ -86,7 +86,9 @@ public class SecurityConfig {
                     EndpointPaths.AUTH_REFRESH,
                     EndpointPaths.AUTH_LOGOUT,
                     EndpointPaths.AUTH_FORGOT_PASSWORD,
-                    EndpointPaths.AUTH_RESET_PASSWORD
+                    EndpointPaths.AUTH_RESET_PASSWORD,
+                    EndpointPaths.AUTH_VERIFY_EMAIL,
+                    EndpointPaths.AUTH_RESEND_VERIFICATION
                 ).permitAll()
                 .requestMatchers(HttpMethod.GET, EndpointPaths.AUTH_RENIEC_BASE + "/**").permitAll()
                 .requestMatchers(EndpointPaths.WS_BASE + "/**").permitAll()

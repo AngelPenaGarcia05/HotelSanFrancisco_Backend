@@ -39,5 +39,11 @@ public interface AuthenticationService {
 
     void resetPassword(ResetPasswordRequest request);
 
+    /** Verifica el correo de una cuenta con el código de 6 dígitos recibido por email. */
+    void verificarCorreo(String correo, String codigo);
+
+    /** Reenvía un nuevo código de verificación (silencioso si el correo no existe o ya está verificado). */
+    void reenviarCodigoVerificacion(String correo);
+
     DashboardClienteResponse getDashboard();
 }

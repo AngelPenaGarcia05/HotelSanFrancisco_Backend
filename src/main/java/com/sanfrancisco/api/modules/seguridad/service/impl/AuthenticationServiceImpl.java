@@ -20,6 +20,7 @@ import com.sanfrancisco.api.modules.seguridad.dto.response.AuthUserResponse;
 import com.sanfrancisco.api.modules.seguridad.dto.response.DashboardClienteResponse;
 import com.sanfrancisco.api.modules.seguridad.dto.response.LoginResponse;
 import com.sanfrancisco.api.modules.seguridad.dto.response.PublicTipoDocumentoResponse;
+import com.sanfrancisco.api.modules.seguridad.entity.CodigoVerificacion;
 import com.sanfrancisco.api.modules.seguridad.entity.Rol;
 import com.sanfrancisco.api.modules.seguridad.entity.Sesion;
 import com.sanfrancisco.api.modules.seguridad.entity.TipoDocumento;
@@ -29,6 +30,7 @@ import com.sanfrancisco.api.modules.seguridad.enums.EstadoSesion;
 import com.sanfrancisco.api.modules.seguridad.enums.EstadoUsuario;
 import com.sanfrancisco.api.shared.utils.ClientIpResolver;
 import com.sanfrancisco.api.shared.utils.DateTimeUtils;
+import com.sanfrancisco.api.modules.seguridad.exception.CorreoNoVerificadoException;
 import com.sanfrancisco.api.modules.seguridad.exception.SesionExpiradaException;
 import com.sanfrancisco.api.modules.seguridad.exception.UsuarioInactivoException;
 import com.sanfrancisco.api.modules.seguridad.repository.DetalleRolRepository;
@@ -37,6 +39,7 @@ import com.sanfrancisco.api.modules.seguridad.repository.SesionRepository;
 import com.sanfrancisco.api.modules.seguridad.repository.TipoDocumentoRepository;
 import com.sanfrancisco.api.modules.seguridad.dto.response.ReniecConsultaResponse;
 import com.sanfrancisco.api.modules.seguridad.reniec.ReniecService;
+import com.sanfrancisco.api.modules.seguridad.repository.CodigoVerificacionRepository;
 import com.sanfrancisco.api.modules.seguridad.repository.TokenRecuperacionRepository;
 import com.sanfrancisco.api.modules.seguridad.repository.UsuarioRepository;
 import com.sanfrancisco.api.modules.seguridad.security.BruteForceProtectionService;
@@ -63,6 +66,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -88,6 +92,14 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     @Value("${app.security.reset-token-expiry-minutes:30}")
     private int resetTokenExpiryMinutes;
 
+    @Value("${app.security.verification-code-expiry-minutes:15}")
+    private int verificationCodeExpiryMinutes;
+
+    @Value("${app.security.verification-code-max-attempts:5}")
+    private int verificationCodeMaxAttempts;
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private final CustomUserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
@@ -99,6 +111,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     private final HuespedRepository huespedRepository;
     private final DetalleRolRepository detalleRolRepository;
     private final TokenRecuperacionRepository tokenRecuperacionRepository;
+    private final CodigoVerificacionRepository codigoVerificacionRepository;
     private final NotificationService notificationService;
     private final ReniecService reniecService;
     private final ReservaRepository reservaRepository;
@@ -116,6 +129,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                                      HuespedRepository huespedRepository,
                                      DetalleRolRepository detalleRolRepository,
                                      TokenRecuperacionRepository tokenRecuperacionRepository,
+                                     CodigoVerificacionRepository codigoVerificacionRepository,
                                      NotificationService notificationService,
                                      ReniecService reniecService,
                                      ReservaRepository reservaRepository,
@@ -132,6 +146,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         this.huespedRepository = huespedRepository;
         this.detalleRolRepository = detalleRolRepository;
         this.tokenRecuperacionRepository = tokenRecuperacionRepository;
+        this.codigoVerificacionRepository = codigoVerificacionRepository;
         this.notificationService = notificationService;
         this.reniecService = reniecService;
         this.reservaRepository = reservaRepository;
@@ -171,6 +186,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new UsuarioInactivoException("El usuario está inactivo. Contacte al administrador.");
         } else if (usuario.getEstado() == EstadoUsuario.BLOQUEADO) {
             throw new LockedException("El usuario está bloqueado de forma permanente. Contacte al administrador.");
+        }
+
+        // Verificación de correo obligatoria para poder iniciar sesión
+        if (!usuario.isCorreoVerificado()) {
+            throw new CorreoNoVerificadoException(
+                    "Debes verificar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada.");
         }
 
         // Success - Reset Brute Force counters
@@ -277,6 +298,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .fechaNacimiento(request.fechaNacimiento())
                 .contrasenaHash(passwordEncoder.encode(request.contrasena()))
                 .estado(EstadoUsuario.ACTIVO)
+                .correoVerificado(false)
                 .rol(rolCliente)
                 .tipoDocumento(tipoDocumento)
                 .build();
@@ -298,47 +320,14 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         log.info("Registro público completado para correo={} (usuarioId={})", email, usuario.getUsuarioId());
 
-        // Auto login — emite tokens y persiste sesión
-        List<String> permissions = detalleRolRepository.findByRolRolId(rolCliente.getRolId()).stream()
-                .map(dr -> dr.getPermiso() != null ? dr.getPermiso().getCodigo() : null)
-                .filter(c -> c != null)
-                .toList();
+        // Verificación de correo obligatoria: NO se auto-loguea. Se genera y envía
+        // el código; el usuario debe verificar su cuenta (POST /auth/verify-email)
+        // antes de poder iniciar sesión.
+        generarYEnviarCodigoVerificacion(usuario);
 
-        String fullName = buildFullName(usuario);
-        String accessToken = jwtService.generateAccessToken(
-                email, usuario.getUsuarioId(), rolCliente.getNombre(), permissions, fullName);
-        String refreshToken = jwtService.generateRefreshToken(email);
-
-        Sesion sesion = Sesion.builder()
-                .tokenHash(hashSha256(refreshToken))
-                .ipOrigen(getClientIp(httpRequest))
-                .userAgent(httpRequest.getHeader("User-Agent"))
-                .fechaInicio(DateTimeUtils.now())
-                .fechaExpiracion(DateTimeUtils.now().plusNanos(jwtService.getRefreshTokenExpirationMs() * 1_000_000L))
-                .estado(EstadoSesion.ACTIVA)
-                .usuario(usuario)
-                .build();
-        sesionRepository.save(sesion);
-
-        jwtService.setTokenCookies(httpResponse, accessToken, refreshToken);
-
-        AuthUserResponse authUser = new AuthUserResponse(
-                usuario.getUsuarioId(),
-                usuario.getNombre(),
-                usuario.getApellidoPaterno(),
-                usuario.getApellidoMaterno(),
-                fullName,
-                usuario.getCorreo(),
-                rolCliente.getNombre(),
-                permissions,
-                null,
-                null,
-                null,
-                null,
-                null
-        );
-
-        return new LoginResponse(true, "Registro completado. Sesión iniciada.", authUser, Instant.now());
+        return new LoginResponse(true,
+                "Registro completado. Te enviamos un código de verificación a tu correo.",
+                null, Instant.now());
     }
 
     @Override
@@ -661,6 +650,75 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         sessionRevocationService.revokeAllActive(usuario.getUsuarioId());
 
         log.info("Contraseña restablecida exitosamente para usuario: {}. Sesiones revocadas.", usuario.getCorreo());
+    }
+
+    @Override
+    public void verificarCorreo(String correo, String codigo) {
+        String email = correo.trim().toLowerCase();
+        Usuario usuario = usuarioRepository.findByCorreo(email)
+                .orElseThrow(() -> new BusinessException("El código de verificación no es válido."));
+
+        if (usuario.isCorreoVerificado()) {
+            throw new BusinessException("Esta cuenta ya está verificada. Puedes iniciar sesión.");
+        }
+
+        CodigoVerificacion registro = codigoVerificacionRepository.findByUsuarioUsuarioId(usuario.getUsuarioId())
+                .orElseThrow(() -> new BusinessException("No hay un código de verificación vigente. Solicita uno nuevo."));
+
+        if (registro.isUsado()) {
+            throw new BusinessException("Este código ya fue utilizado. Solicita uno nuevo.");
+        }
+        if (registro.getFechaExpiracion().isBefore(DateTimeUtils.now())) {
+            throw new BusinessException("El código de verificación ha expirado. Solicita uno nuevo.");
+        }
+        if (registro.getIntentos() >= verificationCodeMaxAttempts) {
+            throw new BusinessException("Demasiados intentos fallidos. Solicita un nuevo código.");
+        }
+
+        if (!hashSha256(codigo.trim()).equals(registro.getCodigoHash())) {
+            registro.setIntentos(registro.getIntentos() + 1);
+            codigoVerificacionRepository.save(registro);
+            throw new BusinessException("Código incorrecto.");
+        }
+
+        usuario.setCorreoVerificado(true);
+        usuarioRepository.save(usuario);
+        registro.setUsado(true);
+        codigoVerificacionRepository.save(registro);
+
+        log.info("Correo verificado exitosamente para usuario: {}", email);
+    }
+
+    @Override
+    public void reenviarCodigoVerificacion(String correo) {
+        String email = correo.trim().toLowerCase();
+        // Respuesta siempre uniforme: no se revela si el correo existe ni su estado.
+        usuarioRepository.findByCorreo(email).ifPresent(usuario -> {
+            if (usuario.isCorreoVerificado()) {
+                return;
+            }
+            generarYEnviarCodigoVerificacion(usuario);
+        });
+    }
+
+    /** Genera un código de 6 dígitos, lo guarda hasheado (reemplaza el anterior) y lo envía por correo. */
+    private void generarYEnviarCodigoVerificacion(Usuario usuario) {
+        codigoVerificacionRepository.deleteByUsuarioId(usuario.getUsuarioId());
+
+        String codigo = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+
+        CodigoVerificacion registro = CodigoVerificacion.builder()
+                .usuario(usuario)
+                .codigoHash(hashSha256(codigo))
+                .fechaExpiracion(DateTimeUtils.now().plusMinutes(verificationCodeExpiryMinutes))
+                .usado(false)
+                .intentos(0)
+                .fechaCreacion(DateTimeUtils.now())
+                .build();
+        codigoVerificacionRepository.save(registro);
+
+        String nombreUsuario = usuario.getNombre() + " " + usuario.getApellidoPaterno();
+        notificationService.sendVerificationCode(usuario.getCorreo(), nombreUsuario, codigo);
     }
 
     private void revokeAllSessionsForUserByEmail(String email) {

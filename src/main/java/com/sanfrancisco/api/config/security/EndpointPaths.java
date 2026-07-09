@@ -35,6 +35,8 @@ public final class EndpointPaths {
     public static final String AUTH_CHANGE_PASSWORD  = AUTH_BASE + "/change-password";
     public static final String AUTH_FORGOT_PASSWORD  = AUTH_BASE + "/forgot-password";
     public static final String AUTH_RESET_PASSWORD   = AUTH_BASE + "/reset-password";
+    public static final String AUTH_VERIFY_EMAIL         = AUTH_BASE + "/verify-email";
+    public static final String AUTH_RESEND_VERIFICATION  = AUTH_BASE + "/resend-verification";
     public static final String AUTH_RENIEC_BASE      = AUTH_BASE + "/reniec";
 
     // =========================================================================
