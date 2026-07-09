@@ -10,6 +10,9 @@ import com.sanfrancisco.api.modules.recepcion.dto.response.ReservaResponse;
 import com.sanfrancisco.api.modules.recepcion.entity.*;
 import com.sanfrancisco.api.modules.notificacionescliente.enums.TipoNotificacionHuesped;
 import com.sanfrancisco.api.modules.notificacionescliente.service.interfaces.NotificacionClienteService;
+import com.sanfrancisco.api.modules.notificaciones.dto.request.SendCancellationRequest;
+import com.sanfrancisco.api.modules.notificaciones.dto.request.SendReservationConfirmationRequest;
+import com.sanfrancisco.api.modules.notificaciones.service.interfaces.NotificationService;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoHabitacion;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
 import com.sanfrancisco.api.modules.recepcion.enums.ModalidadPago;
@@ -32,6 +35,8 @@ import com.sanfrancisco.api.shared.enums.EstadoActivo;
 import com.sanfrancisco.api.shared.exception.ConflictException;
 import com.sanfrancisco.api.shared.exception.ValidationException;
 import com.sanfrancisco.api.shared.utils.DateTimeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -50,6 +55,8 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class ReservaServiceImpl implements ReservaService {
+
+    private static final Logger log = LoggerFactory.getLogger(ReservaServiceImpl.class);
 
     private static final BigDecimal IGV = new BigDecimal("0.18");
     private static final BigDecimal PORC_ADELANTO_PARCIAL = new BigDecimal("0.50");
@@ -86,6 +93,7 @@ public class ReservaServiceImpl implements ReservaService {
     private final DisponibilidadService disponibilidadService;
     private final ReservaEventPublisher eventPublisher;
     private final NotificacionClienteService notificacionClienteService;
+    private final NotificationService notificationService;
 
     public ReservaServiceImpl(ReservaRepository reservaRepository,
                               UsuarioRepository usuarioRepository,
@@ -103,7 +111,8 @@ public class ReservaServiceImpl implements ReservaService {
                               HistorialReservaRepository historialReservaRepository,
                               DisponibilidadService disponibilidadService,
                               ReservaEventPublisher eventPublisher,
-                              NotificacionClienteService notificacionClienteService) {
+                              NotificacionClienteService notificacionClienteService,
+                              NotificationService notificationService) {
         this.reservaRepository = reservaRepository;
         this.usuarioRepository = usuarioRepository;
         this.canalRepository = canalRepository;
@@ -121,6 +130,7 @@ public class ReservaServiceImpl implements ReservaService {
         this.disponibilidadService = disponibilidadService;
         this.eventPublisher = eventPublisher;
         this.notificacionClienteService = notificacionClienteService;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -321,7 +331,20 @@ public class ReservaServiceImpl implements ReservaService {
         reservaMapper.updateEntity(reserva, request, canal, montos);
         Reserva saved = reservaRepository.save(reserva);
         eventPublisher.publishUpdated(saved);
+
+        if (fechasCambiaron) {
+            notificarReservaReprogramada(saved);
+        }
+
         return reservaMapper.toResponse(saved, reservaHabitaciones, detalleHuespedes);
+    }
+
+    private void notificarReservaReprogramada(Reserva reserva) {
+        try {
+            notificationService.sendReservationRescheduled(reserva.getReservaId());
+        } catch (Exception e) {
+            log.warn("No se pudo enviar el correo de reprogramación de la reserva {}: {}", reserva.getReservaId(), e.getMessage());
+        }
     }
 
     @Override
@@ -371,6 +394,30 @@ public class ReservaServiceImpl implements ReservaService {
         ));
     }
 
+    private void notificarReservaConfirmada(Reserva reserva) {
+        try {
+            notificationService.sendReservationConfirmation(new SendReservationConfirmationRequest(reserva.getReservaId()));
+        } catch (Exception e) {
+            log.warn("No se pudo enviar el correo de confirmación de la reserva {}: {}", reserva.getReservaId(), e.getMessage());
+        }
+    }
+
+    private void notificarReservaCancelada(Reserva reserva, String motivo) {
+        try {
+            notificationService.sendCancellation(new SendCancellationRequest(reserva.getReservaId(), motivo));
+        } catch (Exception e) {
+            log.warn("No se pudo enviar el correo de cancelación de la reserva {}: {}", reserva.getReservaId(), e.getMessage());
+        }
+    }
+
+    private void notificarCheckout(Reserva reserva) {
+        try {
+            notificationService.sendCheckout(reserva.getReservaId());
+        } catch (Exception e) {
+            log.warn("No se pudo enviar el correo de check-out de la reserva {}: {}", reserva.getReservaId(), e.getMessage());
+        }
+    }
+
     @Override
     public ReservaResponse cambiarEstado(Integer reservaId, CambiarEstadoReservaRequest request) {
         Reserva reserva = obtenerOFallar(reservaId);
@@ -394,6 +441,12 @@ public class ReservaServiceImpl implements ReservaService {
         Reserva saved = reservaRepository.save(reserva);
         registrarHistorial(saved, actual, nuevo, request.motivo());
         eventPublisher.publishStateChanged(saved);
+
+        if (nuevo == EstadoReserva.CONFIRMADA) {
+            notificarReservaConfirmada(saved);
+        } else if (nuevo == EstadoReserva.CHECK_OUT) {
+            notificarCheckout(saved);
+        }
 
         List<ReservaHabitacion> habitaciones = reservaHabitacionRepository.findByReservaReservaId(reservaId);
         List<DetalleHuesped> huespedes = detalleHuespedRepository.findByIdReservaId(reservaId);
@@ -441,6 +494,8 @@ public class ReservaServiceImpl implements ReservaService {
         Reserva saved = reservaRepository.save(reserva);
         registrarHistorial(saved, estadoAntes, EstadoReserva.CANCELADA, request.motivo());
         eventPublisher.publishStateChanged(saved);
+
+        notificarReservaCancelada(saved, request.motivo());
 
         List<ReservaHabitacion> habitaciones = reservaHabitacionRepository.findByReservaReservaId(reservaId);
         List<DetalleHuesped> huespedes       = detalleHuespedRepository.findByIdReservaId(reservaId);
