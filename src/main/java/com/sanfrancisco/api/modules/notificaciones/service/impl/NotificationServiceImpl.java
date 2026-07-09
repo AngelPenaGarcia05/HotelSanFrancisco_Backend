@@ -288,6 +288,19 @@ public class NotificationServiceImpl implements NotificationService {
         }
     }
 
+    @Override
+    public void sendVerificationCode(String destinatario, String nombreUsuario, String codigo) {
+        Map<String, String> variables = Map.of(
+                "nombreUsuario", nombreUsuario,
+                "codigo", codigo
+        );
+        try {
+            enviarPorPlantilla(EmailTemplateKey.EMAIL_VERIFICATION_CODE, destinatario, variables, null, null);
+        } catch (Exception e) {
+            log.warn("Fallo al enviar código de verificación a {}: {}", destinatario, e.getMessage());
+        }
+    }
+
     // =====================================================================
     // Solicitudes — notificación de cambio de estado
     // =====================================================================

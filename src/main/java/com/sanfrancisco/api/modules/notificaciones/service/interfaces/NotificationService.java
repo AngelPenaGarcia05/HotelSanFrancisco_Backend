@@ -45,6 +45,9 @@ public interface NotificationService {
     // Auth — recuperación de contraseña
     void sendPasswordReset(String destinatario, String nombreUsuario, String linkReset);
 
+    // Auth — código de verificación de correo (registro)
+    void sendVerificationCode(String destinatario, String nombreUsuario, String codigo);
+
     // Solicitudes — notificación de cambio de estado
     void sendSolicitudStatusChanged(String destinatario, String nombreUsuario, String codigoSolicitud,
                                     String asuntoSolicitud, String estadoAnterior, String nuevoEstado,

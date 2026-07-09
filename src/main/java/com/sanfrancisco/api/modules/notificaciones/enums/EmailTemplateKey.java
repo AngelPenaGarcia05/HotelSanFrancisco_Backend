@@ -8,6 +8,7 @@ public enum EmailTemplateKey {
     STAY_REMINDER,
     STAY_CHECKOUT,
     PASSWORD_RESET,
+    EMAIL_VERIFICATION_CODE,
     REQUEST_STATUS_CHANGED
 }
 

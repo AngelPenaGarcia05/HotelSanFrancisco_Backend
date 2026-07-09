@@ -66,6 +66,13 @@ public class Usuario extends AuditedEntity {
     @Column(name = "estado", nullable = false, length = 10)
     private EstadoUsuario estado;
 
+    // Verificación de correo: los usuarios existentes y los creados por un admin
+    // quedan verificados (default TRUE); el auto-registro lo pone en FALSE hasta
+    // que el usuario introduce el código enviado a su correo.
+    @Builder.Default
+    @Column(name = "correo_verificado", nullable = false)
+    private boolean correoVerificado = true;
+
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "rol_id", nullable = false)
