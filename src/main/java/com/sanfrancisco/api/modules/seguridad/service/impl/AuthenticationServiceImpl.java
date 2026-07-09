@@ -30,6 +30,7 @@ import com.sanfrancisco.api.modules.seguridad.enums.EstadoSesion;
 import com.sanfrancisco.api.modules.seguridad.enums.EstadoUsuario;
 import com.sanfrancisco.api.shared.utils.ClientIpResolver;
 import com.sanfrancisco.api.shared.utils.DateTimeUtils;
+import com.sanfrancisco.api.modules.seguridad.exception.CorreoNoVerificadoException;
 import com.sanfrancisco.api.modules.seguridad.exception.SesionExpiradaException;
 import com.sanfrancisco.api.modules.seguridad.exception.UsuarioInactivoException;
 import com.sanfrancisco.api.modules.seguridad.repository.DetalleRolRepository;
@@ -187,6 +188,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             throw new LockedException("El usuario está bloqueado de forma permanente. Contacte al administrador.");
         }
 
+        // Verificación de correo obligatoria para poder iniciar sesión
+        if (!usuario.isCorreoVerificado()) {
+            throw new CorreoNoVerificadoException(
+                    "Debes verificar tu correo antes de iniciar sesión. Revisa tu bandeja de entrada.");
+        }
+
         // Success - Reset Brute Force counters
         bruteForceProtectionService.loginSucceeded(email);
         bruteForceProtectionService.loginSucceeded(clientIp);
@@ -291,6 +298,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                 .fechaNacimiento(request.fechaNacimiento())
                 .contrasenaHash(passwordEncoder.encode(request.contrasena()))
                 .estado(EstadoUsuario.ACTIVO)
+                .correoVerificado(false)
                 .rol(rolCliente)
                 .tipoDocumento(tipoDocumento)
                 .build();
@@ -312,47 +320,14 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
         log.info("Registro público completado para correo={} (usuarioId={})", email, usuario.getUsuarioId());
 
-        // Auto login — emite tokens y persiste sesión
-        List<String> permissions = detalleRolRepository.findByRolRolId(rolCliente.getRolId()).stream()
-                .map(dr -> dr.getPermiso() != null ? dr.getPermiso().getCodigo() : null)
-                .filter(c -> c != null)
-                .toList();
+        // Verificación de correo obligatoria: NO se auto-loguea. Se genera y envía
+        // el código; el usuario debe verificar su cuenta (POST /auth/verify-email)
+        // antes de poder iniciar sesión.
+        generarYEnviarCodigoVerificacion(usuario);
 
-        String fullName = buildFullName(usuario);
-        String accessToken = jwtService.generateAccessToken(
-                email, usuario.getUsuarioId(), rolCliente.getNombre(), permissions, fullName);
-        String refreshToken = jwtService.generateRefreshToken(email);
-
-        Sesion sesion = Sesion.builder()
-                .tokenHash(hashSha256(refreshToken))
-                .ipOrigen(getClientIp(httpRequest))
-                .userAgent(httpRequest.getHeader("User-Agent"))
-                .fechaInicio(DateTimeUtils.now())
-                .fechaExpiracion(DateTimeUtils.now().plusNanos(jwtService.getRefreshTokenExpirationMs() * 1_000_000L))
-                .estado(EstadoSesion.ACTIVA)
-                .usuario(usuario)
-                .build();
-        sesionRepository.save(sesion);
-
-        jwtService.setTokenCookies(httpResponse, accessToken, refreshToken);
-
-        AuthUserResponse authUser = new AuthUserResponse(
-                usuario.getUsuarioId(),
-                usuario.getNombre(),
-                usuario.getApellidoPaterno(),
-                usuario.getApellidoMaterno(),
-                fullName,
-                usuario.getCorreo(),
-                rolCliente.getNombre(),
-                permissions,
-                null,
-                null,
-                null,
-                null,
-                null
-        );
-
-        return new LoginResponse(true, "Registro completado. Sesión iniciada.", authUser, Instant.now());
+        return new LoginResponse(true,
+                "Registro completado. Te enviamos un código de verificación a tu correo.",
+                null, Instant.now());
     }
 
     @Override

@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.exception;
 
+import com.sanfrancisco.api.modules.seguridad.exception.CorreoNoVerificadoException;
 import com.sanfrancisco.api.modules.seguridad.exception.SesionExpiradaException;
 import com.sanfrancisco.api.modules.seguridad.exception.UsuarioInactivoException;
 import com.sanfrancisco.api.shared.api.ErrorResponse;
@@ -44,6 +45,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleUsuarioInactivo(UsuarioInactivoException ex, HttpServletRequest req) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ErrorResponse.of("USER_INACTIVE", ex.getMessage(), req.getRequestURI()));
+    }
+
+    @ExceptionHandler(CorreoNoVerificadoException.class)
+    public ResponseEntity<ErrorResponse> handleCorreoNoVerificado(CorreoNoVerificadoException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ErrorResponse.of("EMAIL_NOT_VERIFIED", ex.getMessage(), req.getRequestURI()));
     }
 
     @ExceptionHandler(BusinessException.class)
