@@ -9,6 +9,7 @@ import com.sanfrancisco.api.modules.notificaciones.entity.RecordatorioConfig;
 import com.sanfrancisco.api.modules.notificaciones.enums.EmailStatus;
 import com.sanfrancisco.api.modules.notificaciones.enums.EmailTemplateKey;
 import com.sanfrancisco.api.modules.notificaciones.enums.SmtpSecurity;
+import com.sanfrancisco.api.modules.notificaciones.mail.BrevoMailClient;
 import com.sanfrancisco.api.modules.notificaciones.mapper.NotificationMapper;
 import com.sanfrancisco.api.modules.notificaciones.repository.LogCorreoRepository;
 import com.sanfrancisco.api.modules.notificaciones.repository.PlantillaCorreoRepository;
@@ -24,14 +25,11 @@ import com.sanfrancisco.api.modules.recepcion.repository.ReservaRepository;
 import com.sanfrancisco.api.modules.notificaciones.service.interfaces.NotificationService;
 import com.sanfrancisco.api.shared.exception.ValidationException;
 import com.sanfrancisco.api.shared.utils.DateTimeUtils;
-import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,7 +54,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final PagoRepository pagoRepository;
     private final DetalleHuespedRepository detalleHuespedRepository;
     private final NotificationMapper mapper;
-    private final JavaMailSender mailSender;
+    private final BrevoMailClient brevoMailClient;
 
     // Configuración de correo gestionada por entorno (spring.mail.* y app.notificaciones.*)
     private final boolean emailHabilitado;
@@ -74,7 +72,7 @@ public class NotificationServiceImpl implements NotificationService {
                                     PagoRepository pagoRepository,
                                     DetalleHuespedRepository detalleHuespedRepository,
                                     NotificationMapper mapper,
-                                    JavaMailSender mailSender,
+                                    BrevoMailClient brevoMailClient,
                                     @Value("${app.notificaciones.email-habilitado:false}") boolean emailHabilitado,
                                     @Value("${app.notificaciones.remitente-nombre:Hotel San Francisco}") String remitenteNombre,
                                     @Value("${app.notificaciones.remitente-correo:no-reply@hotelsanfrancisco.pe}") String remitenteCorreo,
@@ -89,7 +87,7 @@ public class NotificationServiceImpl implements NotificationService {
         this.pagoRepository = pagoRepository;
         this.detalleHuespedRepository = detalleHuespedRepository;
         this.mapper = mapper;
-        this.mailSender = mailSender;
+        this.brevoMailClient = brevoMailClient;
         this.emailHabilitado = emailHabilitado;
         this.remitenteNombre = remitenteNombre;
         this.remitenteCorreo = remitenteCorreo;
@@ -421,16 +419,10 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     private void enviarCorreoHtml(String destinatario, String asunto, String cuerpoHtml) throws Exception {
-        MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-        helper.setTo(destinatario);
-        helper.setSubject(asunto);
-        helper.setText(cuerpoHtml, true);
-        helper.setFrom(remitenteCorreo, remitenteNombre);
-        if (responderA != null && !responderA.isBlank()) {
-            helper.setReplyTo(responderA);
-        }
-        mailSender.send(message);
+        // Envío vía la API REST de Brevo (HTTPS). Las plantillas, el interpolado,
+        // el log y los reintentos siguen gestionándose arriba; este método solo
+        // delega el transporte del correo ya renderizado.
+        brevoMailClient.enviar(remitenteCorreo, remitenteNombre, destinatario, asunto, cuerpoHtml, responderA);
     }
 
     private String interpolar(String texto, Map<String, String> variables) {
