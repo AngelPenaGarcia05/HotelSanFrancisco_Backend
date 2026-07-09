@@ -410,6 +410,14 @@ public class ReservaServiceImpl implements ReservaService {
         }
     }
 
+    private void notificarCheckout(Reserva reserva) {
+        try {
+            notificationService.sendCheckout(reserva.getReservaId());
+        } catch (Exception e) {
+            log.warn("No se pudo enviar el correo de check-out de la reserva {}: {}", reserva.getReservaId(), e.getMessage());
+        }
+    }
+
     @Override
     public ReservaResponse cambiarEstado(Integer reservaId, CambiarEstadoReservaRequest request) {
         Reserva reserva = obtenerOFallar(reservaId);
@@ -436,6 +444,8 @@ public class ReservaServiceImpl implements ReservaService {
 
         if (nuevo == EstadoReserva.CONFIRMADA) {
             notificarReservaConfirmada(saved);
+        } else if (nuevo == EstadoReserva.CHECK_OUT) {
+            notificarCheckout(saved);
         }
 
         List<ReservaHabitacion> habitaciones = reservaHabitacionRepository.findByReservaReservaId(reservaId);

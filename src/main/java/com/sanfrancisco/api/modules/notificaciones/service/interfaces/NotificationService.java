@@ -32,6 +32,9 @@ public interface NotificationService {
     // Reprogramación (cambio de fechas) — invocado internamente desde el flujo de reservas
     EmailLogResponse sendReservationRescheduled(Integer reservaId);
 
+    // Check-out (fin de estadía) — invocado internamente al pasar la reserva a CHECK_OUT
+    EmailLogResponse sendCheckout(Integer reservaId);
+
     // Recordatorios
     ReminderSettingsResponse getReminderSettings();
 
