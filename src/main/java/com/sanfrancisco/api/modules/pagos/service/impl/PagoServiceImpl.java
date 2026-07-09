@@ -15,11 +15,15 @@ import com.sanfrancisco.api.modules.pagos.specification.PagoSpecification;
 import com.sanfrancisco.api.modules.pagos.websocket.PagoEventPublisher;
 import com.sanfrancisco.api.modules.notificacionescliente.enums.TipoNotificacionHuesped;
 import com.sanfrancisco.api.modules.notificacionescliente.service.interfaces.NotificacionClienteService;
+import com.sanfrancisco.api.modules.notificaciones.dto.request.SendPaymentConfirmationRequest;
+import com.sanfrancisco.api.modules.notificaciones.service.interfaces.NotificationService;
 import com.sanfrancisco.api.modules.recepcion.entity.Reserva;
 import com.sanfrancisco.api.modules.recepcion.repository.ReservaRepository;
 import com.sanfrancisco.api.modules.ventas.entity.Venta;
 import com.sanfrancisco.api.modules.ventas.repository.VentaRepository;
 import com.sanfrancisco.api.shared.exception.ValidationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -32,6 +36,8 @@ import java.util.List;
 @Transactional
 public class PagoServiceImpl implements PagoService {
 
+    private static final Logger log = LoggerFactory.getLogger(PagoServiceImpl.class);
+
     private final PagoRepository pagoRepository;
     private final MetodoPagoRepository metodoPagoRepository;
     private final VentaRepository ventaRepository;
@@ -39,6 +45,7 @@ public class PagoServiceImpl implements PagoService {
     private final PagoMapper pagoMapper;
     private final PagoEventPublisher eventPublisher;
     private final NotificacionClienteService notificacionClienteService;
+    private final NotificationService notificationService;
 
     public PagoServiceImpl(PagoRepository pagoRepository,
                            MetodoPagoRepository metodoPagoRepository,
@@ -46,7 +53,8 @@ public class PagoServiceImpl implements PagoService {
                            ReservaRepository reservaRepository,
                            PagoMapper pagoMapper,
                            PagoEventPublisher eventPublisher,
-                           NotificacionClienteService notificacionClienteService) {
+                           NotificacionClienteService notificacionClienteService,
+                           NotificationService notificationService) {
         this.pagoRepository = pagoRepository;
         this.metodoPagoRepository = metodoPagoRepository;
         this.ventaRepository = ventaRepository;
@@ -54,6 +62,7 @@ public class PagoServiceImpl implements PagoService {
         this.pagoMapper = pagoMapper;
         this.eventPublisher = eventPublisher;
         this.notificacionClienteService = notificacionClienteService;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -102,6 +111,14 @@ public class PagoServiceImpl implements PagoService {
                     "Se registró un pago de S/ " + saved.getMonto()
                             + " para tu reserva " + reserva.getCodReserva() + ".",
                     reserva.getReservaId());
+        }
+
+        if (reserva != null) {
+            try {
+                notificationService.sendPaymentConfirmation(new SendPaymentConfirmationRequest(saved.getPagoId()));
+            } catch (Exception e) {
+                log.warn("No se pudo enviar el correo de confirmación del pago {}: {}", saved.getPagoId(), e.getMessage());
+            }
         }
 
         return pagoMapper.toResponse(saved);
