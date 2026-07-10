@@ -49,6 +49,13 @@ public record UpdateReservaRequest(
         List<ReservaHabitacionRequest> habitaciones,
 
         @Valid
-        List<HuespedReservaRequest> huespedes
+        List<HuespedReservaRequest> huespedes,
+
+        // Acompañantes (huéspedes SIN cuenta) que el staff registra por sus datos y se
+        // crean/reutilizan por numeroDocumento. Se fusionan con `huespedes` (por id) como
+        // huéspedes NO principales. Si `huespedes` no viene, se preserva el titular actual
+        // y estos acompañantes reemplazan a los no principales existentes.
+        @Valid
+        List<AcompananteRequest> acompanantes
 ) {
 }

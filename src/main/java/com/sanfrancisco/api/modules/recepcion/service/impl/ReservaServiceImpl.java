@@ -387,10 +387,40 @@ public class ReservaServiceImpl implements ReservaService {
             reservaHabitaciones = reservaHabitacionRepository.findByReservaReservaId(reservaId);
         }
 
-        if (request.huespedes() != null && !request.huespedes().isEmpty()) {
-            validarUnSoloPrincipal(request.huespedes());
+        boolean hayHuespedes    = request.huespedes()    != null && !request.huespedes().isEmpty();
+        boolean hayAcompanantes = request.acompanantes() != null && !request.acompanantes().isEmpty();
+
+        if (hayHuespedes || hayAcompanantes) {
+            List<HuespedReservaRequest> huespedesFinal = new ArrayList<>();
+            Set<Integer> huespedIdsAgregados = new HashSet<>();
+
+            if (hayHuespedes) {
+                // El staff gestiona la lista completa por id; los acompañantes se fusionan.
+                validarUnSoloPrincipal(request.huespedes());
+                for (HuespedReservaRequest h : request.huespedes()) {
+                    if (h.huespedId() != null && huespedIdsAgregados.add(h.huespedId())) {
+                        huespedesFinal.add(h);
+                    }
+                }
+            } else {
+                // Solo acompañantes: se preserva el titular existente (huésped principal).
+                DetalleHuesped titular = detalleHuespedRepository.findByIdReservaIdAndEsPrincipalTrue(reservaId)
+                        .orElseThrow(() -> new BusinessException("La reserva no tiene un huésped principal registrado"));
+                huespedesFinal.add(new HuespedReservaRequest(titular.getHuesped().getHuespedId(), true));
+                huespedIdsAgregados.add(titular.getHuesped().getHuespedId());
+            }
+
+            agregarAcompanantes(request.acompanantes(), huespedesFinal, huespedIdsAgregados);
+
+            // Capacidad: invariante de dominio, se valida SIEMPRE. El nº de huéspedes
+            // (titular + acompañantes) no puede exceder los pax finales (los del request
+            // si se cambian en esta misma llamada, si no los persistidos).
+            Integer nroAdultosFinal = request.nroAdultos() != null ? request.nroAdultos() : reserva.getNroAdultos();
+            Integer nroNinosFinal   = request.nroNinos()   != null ? request.nroNinos()   : reserva.getNroNinos();
+            validarCapacidadHuespedes(huespedesFinal.size(), nroAdultosFinal, nroNinosFinal);
+
             detalleHuespedRepository.deleteByIdReservaId(reservaId);
-            detalleHuespedes = persistirHuespedes(request.huespedes(), reserva);
+            detalleHuespedes = persistirHuespedes(huespedesFinal, reserva);
         } else {
             detalleHuespedes = detalleHuespedRepository.findByIdReservaId(reservaId);
         }
