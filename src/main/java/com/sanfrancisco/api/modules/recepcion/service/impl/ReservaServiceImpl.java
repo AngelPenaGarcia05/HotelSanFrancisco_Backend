@@ -1,6 +1,7 @@
 package com.sanfrancisco.api.modules.recepcion.service.impl;
 
 import com.sanfrancisco.api.exception.BusinessException;
+import com.sanfrancisco.api.exception.ForbiddenException;
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
 import com.sanfrancisco.api.modules.recepcion.dto.ReservaMontos;
 import com.sanfrancisco.api.modules.recepcion.dto.request.*;
@@ -635,7 +636,7 @@ public class ReservaServiceImpl implements ReservaService {
     public ReservaResponse findPropiaById(Integer reservaId, Integer usuarioId) {
         Reserva reserva = obtenerOFallar(reservaId);
         if (!reserva.getUsuario().getUsuarioId().equals(usuarioId)) {
-            throw new BusinessException("No tienes permiso para ver esta reserva");
+            throw new ForbiddenException("No tienes permiso para ver esta reserva");
         }
         List<ReservaHabitacion> habitaciones = reservaHabitacionRepository.findByReservaReservaId(reservaId);
         List<DetalleHuesped> huespedes = detalleHuespedRepository.findByIdReservaId(reservaId);
@@ -648,7 +649,7 @@ public class ReservaServiceImpl implements ReservaService {
                                                       CancelarReservaRequest request) {
         Reserva reserva = obtenerOFallar(reservaId);
         if (!reserva.getUsuario().getUsuarioId().equals(usuarioId)) {
-            throw new BusinessException("No tienes permiso para cancelar esta reserva");
+            throw new ForbiddenException("No tienes permiso para cancelar esta reserva");
         }
         return cancelar(reservaId, request);
     }
@@ -658,7 +659,7 @@ public class ReservaServiceImpl implements ReservaService {
                                                     List<AcompananteRequest> acompanantes) {
         Reserva reserva = obtenerOFallar(reservaId);
         if (!reserva.getUsuario().getUsuarioId().equals(usuarioId)) {
-            throw new BusinessException("No tienes permiso para editar esta reserva");
+            throw new ForbiddenException("No tienes permiso para editar esta reserva");
         }
         if (reserva.getEstado() != EstadoReserva.PENDIENTE && reserva.getEstado() != EstadoReserva.CONFIRMADA) {
             throw new BusinessException(
