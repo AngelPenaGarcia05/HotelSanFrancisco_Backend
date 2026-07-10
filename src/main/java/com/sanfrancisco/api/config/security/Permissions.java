@@ -225,6 +225,7 @@ public final class Permissions {
     // =========================================================================
     public static final String MIS_RESERVAS_READ   = "mis-reservas:read";
     public static final String MIS_RESERVAS_CREATE = "mis-reservas:create";
+    public static final String MIS_RESERVAS_UPDATE = "mis-reservas:update";
     public static final String MIS_RESERVAS_DELETE = "mis-reservas:delete";
 
     // =========================================================================

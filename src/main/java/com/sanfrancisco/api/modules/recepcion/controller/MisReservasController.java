@@ -2,6 +2,7 @@ package com.sanfrancisco.api.modules.recepcion.controller;
 
 import com.sanfrancisco.api.modules.recepcion.dto.request.CancelarReservaRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CreateReservaRequest;
+import com.sanfrancisco.api.modules.recepcion.dto.request.EditarAcompanantesRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.MisReservasCreateRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.response.CancelacionResponse;
 import com.sanfrancisco.api.modules.recepcion.dto.response.ReservaResponse;
@@ -69,9 +70,21 @@ public class MisReservasController {
                 false
         );
 
-        ReservaResponse response = reservaService.createParaCliente(fullRequest, userPrincipal.userId());
+        ReservaResponse response = reservaService.createParaCliente(
+                fullRequest, userPrincipal.userId(), request.acompanantes());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(response, "Reserva creada exitosamente"));
+    }
+
+    @PatchMapping("/{id}/acompanantes")
+    public ApiResponse<ReservaResponse> editarAcompanantes(
+            @AuthenticationPrincipal UserPrincipal userPrincipal,
+            @PathVariable Integer id,
+            @Valid @RequestBody EditarAcompanantesRequest request) {
+
+        ReservaResponse response = reservaService.editarAcompanantesPropia(
+                id, userPrincipal.userId(), request.acompanantes());
+        return ApiResponse.ok(response, "Acompañantes actualizados exitosamente");
     }
 
     @DeleteMapping("/{id}")

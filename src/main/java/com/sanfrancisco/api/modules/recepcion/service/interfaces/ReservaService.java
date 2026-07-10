@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.recepcion.service.interfaces;
 
+import com.sanfrancisco.api.modules.recepcion.dto.request.AcompananteRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CambiarEstadoReservaRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CancelarReservaRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CreateReservaRequest;
@@ -22,8 +23,12 @@ public interface ReservaService {
      * El usuario (y por tanto el huésped principal) se derivan del JWT, ignorando el
      * usuarioId del body. Si no llega ningún huésped, se infiere/crea el huésped
      * principal a partir de los datos del usuario autenticado.
+     * <p>
+     * Los {@code acompanantes} (huéspedes sin cuenta) se crean/reutilizan en la tabla
+     * huespedes con {@code usuario_id = NULL} y se enlazan a la reserva como no principales.
      */
-    ReservaResponse createParaCliente(CreateReservaRequest request, Integer usuarioId);
+    ReservaResponse createParaCliente(CreateReservaRequest request, Integer usuarioId,
+                                      List<AcompananteRequest> acompanantes);
 
     ReservaResponse update(Integer reservaId, UpdateReservaRequest request);
 
@@ -51,4 +56,15 @@ public interface ReservaService {
     ReservaResponse findPropiaById(Integer reservaId, Integer usuarioId);
 
     CancelacionResponse cancelarPropiaReserva(Integer reservaId, Integer usuarioId, CancelarReservaRequest request);
+
+    /**
+     * Edita los acompañantes de una reserva propia del cliente autenticado.
+     * <p>
+     * Reemplazo TOTAL: la lista sustituye a los acompañantes actuales. El titular
+     * (huésped principal) se preserva y nunca se altera por aquí. Cada acompañante
+     * se crea/reutiliza por {@code numeroDocumento}. Solo se permite en estados
+     * PENDIENTE y CONFIRMADA, y se revalida la capacidad declarada de la reserva.
+     */
+    ReservaResponse editarAcompanantesPropia(Integer reservaId, Integer usuarioId,
+                                             List<AcompananteRequest> acompanantes);
 }
