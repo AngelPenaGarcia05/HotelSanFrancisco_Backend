@@ -452,7 +452,7 @@ class ReservaServiceTest {
             when(detalleHuespedRepository.save(any())).thenReturn(detalleHuesped);
             when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList())).thenReturn(reservaResponse);
 
-            service.createParaCliente(req, 1);
+            service.createParaCliente(req, 1, null);
 
             ArgumentCaptor<ReservaMontos> captor = ArgumentCaptor.forClass(ReservaMontos.class);
             verify(reservaMapper).toEntity(any(), any(), any(), captor.capture());

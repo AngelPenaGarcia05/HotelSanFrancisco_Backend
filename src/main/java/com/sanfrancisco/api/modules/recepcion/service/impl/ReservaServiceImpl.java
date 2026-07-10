@@ -46,7 +46,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -199,16 +201,44 @@ public class ReservaServiceImpl implements ReservaService {
     }
 
     @Override
-    public ReservaResponse createParaCliente(CreateReservaRequest request, Integer usuarioId) {
+    public ReservaResponse createParaCliente(CreateReservaRequest request, Integer usuarioId,
+                                             List<AcompananteRequest> acompanantes) {
         // Seguridad: el usuario (y el huésped) se derivan del JWT, nunca del body.
         Usuario usuario = usuarioRepository.findById(usuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado: " + usuarioId));
 
-        List<HuespedReservaRequest> huespedes = request.huespedes();
-        if (huespedes == null || huespedes.isEmpty()) {
-            Huesped huesped = obtenerOCrearHuespedDeUsuario(usuario);
-            huespedes = List.of(new HuespedReservaRequest(huesped.getHuespedId(), true));
+        // Se construye la lista final de huéspedes deduplicando por huespedId para no
+        // insertar el mismo huésped dos veces (violaría la PK de detalles_huesped).
+        List<HuespedReservaRequest> huespedes = new ArrayList<>();
+        Set<Integer> huespedIdsAgregados = new HashSet<>();
+
+        if (request.huespedes() != null && !request.huespedes().isEmpty()) {
+            // Compatibilidad: si el cliente envía huéspedes por id, se respetan.
+            for (HuespedReservaRequest h : request.huespedes()) {
+                if (h.huespedId() != null && huespedIdsAgregados.add(h.huespedId())) {
+                    huespedes.add(h);
+                }
+            }
+        } else {
+            // Caso normal ("reserva a tu nombre"): el titular es el huésped principal.
+            Huesped titular = obtenerOCrearHuespedDeUsuario(usuario);
+            huespedes.add(new HuespedReservaRequest(titular.getHuespedId(), true));
+            huespedIdsAgregados.add(titular.getHuespedId());
         }
+
+        // Acompañantes (huéspedes sin cuenta): se crean/reutilizan por documento y se
+        // enlazan como NO principales.
+        if (acompanantes != null && !acompanantes.isEmpty()) {
+            for (AcompananteRequest acomp : acompanantes) {
+                Huesped huesped = obtenerOCrearAcompanante(acomp);
+                if (huespedIdsAgregados.add(huesped.getHuespedId())) {
+                    huespedes.add(new HuespedReservaRequest(huesped.getHuespedId(), false));
+                }
+            }
+        }
+
+        // La cantidad de huéspedes identificados no puede exceder la capacidad declarada.
+        validarCapacidadHuespedes(huespedes.size(), request.nroAdultos(), request.nroNinos());
 
         CreateReservaRequest fullRequest = new CreateReservaRequest(
                 null,                       // codReserva lo genera el backend
@@ -249,6 +279,42 @@ public class ReservaServiceImpl implements ReservaService {
                                 .usuario(usuario)
                                 .build()
                 ));
+    }
+
+    /**
+     * Devuelve el huésped acompañante por su número de documento; si no existe, lo crea
+     * como huésped SIN cuenta ({@code usuario_id = NULL}). Reutilizar por documento evita
+     * chocar con la restricción de unicidad {@code uk_huespedes_documento}.
+     */
+    private Huesped obtenerOCrearAcompanante(AcompananteRequest req) {
+        return huespedRepository.findByNumeroDocumento(req.numeroDocumento())
+                .orElseGet(() -> huespedRepository.save(
+                        Huesped.builder()
+                                .nombre(req.nombre())
+                                .apellidoPaterno(req.apellidoPaterno())
+                                .apellidoMaterno(req.apellidoMaterno())
+                                .numeroDocumento(req.numeroDocumento())
+                                .nacionalidad(req.nacionalidad())
+                                .correo(req.correo())
+                                .telefono(req.telefono())
+                                .estado(EstadoActivo.ACTIVO)
+                                .usuario(null)   // acompañante: no tiene cuenta de usuario
+                                .build()
+                ));
+    }
+
+    /**
+     * Valida que el número de huéspedes identificados (titular + acompañantes) no exceda
+     * la capacidad declarada de la reserva (adultos + niños).
+     */
+    private void validarCapacidadHuespedes(int totalHuespedes, Integer nroAdultos, Integer nroNinos) {
+        int capacidad = (nroAdultos == null ? 0 : nroAdultos) + (nroNinos == null ? 0 : nroNinos);
+        if (totalHuespedes > capacidad) {
+            throw new ValidationException(
+                    "El número de huéspedes identificados (" + totalHuespedes
+                            + ") excede la capacidad declarada de la reserva (" + capacidad
+                            + " = " + nroAdultos + " adultos + " + nroNinos + " niños).");
+        }
     }
 
     @Override

@@ -38,6 +38,12 @@ public record MisReservasCreateRequest(
         // Opcional para el endpoint /mis-reservas: si llega vacío o nulo, el backend
         // infiere/crea el huésped principal a partir del usuario autenticado (JWT).
         @Valid
-        List<HuespedReservaRequest> huespedes
+        List<HuespedReservaRequest> huespedes,
+
+        // Acompañantes de la reserva (huéspedes sin cuenta). El titular NO se incluye
+        // aquí: siempre se deriva del JWT como huésped principal. Cada acompañante se
+        // crea/reutiliza en la tabla huespedes con usuario_id = NULL.
+        @Valid
+        List<AcompananteRequest> acompanantes
 ) {
 }

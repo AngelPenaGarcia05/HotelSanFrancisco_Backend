@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.recepcion.service.interfaces;
 
+import com.sanfrancisco.api.modules.recepcion.dto.request.AcompananteRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CambiarEstadoReservaRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CancelarReservaRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CreateReservaRequest;
@@ -22,8 +23,12 @@ public interface ReservaService {
      * El usuario (y por tanto el huésped principal) se derivan del JWT, ignorando el
      * usuarioId del body. Si no llega ningún huésped, se infiere/crea el huésped
      * principal a partir de los datos del usuario autenticado.
+     * <p>
+     * Los {@code acompanantes} (huéspedes sin cuenta) se crean/reutilizan en la tabla
+     * huespedes con {@code usuario_id = NULL} y se enlazan a la reserva como no principales.
      */
-    ReservaResponse createParaCliente(CreateReservaRequest request, Integer usuarioId);
+    ReservaResponse createParaCliente(CreateReservaRequest request, Integer usuarioId,
+                                      List<AcompananteRequest> acompanantes);
 
     ReservaResponse update(Integer reservaId, UpdateReservaRequest request);
 

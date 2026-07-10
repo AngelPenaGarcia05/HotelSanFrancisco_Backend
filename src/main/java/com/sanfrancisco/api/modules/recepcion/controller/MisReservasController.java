@@ -69,7 +69,8 @@ public class MisReservasController {
                 false
         );
 
-        ReservaResponse response = reservaService.createParaCliente(fullRequest, userPrincipal.userId());
+        ReservaResponse response = reservaService.createParaCliente(
+                fullRequest, userPrincipal.userId(), request.acompanantes());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(response, "Reserva creada exitosamente"));
     }
