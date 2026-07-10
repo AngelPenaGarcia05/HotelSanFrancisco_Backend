@@ -118,6 +118,8 @@ public class SecurityConfig {
                     .hasAuthority(Permissions.MIS_RESERVAS_READ)
                 .requestMatchers(HttpMethod.POST, EndpointPaths.MIS_RESERVAS_BASE)
                     .hasAuthority(Permissions.MIS_RESERVAS_CREATE)
+                .requestMatchers(HttpMethod.PATCH, EndpointPaths.MIS_RESERVAS_BASE + "/**")
+                    .hasAuthority(Permissions.MIS_RESERVAS_UPDATE)
                 .requestMatchers(HttpMethod.DELETE, EndpointPaths.MIS_RESERVAS_BASE + "/**")
                     .hasAuthority(Permissions.MIS_RESERVAS_DELETE)
 

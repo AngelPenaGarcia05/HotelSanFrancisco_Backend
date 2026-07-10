@@ -56,4 +56,15 @@ public interface ReservaService {
     ReservaResponse findPropiaById(Integer reservaId, Integer usuarioId);
 
     CancelacionResponse cancelarPropiaReserva(Integer reservaId, Integer usuarioId, CancelarReservaRequest request);
+
+    /**
+     * Edita los acompañantes de una reserva propia del cliente autenticado.
+     * <p>
+     * Reemplazo TOTAL: la lista sustituye a los acompañantes actuales. El titular
+     * (huésped principal) se preserva y nunca se altera por aquí. Cada acompañante
+     * se crea/reutiliza por {@code numeroDocumento}. Solo se permite en estados
+     * PENDIENTE y CONFIRMADA, y se revalida la capacidad declarada de la reserva.
+     */
+    ReservaResponse editarAcompanantesPropia(Integer reservaId, Integer usuarioId,
+                                             List<AcompananteRequest> acompanantes);
 }

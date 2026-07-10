@@ -228,14 +228,7 @@ public class ReservaServiceImpl implements ReservaService {
 
         // Acompañantes (huéspedes sin cuenta): se crean/reutilizan por documento y se
         // enlazan como NO principales.
-        if (acompanantes != null && !acompanantes.isEmpty()) {
-            for (AcompananteRequest acomp : acompanantes) {
-                Huesped huesped = obtenerOCrearAcompanante(acomp);
-                if (huespedIdsAgregados.add(huesped.getHuespedId())) {
-                    huespedes.add(new HuespedReservaRequest(huesped.getHuespedId(), false));
-                }
-            }
-        }
+        agregarAcompanantes(acompanantes, huespedes, huespedIdsAgregados);
 
         // La cantidad de huéspedes identificados no puede exceder la capacidad declarada.
         validarCapacidadHuespedes(huespedes.size(), request.nroAdultos(), request.nroNinos());
@@ -301,6 +294,24 @@ public class ReservaServiceImpl implements ReservaService {
                                 .usuario(null)   // acompañante: no tiene cuenta de usuario
                                 .build()
                 ));
+    }
+
+    /**
+     * Resuelve la lista de acompañantes (crear/reutilizar por documento) y los agrega
+     * como huéspedes NO principales, deduplicando por huespedId contra {@code yaAgregados}.
+     */
+    private void agregarAcompanantes(List<AcompananteRequest> acompanantes,
+                                     List<HuespedReservaRequest> destino,
+                                     Set<Integer> yaAgregados) {
+        if (acompanantes == null || acompanantes.isEmpty()) {
+            return;
+        }
+        for (AcompananteRequest acomp : acompanantes) {
+            Huesped huesped = obtenerOCrearAcompanante(acomp);
+            if (yaAgregados.add(huesped.getHuespedId())) {
+                destino.add(new HuespedReservaRequest(huesped.getHuespedId(), false));
+            }
+        }
     }
 
     /**
@@ -610,6 +621,41 @@ public class ReservaServiceImpl implements ReservaService {
             throw new BusinessException("No tienes permiso para cancelar esta reserva");
         }
         return cancelar(reservaId, request);
+    }
+
+    @Override
+    public ReservaResponse editarAcompanantesPropia(Integer reservaId, Integer usuarioId,
+                                                    List<AcompananteRequest> acompanantes) {
+        Reserva reserva = obtenerOFallar(reservaId);
+        if (!reserva.getUsuario().getUsuarioId().equals(usuarioId)) {
+            throw new BusinessException("No tienes permiso para editar esta reserva");
+        }
+        if (reserva.getEstado() != EstadoReserva.PENDIENTE && reserva.getEstado() != EstadoReserva.CONFIRMADA) {
+            throw new BusinessException(
+                    "No se pueden editar los acompañantes de una reserva en estado " + reserva.getEstado());
+        }
+
+        // El titular (huésped principal) se preserva; nunca se altera por este endpoint.
+        DetalleHuesped titular = detalleHuespedRepository.findByIdReservaIdAndEsPrincipalTrue(reservaId)
+                .orElseThrow(() -> new BusinessException("La reserva no tiene un huésped principal registrado"));
+
+        List<HuespedReservaRequest> huespedes = new ArrayList<>();
+        Set<Integer> huespedIdsAgregados = new HashSet<>();
+        huespedes.add(new HuespedReservaRequest(titular.getHuesped().getHuespedId(), true));
+        huespedIdsAgregados.add(titular.getHuesped().getHuespedId());
+
+        agregarAcompanantes(acompanantes, huespedes, huespedIdsAgregados);
+
+        // Capacidad: 1 titular + nº acompañantes <= nroAdultos + nroNinos declarados.
+        validarCapacidadHuespedes(huespedes.size(), reserva.getNroAdultos(), reserva.getNroNinos());
+
+        // Reemplazo total del vínculo reserva-huésped y re-persistencia.
+        detalleHuespedRepository.deleteByIdReservaId(reservaId);
+        List<DetalleHuesped> detalleHuespedes = persistirHuespedes(huespedes, reserva);
+
+        List<ReservaHabitacion> habitaciones = reservaHabitacionRepository.findByReservaReservaId(reservaId);
+        Integer estanciaId = resolverEstanciaId(reservaId);
+        return reservaMapper.toResponse(reserva, habitaciones, detalleHuespedes, estanciaId);
     }
 
     @Override
