@@ -31,7 +31,11 @@ public class DetalleHuespedMapper {
         return new DetalleHuespedResponse(
                 h.getHuespedId(),
                 nombre.toString(),
+                h.getNombre(),
+                h.getApellidoPaterno(),
+                h.getApellidoMaterno(),
                 h.getNumeroDocumento(),
+                h.getNacionalidad(),
                 h.getCorreo(),
                 h.getTelefono(),
                 entity.getEsPrincipal()

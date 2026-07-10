@@ -2,6 +2,7 @@ package com.sanfrancisco.api.modules.recepcion.service;
 
 import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.exception.BusinessException;
+import com.sanfrancisco.api.exception.ForbiddenException;
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
 import com.sanfrancisco.api.modules.recepcion.dto.ReservaMontos;
 import com.sanfrancisco.api.modules.recepcion.dto.request.*;
@@ -803,6 +804,152 @@ class ReservaServiceTest {
             assertThatThrownBy(() -> service.findByCodigo("X-999"))
                     .isInstanceOf(ResourceNotFoundException.class)
                     .hasMessageContaining("X-999");
+        }
+    }
+
+    // =========================================================================
+    // EDITAR ACOMPAÑANTES — Cliente (PATCH /mis-reservas/{id}/acompanantes)
+    // =========================================================================
+    @Nested
+    @DisplayName("Editar acompañantes de reserva propia (cliente)")
+    class EditarAcompanantesPropia {
+
+        private DetalleHuesped titular;
+        private Huesped acompHuesped;
+
+        @BeforeEach
+        void setUpTitularYAcompanante() {
+            titular = DetalleHuesped.builder()
+                    .huesped(huesped)          // id 20 (titular)
+                    .reserva(reserva)
+                    .esPrincipal(true)
+                    .build();
+            acompHuesped = Huesped.builder()
+                    .huespedId(21)
+                    .nombre("Ana")
+                    .apellidoPaterno("Gómez")
+                    .numeroDocumento("99999999")
+                    .estado(EstadoActivo.ACTIVO)
+                    .build();
+        }
+
+        private AcompananteRequest acompReq(String documento) {
+            return new AcompananteRequest("Ana", "Gómez", null, documento, null, null, null);
+        }
+
+        @Test
+        @DisplayName("Exitoso: reemplazo total preservando al titular y validando capacidad")
+        void editar_exitoso_preservaTitularYReemplaza() {
+            when(reservaRepository.findById(5)).thenReturn(Optional.of(reserva));
+            when(detalleHuespedRepository.findByIdReservaIdAndEsPrincipalTrue(5))
+                    .thenReturn(Optional.of(titular));
+            when(huespedRepository.findByNumeroDocumento("99999999"))
+                    .thenReturn(Optional.of(acompHuesped));
+            when(huespedRepository.findById(20)).thenReturn(Optional.of(huesped));
+            when(huespedRepository.findById(21)).thenReturn(Optional.of(acompHuesped));
+            when(detalleHuespedMapper.toEntity(any(), any(), any())).thenReturn(detalleHuesped);
+            when(detalleHuespedRepository.save(any())).thenReturn(detalleHuesped);
+            when(reservaHabitacionRepository.findByReservaReservaId(5))
+                    .thenReturn(List.of(reservaHabitacion));
+            when(estanciaRepository.findByReservaReservaId(5)).thenReturn(Optional.empty());
+            when(reservaMapper.toResponse(any(Reserva.class), anyList(), anyList(), any()))
+                    .thenReturn(reservaResponse);
+
+            ReservaResponse result = service.editarAcompanantesPropia(5, 1, List.of(acompReq("99999999")));
+
+            assertThat(result).isNotNull();
+            // Se borra el vínculo previo antes de re-persistir (reemplazo total)
+            verify(detalleHuespedRepository).deleteByIdReservaId(5);
+            // El titular (id 20, esPrincipal=true) se conserva y llega al mapper de detalle
+            ArgumentCaptor<HuespedReservaRequest> captor = ArgumentCaptor.forClass(HuespedReservaRequest.class);
+            verify(detalleHuespedMapper, times(2)).toEntity(captor.capture(), any(), any());
+            assertThat(captor.getAllValues())
+                    .anyMatch(h -> h.huespedId() == 20 && Boolean.TRUE.equals(h.esPrincipal()))
+                    .anyMatch(h -> h.huespedId() == 21 && Boolean.FALSE.equals(h.esPrincipal()));
+        }
+
+        @Test
+        @DisplayName("Falla: reserva de otro usuario → ForbiddenException (403)")
+        void editar_falla_reservaAjena_lanzaForbidden() {
+            when(reservaRepository.findById(5)).thenReturn(Optional.of(reserva)); // reserva.usuario.id = 1
+
+            assertThatThrownBy(() -> service.editarAcompanantesPropia(5, 999, List.of(acompReq("99999999"))))
+                    .isInstanceOf(ForbiddenException.class)
+                    .hasMessageContaining("permiso");
+        }
+
+        @Test
+        @DisplayName("Falla: reserva en CHECK_IN no permite editar acompañantes → BusinessException")
+        void editar_falla_estadoNoEditable_lanzaBusiness() {
+            reserva.setEstado(EstadoReserva.CHECK_IN);
+            when(reservaRepository.findById(5)).thenReturn(Optional.of(reserva));
+
+            assertThatThrownBy(() -> service.editarAcompanantesPropia(5, 1, List.of(acompReq("99999999"))))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("CHECK_IN");
+        }
+
+        @Test
+        @DisplayName("Falla: titular + acompañantes exceden la capacidad declarada → ValidationException")
+        void editar_falla_excedeCapacidad_lanzaValidation() {
+            // reserva: nroAdultos=2, nroNinos=0 → capacidad 2. Titular + 2 acompañantes = 3.
+            Huesped acomp2 = Huesped.builder().huespedId(22).numeroDocumento("88888888")
+                    .estado(EstadoActivo.ACTIVO).build();
+            when(reservaRepository.findById(5)).thenReturn(Optional.of(reserva));
+            when(detalleHuespedRepository.findByIdReservaIdAndEsPrincipalTrue(5))
+                    .thenReturn(Optional.of(titular));
+            when(huespedRepository.findByNumeroDocumento("99999999")).thenReturn(Optional.of(acompHuesped));
+            when(huespedRepository.findByNumeroDocumento("88888888")).thenReturn(Optional.of(acomp2));
+
+            assertThatThrownBy(() -> service.editarAcompanantesPropia(
+                    5, 1, List.of(acompReq("99999999"), acompReq("88888888"))))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessageContaining("capacidad");
+            // No se toca el vínculo si la validación falla
+            verify(detalleHuespedRepository, never()).deleteByIdReservaId(anyInt());
+        }
+    }
+
+    // =========================================================================
+    // UPDATE STAFF — acompañantes fusionados y capacidad
+    // =========================================================================
+    @Nested
+    @DisplayName("Update de staff con acompañantes")
+    class UpdateStaffAcompanantes {
+
+        private AcompananteRequest acompReq(String documento) {
+            return new AcompananteRequest("Ana", "Gómez", null, documento, null, null, null);
+        }
+
+        private UpdateReservaRequest soloAcompanantes(List<AcompananteRequest> acompanantes) {
+            return new UpdateReservaRequest(
+                    null, null, null, null, null, null, null, null, null, null,
+                    null, null, acompanantes);
+        }
+
+        @Test
+        @DisplayName("Falla: acompañantes exceden capacidad en el update → ValidationException (invariante)")
+        void update_falla_acompanantesExcedenCapacidad_lanzaValidation() {
+            DetalleHuesped titular = DetalleHuesped.builder()
+                    .huesped(huesped).reserva(reserva).esPrincipal(true).build();
+            Huesped a1 = Huesped.builder().huespedId(21).numeroDocumento("99999999")
+                    .estado(EstadoActivo.ACTIVO).build();
+            Huesped a2 = Huesped.builder().huespedId(22).numeroDocumento("88888888")
+                    .estado(EstadoActivo.ACTIVO).build();
+
+            when(reservaRepository.findById(5)).thenReturn(Optional.of(reserva));
+            when(reservaHabitacionRepository.findByReservaReservaId(5))
+                    .thenReturn(List.of(reservaHabitacion));
+            when(detalleHuespedRepository.findByIdReservaIdAndEsPrincipalTrue(5))
+                    .thenReturn(Optional.of(titular));
+            when(huespedRepository.findByNumeroDocumento("99999999")).thenReturn(Optional.of(a1));
+            when(huespedRepository.findByNumeroDocumento("88888888")).thenReturn(Optional.of(a2));
+
+            assertThatThrownBy(() -> service.update(5, soloAcompanantes(
+                    List.of(acompReq("99999999"), acompReq("88888888")))))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessageContaining("capacidad");
+            verify(detalleHuespedRepository, never()).deleteByIdReservaId(anyInt());
         }
     }
 
