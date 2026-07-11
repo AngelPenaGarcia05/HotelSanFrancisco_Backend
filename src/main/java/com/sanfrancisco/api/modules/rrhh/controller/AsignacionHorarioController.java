@@ -27,17 +27,15 @@ public class AsignacionHorarioController {
                 .body(ApiResponse.ok(detalleHorarioService.asignar(request), "Horario asignado exitosamente al usuario"));
     }
 
-    @PutMapping("/usuario/{usuarioId}/horario/{horarioId}")
-    public ApiResponse<DetalleHorarioResponse> update(@PathVariable Integer usuarioId,
-                                                      @PathVariable Integer horarioId,
+    @PutMapping("/{detalleHorarioId}")
+    public ApiResponse<DetalleHorarioResponse> update(@PathVariable Integer detalleHorarioId,
                                                       @Valid @RequestBody AsignarHorarioRequest request) {
-        return ApiResponse.ok(detalleHorarioService.update(usuarioId, horarioId, request), "Asignación actualizada");
+        return ApiResponse.ok(detalleHorarioService.update(detalleHorarioId, request), "Asignación actualizada");
     }
 
-    @DeleteMapping("/usuario/{usuarioId}/horario/{horarioId}")
-    public ResponseEntity<ApiResponse<Void>> remover(@PathVariable Integer usuarioId,
-                                                     @PathVariable Integer horarioId) {
-        detalleHorarioService.remover(usuarioId, horarioId);
+    @DeleteMapping("/{detalleHorarioId}")
+    public ResponseEntity<ApiResponse<Void>> remover(@PathVariable Integer detalleHorarioId) {
+        detalleHorarioService.remover(detalleHorarioId);
         return ResponseEntity.ok(ApiResponse.message("Horario removido del usuario"));
     }
 

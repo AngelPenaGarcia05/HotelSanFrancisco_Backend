@@ -3,7 +3,6 @@ package com.sanfrancisco.api.modules.rrhh.mapper;
 import com.sanfrancisco.api.modules.rrhh.dto.request.AsignarHorarioRequest;
 import com.sanfrancisco.api.modules.rrhh.dto.response.DetalleHorarioResponse;
 import com.sanfrancisco.api.modules.rrhh.entity.DetalleHorario;
-import com.sanfrancisco.api.modules.rrhh.entity.DetalleHorarioPK;
 import com.sanfrancisco.api.modules.rrhh.entity.Horario;
 import com.sanfrancisco.api.shared.enums.EstadoActivo;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
@@ -13,9 +12,7 @@ import org.springframework.stereotype.Component;
 public class DetalleHorarioMapper {
 
     public DetalleHorario toEntity(AsignarHorarioRequest request, Usuario usuario, Horario horario) {
-        DetalleHorarioPK id = new DetalleHorarioPK(usuario.getUsuarioId(), horario.getHorarioId());
         return DetalleHorario.builder()
-                .id(id)
                 .usuario(usuario)
                 .horario(horario)
                 .diaSemana(request.diaSemana())
@@ -35,6 +32,7 @@ public class DetalleHorarioMapper {
         Usuario u = entity.getUsuario();
         Horario h = entity.getHorario();
         return new DetalleHorarioResponse(
+                entity.getDetalleHorarioId(),
                 u != null ? u.getUsuarioId() : null,
                 u != null ? buildNombreCompleto(u) : null,
                 h != null ? h.getHorarioId() : null,

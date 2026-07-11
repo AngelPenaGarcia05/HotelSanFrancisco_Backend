@@ -54,6 +54,7 @@ public class AsistenciaMapper {
                 entity.getObservaciones(),
                 u != null ? u.getUsuarioId() : null,
                 u != null ? buildNombreCompleto(u) : null,
+                entity.getTurno() != null ? entity.getTurno().getTurnoId() : null,
                 entity.getFechaCreacion(),
                 entity.getFechaModificacion()
         );

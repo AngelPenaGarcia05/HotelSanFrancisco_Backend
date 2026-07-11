@@ -103,6 +103,8 @@ public final class EndpointPaths {
     public static final String PAGO_NOMINA_BASE         = "/api/v1/pagos-nomina";
     public static final String BONO_BASE                = "/api/v1/bonos";
     public static final String ASIGNACION_HORARIO_BASE  = "/api/v1/asignaciones-horario";
+    public static final String MI_ASISTENCIA_BASE       = "/api/v1/mi-asistencia";
+    public static final String TURNO_BASE               = "/api/v1/turnos";
 
     // =========================================================================
     // BOOKING — Flujo público de reservas web

@@ -1,8 +1,10 @@
 package com.sanfrancisco.api.modules.rrhh.controller;
 
+import com.sanfrancisco.api.modules.rrhh.dto.request.CalcularNominaRequest;
 import com.sanfrancisco.api.modules.rrhh.dto.request.CambiarEstadoPagoNominaRequest;
 import com.sanfrancisco.api.modules.rrhh.dto.request.CreatePagoNominaRequest;
 import com.sanfrancisco.api.modules.rrhh.dto.request.PagoNominaFilterRequest;
+import com.sanfrancisco.api.modules.rrhh.dto.response.CalculoNominaResponse;
 import com.sanfrancisco.api.modules.rrhh.dto.response.PagoNominaResponse;
 import com.sanfrancisco.api.modules.rrhh.service.interfaces.PagoNominaService;
 import com.sanfrancisco.api.shared.api.ApiResponse;
@@ -27,6 +29,13 @@ public class PagoNominaController {
     public ResponseEntity<ApiResponse<PagoNominaResponse>> create(@Valid @RequestBody CreatePagoNominaRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.ok(pagoNominaService.create(request), "Pago de nómina creado"));
+    }
+
+    /** Preview: calcula la nómina desde la asistencia del periodo sin persistir. */
+    @PostMapping("/calcular")
+    public ApiResponse<CalculoNominaResponse> calcular(@Valid @RequestBody CalcularNominaRequest request) {
+        return ApiResponse.ok(pagoNominaService.calcularDesdeAsistencia(request),
+                "Cálculo de nómina generado desde la asistencia");
     }
 
     @PatchMapping("/{id}/estado")

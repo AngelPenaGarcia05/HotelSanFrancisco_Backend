@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface DetalleHorarioService {
     DetalleHorarioResponse asignar(AsignarHorarioRequest request);
-    DetalleHorarioResponse update(Integer usuarioId, Integer horarioId, AsignarHorarioRequest request);
-    void remover(Integer usuarioId, Integer horarioId);
+    DetalleHorarioResponse update(Integer detalleHorarioId, AsignarHorarioRequest request);
+    void remover(Integer detalleHorarioId);
     List<DetalleHorarioResponse> findByUsuarioId(Integer usuarioId);
 }
