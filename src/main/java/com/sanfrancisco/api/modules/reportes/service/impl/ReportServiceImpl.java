@@ -5,6 +5,7 @@ import com.sanfrancisco.api.modules.pagos.enums.TipoPago;
 import com.sanfrancisco.api.modules.pagos.repository.PagoRepository;
 import com.sanfrancisco.api.modules.recepcion.entity.Reserva;
 import com.sanfrancisco.api.modules.recepcion.entity.ReservaHabitacion;
+import com.sanfrancisco.api.modules.recepcion.enums.EstadoHabitacion;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
 import com.sanfrancisco.api.modules.recepcion.repository.HabitacionRepository;
 import com.sanfrancisco.api.modules.recepcion.repository.ReservaHabitacionRepository;
@@ -37,6 +38,16 @@ import java.util.stream.Stream;
 public class ReportServiceImpl implements ReportService {
 
     private static final BigDecimal CIEN = BigDecimal.valueOf(100);
+
+    /**
+     * Estados de habitación fuera de servicio (OOO): no forman parte del
+     * inventario vendible, por lo que se excluyen del denominador de ocupación
+     * y RevPAR (estándar STR/USALI). LIMPIEZA sí es vendible (rotación normal).
+     * Nota: el estado es el actual, no histórico; para rangos pasados es una
+     * aproximación del inventario vendible de hoy.
+     */
+    private static final List<EstadoHabitacion> ESTADOS_NO_VENDIBLES =
+            List.of(EstadoHabitacion.MANTENIMIENTO, EstadoHabitacion.BLOQUEADA);
 
     private final PagoRepository pagoRepository;
     private final ReservaRepository reservaRepository;
@@ -181,7 +192,7 @@ public class ReportServiceImpl implements ReportService {
     public OccupancyReportResponse buildOccupancyReport(ReportRangeRequest range) {
         LocalDate desde = range.resolveDesde();
         LocalDate hasta = range.resolveHasta();
-        long totalHabitaciones = Math.max(1, habitacionRepository.count());
+        long totalHabitaciones = Math.max(1, habitacionRepository.countByEstadoNotIn(ESTADOS_NO_VENDIBLES));
         long dias = Math.max(1, ChronoUnit.DAYS.between(desde, hasta) + 1);
 
         List<ReservaHabitacion> ocupaciones = reservaHabitacionRepository.findSolapadasConRango(desde, hasta);
@@ -218,7 +229,7 @@ public class ReportServiceImpl implements ReportService {
 
         // Inventario real de habitaciones por tipo (denominador correcto de
         // disponibilidad, en lugar de repartir el total a partes iguales).
-        Map<String, Long> inventarioPorTipo = habitacionRepository.contarPorTipo().stream()
+        Map<String, Long> inventarioPorTipo = habitacionRepository.contarPorTipo(ESTADOS_NO_VENDIBLES).stream()
                 .collect(Collectors.toMap(row -> (String) row[0], row -> (Long) row[1]));
 
         Map<String, List<ReservaHabitacion>> porTipo = ocupaciones.stream()

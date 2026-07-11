@@ -25,16 +25,20 @@ public interface HabitacionRepository extends JpaRepository<Habitacion, Integer>
      * Inventario de habitaciones por tipo: [nombreTipo, cantidad]. Se usa como
      * denominador real de "habitaciones disponibles por tipo" en el reporte de
      * ocupación (estándar STR/USALI), en lugar de repartir el total a partes
-     * iguales entre los tipos.
+     * iguales entre los tipos. Excluye las habitaciones fuera de servicio
+     * (estados OOO) recibidas en {@code estadosExcluir}.
      */
-    @Query("SELECT t.nombre, COUNT(h) FROM Habitacion h JOIN h.tipoHabitacion t GROUP BY t.nombre")
-    List<Object[]> contarPorTipo();
+    @Query("SELECT t.nombre, COUNT(h) FROM Habitacion h JOIN h.tipoHabitacion t "
+            + "WHERE h.estado NOT IN :estadosExcluir GROUP BY t.nombre")
+    List<Object[]> contarPorTipo(@Param("estadosExcluir") Collection<EstadoHabitacion> estadosExcluir);
 
     boolean existsByNumero(String numero);
 
     List<Habitacion> findByEstado(EstadoHabitacion estado);
 
     long countByEstado(EstadoHabitacion estado);
+
+    long countByEstadoNotIn(Collection<EstadoHabitacion> estados);
 
     List<Habitacion> findByEstadoIn(Collection<EstadoHabitacion> estados);
 
