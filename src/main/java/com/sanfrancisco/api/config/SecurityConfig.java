@@ -437,6 +437,8 @@ public class SecurityConfig {
                 // =============================================================
                 .requestMatchers(HttpMethod.GET, EndpointPaths.PAGO_NOMINA_BASE + "/**")
                     .hasAuthority(Permissions.NOMINA_READ)
+                .requestMatchers(HttpMethod.POST, EndpointPaths.PAGO_NOMINA_BASE + "/calcular")
+                    .hasAuthority(Permissions.NOMINA_CREATE)
                 .requestMatchers(HttpMethod.POST, EndpointPaths.PAGO_NOMINA_BASE)
                     .hasAuthority(Permissions.NOMINA_CREATE)
                 .requestMatchers(HttpMethod.PATCH, EndpointPaths.PAGO_NOMINA_BASE + "/**")
