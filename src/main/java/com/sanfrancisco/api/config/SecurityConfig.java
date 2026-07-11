@@ -401,6 +401,14 @@ public class SecurityConfig {
                     .hasAuthority(Permissions.HORARIO_DELETE)
 
                 // =============================================================
+                // MI ASISTENCIA — marcado self-service del empleado autenticado
+                // =============================================================
+                .requestMatchers(HttpMethod.POST, EndpointPaths.MI_ASISTENCIA_BASE + "/**")
+                    .hasAuthority(Permissions.MI_ASISTENCIA_MARCAR)
+                .requestMatchers(HttpMethod.GET, EndpointPaths.MI_ASISTENCIA_BASE + "/**")
+                    .hasAuthority(Permissions.MI_ASISTENCIA_READ)
+
+                // =============================================================
                 // ASISTENCIA
                 // =============================================================
                 .requestMatchers(HttpMethod.GET, EndpointPaths.ASISTENCIA_BASE + "/**")

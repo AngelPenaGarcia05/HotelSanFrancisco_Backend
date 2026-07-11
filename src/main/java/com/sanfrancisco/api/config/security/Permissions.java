@@ -191,6 +191,10 @@ public final class Permissions {
     public static final String ASISTENCIA_UPDATE = "asistencia:update";
     public static final String ASISTENCIA_DELETE = "asistencia:delete";
 
+    // Marcado self-service del propio empleado (clock-in/out)
+    public static final String MI_ASISTENCIA_MARCAR = "mi-asistencia:marcar";
+    public static final String MI_ASISTENCIA_READ   = "mi-asistencia:read";
+
     // =========================================================================
     // NÓMINA (PAGOS DE NÓMINA)
     // =========================================================================

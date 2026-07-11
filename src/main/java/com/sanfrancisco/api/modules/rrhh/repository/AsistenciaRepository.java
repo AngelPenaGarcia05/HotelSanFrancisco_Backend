@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface AsistenciaRepository extends JpaRepository<Asistencia, Integer>,
@@ -17,4 +18,11 @@ public interface AsistenciaRepository extends JpaRepository<Asistencia, Integer>
     List<Asistencia> findByFechaBetween(LocalDate inicio, LocalDate fin);
 
     List<Asistencia> findByUsuarioUsuarioIdAndFechaBetween(Integer usuarioId, LocalDate inicio, LocalDate fin);
+
+    /** Marca del empleado para una fecha (regla: una marca por día). */
+    Optional<Asistencia> findByUsuarioUsuarioIdAndFecha(Integer usuarioId, LocalDate fecha);
+
+    boolean existsByUsuarioUsuarioIdAndFecha(Integer usuarioId, LocalDate fecha);
+
+    List<Asistencia> findByUsuarioUsuarioIdOrderByFechaDesc(Integer usuarioId);
 }
