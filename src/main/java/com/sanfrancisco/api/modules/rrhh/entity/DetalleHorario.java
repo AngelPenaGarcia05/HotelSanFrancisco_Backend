@@ -17,16 +17,18 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class DetalleHorario {
 
-    @EmbeddedId
-    private DetalleHorarioPK id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "detalle_horario_id")
+    private Integer detalleHorarioId;
 
+    @NotNull
     @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("usuarioId")
     @JoinColumn(name = "usuario_id", nullable = false)
     private Usuario usuario;
 
+    @NotNull
     @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("horarioId")
     @JoinColumn(name = "horario_id", nullable = false)
     private Horario horario;
 
@@ -52,7 +54,7 @@ public class DetalleHorario {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof DetalleHorario that)) return false;
-        return id != null && id.equals(that.id);
+        return detalleHorarioId != null && detalleHorarioId.equals(that.detalleHorarioId);
     }
 
     @Override

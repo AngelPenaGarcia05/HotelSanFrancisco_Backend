@@ -5,6 +5,7 @@ import com.sanfrancisco.api.shared.enums.EstadoActivo;
 import java.time.LocalDate;
 
 public record DetalleHorarioResponse(
+        Integer detalleHorarioId,
         Integer usuarioId,
         String usuarioNombreCompleto,
         Integer horarioId,

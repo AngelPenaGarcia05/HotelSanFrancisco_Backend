@@ -5,7 +5,6 @@ import com.sanfrancisco.api.exception.ResourceNotFoundException;
 import com.sanfrancisco.api.modules.rrhh.dto.request.AsignarHorarioRequest;
 import com.sanfrancisco.api.modules.rrhh.dto.response.DetalleHorarioResponse;
 import com.sanfrancisco.api.modules.rrhh.entity.DetalleHorario;
-import com.sanfrancisco.api.modules.rrhh.entity.DetalleHorarioPK;
 import com.sanfrancisco.api.modules.rrhh.entity.Horario;
 import com.sanfrancisco.api.modules.rrhh.mapper.DetalleHorarioMapper;
 import com.sanfrancisco.api.modules.rrhh.repository.DetalleHorarioRepository;
@@ -40,24 +39,15 @@ public class DetalleHorarioServiceImpl implements DetalleHorarioService {
 
     @Override
     public DetalleHorarioResponse asignar(AsignarHorarioRequest request) {
-        DetalleHorarioPK id = new DetalleHorarioPK(request.usuarioId(), request.horarioId());
-        
-        if (detalleHorarioRepository.existsById(id)) {
-            DetalleHorario existente = detalleHorarioRepository.findById(id).get();
-            if (existente.getEstado() == EstadoActivo.ACTIVO) {
-                throw new BusinessException("El usuario ya tiene asignado este horario");
-            } else {
-                existente.setEstado(EstadoActivo.ACTIVO);
-                existente.setDiaSemana(request.diaSemana());
-                existente.setFechaVigenciaInicio(request.fechaVigenciaInicio());
-                existente.setFechaVigenciaFin(request.fechaVigenciaFin());
-                return detalleHorarioMapper.toResponse(detalleHorarioRepository.save(existente));
-            }
+        // Regla de negocio: un empleado hace como máximo un turno ACTIVO por día.
+        if (detalleHorarioRepository.existsByUsuarioUsuarioIdAndDiaSemanaAndEstado(
+                request.usuarioId(), request.diaSemana(), EstadoActivo.ACTIVO)) {
+            throw new BusinessException("El empleado ya tiene un turno asignado ese día de la semana");
         }
 
         Usuario usuario = usuarioRepository.findById(request.usuarioId())
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado: " + request.usuarioId()));
-        
+
         Horario horario = horarioRepository.findById(request.horarioId())
                 .orElseThrow(() -> new ResourceNotFoundException("Horario no encontrado: " + request.horarioId()));
 
@@ -67,21 +57,23 @@ public class DetalleHorarioServiceImpl implements DetalleHorarioService {
     }
 
     @Override
-    public DetalleHorarioResponse update(Integer usuarioId, Integer horarioId, AsignarHorarioRequest request) {
-        DetalleHorarioPK id = new DetalleHorarioPK(usuarioId, horarioId);
-        DetalleHorario detalle = detalleHorarioRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Asignación de horario no encontrada"));
-                
+    public DetalleHorarioResponse update(Integer detalleHorarioId, AsignarHorarioRequest request) {
+        DetalleHorario detalle = obtenerOFallar(detalleHorarioId);
+
+        // Si cambia el día, validar que no colisione con otro turno ACTIVO del mismo empleado.
+        if (request.diaSemana() != null && !request.diaSemana().equals(detalle.getDiaSemana())
+                && detalleHorarioRepository.existsByUsuarioUsuarioIdAndDiaSemanaAndEstado(
+                        detalle.getUsuario().getUsuarioId(), request.diaSemana(), EstadoActivo.ACTIVO)) {
+            throw new BusinessException("El empleado ya tiene un turno asignado ese día de la semana");
+        }
+
         detalleHorarioMapper.updateEntity(detalle, request);
         return detalleHorarioMapper.toResponse(detalleHorarioRepository.save(detalle));
     }
 
     @Override
-    public void remover(Integer usuarioId, Integer horarioId) {
-        DetalleHorarioPK id = new DetalleHorarioPK(usuarioId, horarioId);
-        DetalleHorario detalle = detalleHorarioRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Asignación de horario no encontrada"));
-        
+    public void remover(Integer detalleHorarioId) {
+        DetalleHorario detalle = obtenerOFallar(detalleHorarioId);
         detalle.setEstado(EstadoActivo.INACTIVO);
         detalleHorarioRepository.save(detalle);
     }
@@ -89,8 +81,13 @@ public class DetalleHorarioServiceImpl implements DetalleHorarioService {
     @Override
     @Transactional(readOnly = true)
     public List<DetalleHorarioResponse> findByUsuarioId(Integer usuarioId) {
-        return detalleHorarioRepository.findByIdUsuarioId(usuarioId).stream()
+        return detalleHorarioRepository.findByUsuarioUsuarioId(usuarioId).stream()
                 .map(detalleHorarioMapper::toResponse)
                 .toList();
+    }
+
+    private DetalleHorario obtenerOFallar(Integer detalleHorarioId) {
+        return detalleHorarioRepository.findById(detalleHorarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Asignación de horario no encontrada: " + detalleHorarioId));
     }
 }
