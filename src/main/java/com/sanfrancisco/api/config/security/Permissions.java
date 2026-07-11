@@ -220,6 +220,14 @@ public final class Permissions {
     public static final String ASIGNACION_HORARIO_DELETE = "asignacion-horario:delete";
 
     // =========================================================================
+    // TURNOS (planificación de personal con fecha concreta)
+    // =========================================================================
+    public static final String TURNOS_GENERAR = "turnos:generar";
+    public static final String TURNOS_READ    = "turnos:read";
+    public static final String TURNOS_UPDATE  = "turnos:update";
+    public static final String TURNOS_DELETE  = "turnos:delete";
+
+    // =========================================================================
     // AUDITORÍA
     // =========================================================================
     public static final String AUDITORIA_READ = "auditoria:read";

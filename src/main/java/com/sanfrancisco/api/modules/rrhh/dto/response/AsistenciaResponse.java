@@ -17,6 +17,7 @@ public record AsistenciaResponse(
         String observaciones,
         Integer usuarioId,
         String usuarioNombreCompleto,
+        Integer turnoId,
         LocalDateTime fechaCreacion,
         LocalDateTime fechaModificacion
 ) {

@@ -401,6 +401,18 @@ public class SecurityConfig {
                     .hasAuthority(Permissions.HORARIO_DELETE)
 
                 // =============================================================
+                // TURNOS — planificación de personal (ADMIN / RRHH)
+                // =============================================================
+                .requestMatchers(HttpMethod.POST, EndpointPaths.TURNO_BASE + "/generar")
+                    .hasAuthority(Permissions.TURNOS_GENERAR)
+                .requestMatchers(HttpMethod.GET, EndpointPaths.TURNO_BASE + "/**")
+                    .hasAuthority(Permissions.TURNOS_READ)
+                .requestMatchers(HttpMethod.PATCH, EndpointPaths.TURNO_BASE + "/**")
+                    .hasAuthority(Permissions.TURNOS_UPDATE)
+                .requestMatchers(HttpMethod.DELETE, EndpointPaths.TURNO_BASE + "/**")
+                    .hasAuthority(Permissions.TURNOS_DELETE)
+
+                // =============================================================
                 // MI ASISTENCIA — marcado self-service del empleado autenticado
                 // =============================================================
                 .requestMatchers(HttpMethod.POST, EndpointPaths.MI_ASISTENCIA_BASE + "/**")

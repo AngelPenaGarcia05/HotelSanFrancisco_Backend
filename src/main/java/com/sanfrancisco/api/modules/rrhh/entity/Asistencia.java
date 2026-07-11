@@ -52,6 +52,11 @@ public class Asistencia extends AuditedEntity {
     @JoinColumn(name = "usuario_id", nullable = false)
     private Usuario usuario;
 
+    /** Turno planificado de ese día (si existe); permite cruzar marca real vs planificado. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "turno_id")
+    private Turno turno;
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

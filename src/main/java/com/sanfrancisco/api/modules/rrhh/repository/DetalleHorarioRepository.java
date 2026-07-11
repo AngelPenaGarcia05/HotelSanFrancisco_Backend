@@ -20,4 +20,7 @@ public interface DetalleHorarioRepository extends JpaRepository<DetalleHorario, 
 
     /** Verifica si el empleado ya tiene un turno ACTIVO asignado ese día (regla: 1 turno/día). */
     boolean existsByUsuarioUsuarioIdAndDiaSemanaAndEstado(Integer usuarioId, Integer diaSemana, EstadoActivo estado);
+
+    /** Plantilla vigente: todas las asignaciones en un estado dado (p. ej. ACTIVO). */
+    List<DetalleHorario> findByEstado(EstadoActivo estado);
 }

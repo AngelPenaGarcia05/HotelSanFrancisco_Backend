@@ -7,9 +7,12 @@ import com.sanfrancisco.api.modules.rrhh.dto.request.CreateAsistenciaRequest;
 import com.sanfrancisco.api.modules.rrhh.dto.request.UpdateAsistenciaRequest;
 import com.sanfrancisco.api.modules.rrhh.dto.response.AsistenciaResponse;
 import com.sanfrancisco.api.modules.rrhh.entity.Asistencia;
+import com.sanfrancisco.api.modules.rrhh.entity.Turno;
+import com.sanfrancisco.api.modules.rrhh.enums.EstadoTurno;
 import com.sanfrancisco.api.modules.rrhh.enums.TipoAsistencia;
 import com.sanfrancisco.api.modules.rrhh.mapper.AsistenciaMapper;
 import com.sanfrancisco.api.modules.rrhh.repository.AsistenciaRepository;
+import com.sanfrancisco.api.modules.rrhh.repository.TurnoRepository;
 import com.sanfrancisco.api.modules.rrhh.service.interfaces.AsistenciaService;
 import com.sanfrancisco.api.modules.rrhh.specification.AsistenciaSpecification;
 import com.sanfrancisco.api.modules.rrhh.websocket.AsistenciaEventPublisher;
@@ -32,17 +35,23 @@ import java.util.List;
 @Transactional
 public class AsistenciaServiceImpl implements AsistenciaService {
 
+    /** Minutos de tolerancia antes de marcar TARDANZA respecto a la hora de inicio del turno. */
+    private static final long TOLERANCIA_TARDANZA_MIN = 5;
+
     private final AsistenciaRepository asistenciaRepository;
     private final UsuarioRepository usuarioRepository;
+    private final TurnoRepository turnoRepository;
     private final AsistenciaMapper asistenciaMapper;
     private final AsistenciaEventPublisher eventPublisher;
 
     public AsistenciaServiceImpl(AsistenciaRepository asistenciaRepository,
                                  UsuarioRepository usuarioRepository,
+                                 TurnoRepository turnoRepository,
                                  AsistenciaMapper asistenciaMapper,
                                  AsistenciaEventPublisher eventPublisher) {
         this.asistenciaRepository = asistenciaRepository;
         this.usuarioRepository = usuarioRepository;
+        this.turnoRepository = turnoRepository;
         this.asistenciaMapper = asistenciaMapper;
         this.eventPublisher = eventPublisher;
     }
@@ -108,11 +117,28 @@ public class AsistenciaServiceImpl implements AsistenciaService {
         Usuario usuario = usuarioRepository.findById(usuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado: " + usuarioId));
 
+        LocalTime ingreso = LocalTime.now().truncatedTo(ChronoUnit.SECONDS);
+
+        // Cruce con el turno planificado del día (si existe y no está cancelado):
+        // deriva TARDANZA y confirma el turno.
+        Turno turno = turnoRepository.findByUsuarioUsuarioIdAndFecha(usuarioId, hoy)
+                .filter(t -> t.getEstado() != EstadoTurno.CANCELADO)
+                .orElse(null);
+
+        TipoAsistencia tipo = TipoAsistencia.NORMAL;
+        if (turno != null) {
+            if (ingreso.isAfter(turno.getHoraInicio().plusMinutes(TOLERANCIA_TARDANZA_MIN))) {
+                tipo = TipoAsistencia.TARDANZA;
+            }
+            turno.setEstado(EstadoTurno.CONFIRMADO);
+        }
+
         Asistencia entity = Asistencia.builder()
                 .fecha(hoy)
-                .horaIngreso(LocalTime.now().truncatedTo(ChronoUnit.SECONDS))
-                .tipo(TipoAsistencia.NORMAL) // La Fase 3 derivará TARDANZA contra el turno planificado
+                .horaIngreso(ingreso)
+                .tipo(tipo)
                 .usuario(usuario)
+                .turno(turno)
                 .build();
 
         Asistencia saved = asistenciaRepository.save(entity);
