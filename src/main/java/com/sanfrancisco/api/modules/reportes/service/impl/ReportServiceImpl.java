@@ -16,6 +16,7 @@ import com.sanfrancisco.api.modules.reportes.dto.response.ManagementDashboardRes
 import com.sanfrancisco.api.modules.reportes.dto.response.OccupancyReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.ReservationsReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.RevenueReportResponse;
+import com.sanfrancisco.api.modules.reportes.export.ExcelReportExporter;
 import com.sanfrancisco.api.modules.reportes.service.interfaces.ReportService;
 import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import org.springframework.stereotype.Service;
@@ -53,15 +54,18 @@ public class ReportServiceImpl implements ReportService {
     private final ReservaRepository reservaRepository;
     private final ReservaHabitacionRepository reservaHabitacionRepository;
     private final HabitacionRepository habitacionRepository;
+    private final ExcelReportExporter excelExporter;
 
     public ReportServiceImpl(PagoRepository pagoRepository,
                               ReservaRepository reservaRepository,
                               ReservaHabitacionRepository reservaHabitacionRepository,
-                              HabitacionRepository habitacionRepository) {
+                              HabitacionRepository habitacionRepository,
+                              ExcelReportExporter excelExporter) {
         this.pagoRepository = pagoRepository;
         this.reservaRepository = reservaRepository;
         this.reservaHabitacionRepository = reservaHabitacionRepository;
         this.habitacionRepository = habitacionRepository;
+        this.excelExporter = excelExporter;
     }
 
     // =====================================================================
@@ -316,14 +320,34 @@ public class ReportServiceImpl implements ReportService {
     @Override
     public byte[] exportar(ExportReporteRequest request) {
         ReportRangeRequest range = request.toRangeRequest();
-        String csv = switch (request.tipo() == null ? "" : request.tipo().toLowerCase()) {
+        String tipo = request.tipo() == null ? "" : request.tipo().toLowerCase();
+        return switch (request.formatoNormalizado()) {
+            case "CSV" -> exportarCsv(tipo, range);
+            case "EXCEL" -> exportarExcel(tipo, range);
+            case "PDF" -> throw new IllegalArgumentException("Formato PDF aún no disponible");
+            default -> throw new IllegalArgumentException("Formato no válido: " + request.formato());
+        };
+    }
+
+    private byte[] exportarCsv(String tipo, ReportRangeRequest range) {
+        String csv = switch (tipo) {
             case "ingresos" -> buildIngresosCSV(buildRevenueReport(range));
             case "reservas" -> buildReservasCSV(buildReservationsReport(range));
             case "ocupacion" -> buildOcupacionCSV(buildOccupancyReport(range));
             case "gerencial" -> buildGerencialCSV(buildManagementDashboard(range));
-            default -> throw new IllegalArgumentException("Tipo de reporte no válido: " + request.tipo());
+            default -> throw new IllegalArgumentException("Tipo de reporte no válido: " + tipo);
         };
         return csv.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private byte[] exportarExcel(String tipo, ReportRangeRequest range) {
+        return switch (tipo) {
+            case "ingresos" -> excelExporter.ingresos(buildRevenueReport(range));
+            case "reservas" -> excelExporter.reservas(buildReservationsReport(range));
+            case "ocupacion" -> excelExporter.ocupacion(buildOccupancyReport(range));
+            case "gerencial" -> excelExporter.gerencial(buildManagementDashboard(range));
+            default -> throw new IllegalArgumentException("Tipo de reporte no válido: " + tipo);
+        };
     }
 
     private String buildIngresosCSV(RevenueReportResponse r) {

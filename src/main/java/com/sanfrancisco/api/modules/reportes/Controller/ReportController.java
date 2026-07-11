@@ -49,12 +49,18 @@ public class ReportController {
 
     @PostMapping("/exportar")
     public ResponseEntity<byte[]> exportar(@RequestBody ExportReporteRequest request) {
-        byte[] csv = reportService.exportar(request);
+        byte[] contenido = reportService.exportar(request);
+        String[] meta = switch (request.formatoNormalizado()) {
+            case "PDF" -> new String[]{"pdf", "application/pdf"};
+            case "EXCEL" -> new String[]{"xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"};
+            default -> new String[]{"csv", "text/csv; charset=UTF-8"};
+        };
         String filename = "reporte-" + (request.tipo() != null ? request.tipo() : "general")
-                + "-" + DateTimeUtils.today() + ".csv";
+                + "-" + DateTimeUtils.today() + "." + meta[0];
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.parseMediaType("text/csv; charset=UTF-8"));
+        headers.setContentType(MediaType.parseMediaType(meta[1]));
         headers.setContentDisposition(ContentDisposition.attachment().filename(filename).build());
-        return ResponseEntity.ok().headers(headers).body(csv);
+        return ResponseEntity.ok().headers(headers).body(contenido);
     }
 }
