@@ -2,6 +2,7 @@ package com.sanfrancisco.api.modules.notificacionescliente.controller;
 
 import com.sanfrancisco.api.modules.notificacionescliente.dto.response.NotificacionHuespedResponse;
 import com.sanfrancisco.api.modules.notificacionescliente.service.interfaces.NotificacionClienteService;
+import com.sanfrancisco.api.shared.api.ApiResponse;
 import com.sanfrancisco.api.shared.api.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,16 +30,16 @@ public class NotificacionClienteController {
     @Operation(summary = "Listar mis notificaciones",
             description = "Devuelve las notificaciones del cliente autenticado, ordenadas por fecha descendente.")
     @GetMapping
-    public PageResponse<NotificacionHuespedResponse> listarMias(
+    public ResponseEntity<ApiResponse<PageResponse<NotificacionHuespedResponse>>> listarMias(
             @PageableDefault(size = 100, sort = "fechaCreacion", direction = Sort.Direction.DESC) Pageable pageable) {
-        return PageResponse.from(service.getMias(pageable));
+        return ResponseEntity.ok(ApiResponse.ok(PageResponse.from(service.getMias(pageable))));
     }
 
     @Operation(summary = "Marcar todas como leídas",
             description = "Marca como leídas todas las notificaciones del cliente autenticado.")
     @PatchMapping("/leer-todas")
-    public ResponseEntity<Void> leerTodas() {
+    public ResponseEntity<ApiResponse<Void>> leerTodas() {
         service.marcarTodasLeidas();
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.message("Notificaciones marcadas como leídas"));
     }
 }
