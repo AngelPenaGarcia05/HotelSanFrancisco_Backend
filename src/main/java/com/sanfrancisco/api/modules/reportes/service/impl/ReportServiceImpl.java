@@ -203,8 +203,10 @@ public class ReportServiceImpl implements ReportService {
                 ? BigDecimal.ZERO
                 : promedio(serie.stream().map(OccupancyReportResponse.OccupancyPoint::porcentajeOcupacion).toList());
 
-        long nochesOcupadasTotal = ocupaciones.stream().mapToLong(ReservaHabitacion::getNoches).sum();
-        BigDecimal ingresosTotal = ocupaciones.stream().map(ReservaHabitacion::getSubtotal)
+        long nochesOcupadasTotal = ocupaciones.stream()
+                .mapToLong(rh -> nochesEnRango(rh, desde, hasta)).sum();
+        BigDecimal ingresosTotal = ocupaciones.stream()
+                .map(rh -> ingresoEnRango(rh, desde, hasta))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal adrPromedio = nochesOcupadasTotal == 0
                 ? BigDecimal.ZERO
@@ -222,8 +224,9 @@ public class ReportServiceImpl implements ReportService {
         List<OccupancyReportResponse.OccupancyByRoomType> porTipoHabitacion = porTipo.entrySet().stream()
                 .map(e -> {
                     List<ReservaHabitacion> lista = e.getValue();
-                    long noches = lista.stream().mapToLong(ReservaHabitacion::getNoches).sum();
-                    BigDecimal ingresos = lista.stream().map(ReservaHabitacion::getSubtotal)
+                    long noches = lista.stream().mapToLong(rh -> nochesEnRango(rh, desde, hasta)).sum();
+                    BigDecimal ingresos = lista.stream()
+                            .map(rh -> ingresoEnRango(rh, desde, hasta))
                             .reduce(BigDecimal.ZERO, BigDecimal::add);
                     long disponibles = habitacionesPorTipoDefault * dias;
                     BigDecimal pctOcup = disponibles == 0 ? BigDecimal.ZERO
@@ -444,6 +447,37 @@ public class ReportServiceImpl implements ReportService {
         Reserva reserva = rh.getReserva();
         if (reserva == null) return false;
         return !dia.isBefore(reserva.getFechaInicio()) && dia.isBefore(reserva.getFechaFin());
+    }
+
+    /**
+     * Noches de la reserva-habitación que caen DENTRO del rango [desde, hasta].
+     * Estándar STR/USALI: las room-nights se prorratean al período reportado, no se
+     * cuenta la estancia completa. Una noche corresponde al día {@code d} tal que
+     * fechaInicio <= d < fechaFin (check-out exclusivo).
+     */
+    private long nochesEnRango(ReservaHabitacion rh, LocalDate desde, LocalDate hasta) {
+        Reserva reserva = rh.getReserva();
+        if (reserva == null) return 0;
+        LocalDate inicio = reserva.getFechaInicio().isAfter(desde) ? reserva.getFechaInicio() : desde;
+        LocalDate finExclusivo = reserva.getFechaFin().isBefore(hasta.plusDays(1))
+                ? reserva.getFechaFin() : hasta.plusDays(1);
+        long noches = ChronoUnit.DAYS.between(inicio, finExclusivo);
+        return Math.max(0, noches);
+    }
+
+    /**
+     * Ingreso de habitación atribuible a las noches dentro del rango: tarifa por noche
+     * (subtotal / noches totales de la estancia) multiplicada por las noches en rango.
+     * Mantiene ADR/RevPAR consistentes con el período (STR/USALI).
+     */
+    private BigDecimal ingresoEnRango(ReservaHabitacion rh, LocalDate desde, LocalDate hasta) {
+        int nochesTotales = rh.getNoches();
+        if (nochesTotales <= 0 || rh.getSubtotal() == null) return BigDecimal.ZERO;
+        long nochesRango = nochesEnRango(rh, desde, hasta);
+        if (nochesRango == 0) return BigDecimal.ZERO;
+        return rh.getSubtotal()
+                .multiply(BigDecimal.valueOf(nochesRango))
+                .divide(BigDecimal.valueOf(nochesTotales), 2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal sumarPorTipo(List<Pago> pagos, TipoPago tipo) {
