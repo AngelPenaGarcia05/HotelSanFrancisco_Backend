@@ -216,19 +216,23 @@ public class ReportServiceImpl implements ReportService {
                 ? BigDecimal.ZERO
                 : ingresosTotal.divide(BigDecimal.valueOf(nochesDisponiblesTotal), 2, RoundingMode.HALF_UP);
 
+        // Inventario real de habitaciones por tipo (denominador correcto de
+        // disponibilidad, en lugar de repartir el total a partes iguales).
+        Map<String, Long> inventarioPorTipo = habitacionRepository.contarPorTipo().stream()
+                .collect(Collectors.toMap(row -> (String) row[0], row -> (Long) row[1]));
+
         Map<String, List<ReservaHabitacion>> porTipo = ocupaciones.stream()
                 .collect(Collectors.groupingBy(rh -> rh.getTipoHabitacion().getNombre()));
-
-        long habitacionesPorTipoDefault = porTipo.isEmpty() ? totalHabitaciones : totalHabitaciones / Math.max(1, porTipo.size());
 
         List<OccupancyReportResponse.OccupancyByRoomType> porTipoHabitacion = porTipo.entrySet().stream()
                 .map(e -> {
                     List<ReservaHabitacion> lista = e.getValue();
+                    long habitacionesTipo = inventarioPorTipo.getOrDefault(e.getKey(), 0L);
                     long noches = lista.stream().mapToLong(rh -> nochesEnRango(rh, desde, hasta)).sum();
                     BigDecimal ingresos = lista.stream()
                             .map(rh -> ingresoEnRango(rh, desde, hasta))
                             .reduce(BigDecimal.ZERO, BigDecimal::add);
-                    long disponibles = habitacionesPorTipoDefault * dias;
+                    long disponibles = habitacionesTipo * dias;
                     BigDecimal pctOcup = disponibles == 0 ? BigDecimal.ZERO
                             : BigDecimal.valueOf(noches).multiply(CIEN)
                                 .divide(BigDecimal.valueOf(disponibles), 1, RoundingMode.HALF_UP);
@@ -237,7 +241,7 @@ public class ReportServiceImpl implements ReportService {
                     BigDecimal revpar = disponibles == 0 ? BigDecimal.ZERO
                             : ingresos.divide(BigDecimal.valueOf(disponibles), 2, RoundingMode.HALF_UP);
                     return new OccupancyReportResponse.OccupancyByRoomType(
-                            e.getKey(), habitacionesPorTipoDefault, disponibles, noches, pctOcup, adr, revpar);
+                            e.getKey(), habitacionesTipo, disponibles, noches, pctOcup, adr, revpar);
                 })
                 .sorted(Comparator.comparing(OccupancyReportResponse.OccupancyByRoomType::nochesOcupadas).reversed())
                 .toList();
