@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+    <meta charset="utf-8" />
+    <style>
+        @page {
+            size: A4;
+            margin: 1.8cm 1.6cm;
+            @bottom-center {
+                content: "Hotel San Francisco — Reporte gerencial";
+                font-size: 8px;
+                color: #999;
+            }
+            @bottom-right {
+                content: "Página " counter(page) " de " counter(pages);
+                font-size: 8px;
+                color: #999;
+            }
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            color: #2b2b2b;
+            font-size: 11px;
+            margin: 0;
+        }
+        .header {
+            border-bottom: 2px solid #a67c3d;
+            padding-bottom: 10px;
+            margin-bottom: 16px;
+        }
+        .header .brand { font-size: 18px; font-weight: bold; color: #a67c3d; }
+        .header .subtitle { font-size: 13px; font-weight: bold; margin-top: 2px; }
+        .header .meta { font-size: 9px; color: #777; margin-top: 4px; }
+        h2 {
+            font-size: 12px;
+            color: #a67c3d;
+            border-bottom: 1px solid #e3d9c6;
+            padding-bottom: 3px;
+            margin: 18px 0 8px 0;
+        }
+        .kpi-grid { width: 100%; border-collapse: collapse; }
+        .kpi-grid td {
+            width: 25%;
+            border: 1px solid #e3d9c6;
+            padding: 8px;
+            vertical-align: top;
+        }
+        .kpi-label { font-size: 8px; color: #888; text-transform: uppercase; letter-spacing: .5px; }
+        .kpi-value { font-size: 15px; font-weight: bold; margin-top: 3px; }
+        .kpi-delta { font-size: 8px; margin-top: 2px; color: #777; }
+        table.data { width: 100%; border-collapse: collapse; margin-top: 6px; }
+        table.data th {
+            background: #f3ede1;
+            text-align: left;
+            font-size: 9px;
+            text-transform: uppercase;
+            color: #7a6a4a;
+            padding: 5px 7px;
+            border-bottom: 1px solid #e3d9c6;
+        }
+        table.data td {
+            padding: 4px 7px;
+            border-bottom: 1px solid #efe9dd;
+        }
+        table.data td.num { text-align: right; }
+        .muted { color: #999; font-style: italic; }
+        table.layout { width: 100%; border-collapse: collapse; margin-top: 6px; }
+        table.layout td { vertical-align: top; }
+        td.tablecell { width: 320px; padding-right: 12px; }
+        td.chartcell { width: 260px; text-align: center; }
+        img.chart { width: 250px; height: 183px; }
+        img.chart-wide { width: 100%; max-width: 520px; margin-top: 8px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <table style="width:100%; border-collapse:collapse;">
+        <tr>
+            <td style="width:64px; vertical-align:middle;">
+                <img th:if="${logo}" th:src="${logo}" alt="Logo Hotel San Francisco"
+                     style="width:52px; height:52px;" />
+            </td>
+            <td style="vertical-align:middle;">
+                <div class="brand">Hotel San Francisco</div>
+                <div class="subtitle" th:text="${titulo}">Reporte</div>
+                <div class="meta">
+                    Generado el <span th:text="${generadoEn}">--</span>
+                    &#160;·&#160; por <span th:text="${generadoPor}">--</span>
+                </div>
+            </td>
+        </tr>
+    </table>
+</div>
+
+<!-- ============ KPIs ============ -->
+<table class="kpi-grid">
+    <tr>
+        <td>
+            <div class="kpi-label">Ingresos mes actual</div>
+            <div class="kpi-value">S/ <span th:text="${#numbers.formatDecimal(kpis.ingresosMesActual,1,'COMMA',2,'POINT')}">0.00</span></div>
+            <div class="kpi-delta">Mes anterior: S/ <span th:text="${#numbers.formatDecimal(kpis.ingresosMesAnterior,1,'COMMA',2,'POINT')}">0.00</span>
+                (<span th:text="${#numbers.formatDecimal(kpis.variacionIngresos,1,'COMMA',1,'POINT')}">0</span>%)</div>
+        </td>
+        <td>
+            <div class="kpi-label">Ocupación actual</div>
+            <div class="kpi-value"><span th:text="${#numbers.formatDecimal(kpis.ocupacionActual,1,'COMMA',1,'POINT')}">0</span>%</div>
+            <div class="kpi-delta">Mes anterior: <span th:text="${#numbers.formatDecimal(kpis.ocupacionMesAnterior,1,'COMMA',1,'POINT')}">0</span>%
+                (<span th:text="${#numbers.formatDecimal(kpis.variacionOcupacion,1,'COMMA',1,'POINT')}">0</span>%)</div>
+        </td>
+        <td>
+            <div class="kpi-label">ADR</div>
+            <div class="kpi-value">S/ <span th:text="${#numbers.formatDecimal(kpis.adrActual,1,'COMMA',2,'POINT')}">0.00</span></div>
+            <div class="kpi-delta">Tarifa promedio diaria</div>
+        </td>
+        <td>
+            <div class="kpi-label">RevPAR</div>
+            <div class="kpi-value">S/ <span th:text="${#numbers.formatDecimal(kpis.revparActual,1,'COMMA',2,'POINT')}">0.00</span></div>
+            <div class="kpi-delta">Ingreso por hab. disponible</div>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <div class="kpi-label">Reservas activas</div>
+            <div class="kpi-value" th:text="${#numbers.formatInteger(kpis.reservasActivas,1,'COMMA')}">0</div>
+        </td>
+        <td>
+            <div class="kpi-label">Pendientes de pago</div>
+            <div class="kpi-value" th:text="${#numbers.formatInteger(kpis.reservasPendientesPago,1,'COMMA')}">0</div>
+        </td>
+        <td>
+            <div class="kpi-label">Cancelaciones del mes</div>
+            <div class="kpi-value" th:text="${#numbers.formatInteger(kpis.cancelacionesMes,1,'COMMA')}">0</div>
+        </td>
+        <td></td>
+    </tr>
+</table>
+
+<!-- ============ Ingresos ============ -->
+<h2>Ingresos del mes</h2>
+<table class="data">
+    <tr>
+        <th>Total ingresos</th><th>Anticipos</th><th>Saldos</th><th>Reembolsos</th><th>Prom. diario</th>
+    </tr>
+    <tr>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ingresos.totalIngresos,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ingresos.totalAnticipos,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ingresos.totalSaldos,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ingresos.totalReembolsos,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ingresos.ingresoPromedioDiario,1,'COMMA',2,'POINT')}">0.00</span></td>
+    </tr>
+</table>
+
+<table class="layout" th:if="${!ingresos.porMetodoPago.isEmpty()}">
+    <tr>
+        <td class="tablecell">
+            <table class="data">
+                <tr><th>Método de pago</th><th>Monto</th><th>Porcentaje</th></tr>
+                <tr th:each="m : ${ingresos.porMetodoPago}">
+                    <td th:text="${m.metodoPago}">Método</td>
+                    <td class="num">S/ <span th:text="${#numbers.formatDecimal(m.monto,1,'COMMA',2,'POINT')}">0.00</span></td>
+                    <td class="num"><span th:text="${#numbers.formatDecimal(m.porcentaje,1,'COMMA',1,'POINT')}">0</span>%</td>
+                </tr>
+            </table>
+        </td>
+        <td class="chartcell">
+            <img class="chart" th:if="${chartMetodoPago}" th:src="${chartMetodoPago}" alt="Ingresos por método de pago" />
+        </td>
+    </tr>
+</table>
+
+<!-- ============ Reservas ============ -->
+<h2>Reservas del mes</h2>
+<table class="data">
+    <tr><th>Total</th><th>Canceladas</th><th>Tasa cancelación</th><th>Estancia prom.</th></tr>
+    <tr>
+        <td class="num" th:text="${#numbers.formatInteger(reservas.totalReservas,1,'COMMA')}">0</td>
+        <td class="num" th:text="${#numbers.formatInteger(reservas.totalCanceladas,1,'COMMA')}">0</td>
+        <td class="num"><span th:text="${#numbers.formatDecimal(reservas.tasaCancelacion,1,'COMMA',1,'POINT')}">0</span>%</td>
+        <td class="num"><span th:text="${#numbers.formatDecimal(reservas.estanciaPromedioNoches,1,'COMMA',1,'POINT')}">0</span> noches</td>
+    </tr>
+</table>
+
+<table class="layout" th:if="${!reservas.porEstado.isEmpty()}">
+    <tr>
+        <td class="tablecell">
+            <table class="data">
+                <tr><th>Estado</th><th>Cantidad</th><th>Porcentaje</th></tr>
+                <tr th:each="s : ${reservas.porEstado}">
+                    <td th:text="${s.estado}">Estado</td>
+                    <td class="num" th:text="${#numbers.formatInteger(s.cantidad,1,'COMMA')}">0</td>
+                    <td class="num"><span th:text="${#numbers.formatDecimal(s.porcentaje,1,'COMMA',1,'POINT')}">0</span>%</td>
+                </tr>
+            </table>
+        </td>
+        <td class="chartcell">
+            <img class="chart" th:if="${chartReservasEstado}" th:src="${chartReservasEstado}" alt="Reservas por estado" />
+        </td>
+    </tr>
+</table>
+
+<!-- ============ Ocupación ============ -->
+<h2>Ocupación del mes</h2>
+<table class="data">
+    <tr><th>Ocupación promedio</th><th>ADR promedio</th><th>RevPAR promedio</th></tr>
+    <tr>
+        <td class="num"><span th:text="${#numbers.formatDecimal(ocupacion.ocupacionPromedio,1,'COMMA',1,'POINT')}">0</span>%</td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ocupacion.adrPromedio,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ocupacion.revparPromedio,1,'COMMA',2,'POINT')}">0.00</span></td>
+    </tr>
+</table>
+
+<img class="chart-wide" th:if="${chartOcupacionDiaria}" th:src="${chartOcupacionDiaria}" alt="Curva de ocupación diaria" />
+
+<table class="layout" th:if="${!ocupacion.porTipoHabitacion.isEmpty()}">
+    <tr>
+        <td class="tablecell">
+            <table class="data">
+                <tr>
+                    <th>Tipo</th><th>Hab.</th><th>Noches</th><th>% Ocup.</th><th>ADR</th><th>RevPAR</th>
+                </tr>
+                <tr th:each="t : ${ocupacion.porTipoHabitacion}">
+                    <td th:text="${t.tipoHabitacion}">Tipo</td>
+                    <td class="num" th:text="${#numbers.formatInteger(t.habitacionesTotal,1,'COMMA')}">0</td>
+                    <td class="num" th:text="${#numbers.formatInteger(t.nochesOcupadas,1,'COMMA')}">0</td>
+                    <td class="num"><span th:text="${#numbers.formatDecimal(t.porcentajeOcupacion,1,'COMMA',1,'POINT')}">0</span>%</td>
+                    <td class="num">S/ <span th:text="${#numbers.formatDecimal(t.adr,1,'COMMA',2,'POINT')}">0.00</span></td>
+                    <td class="num">S/ <span th:text="${#numbers.formatDecimal(t.revpar,1,'COMMA',2,'POINT')}">0.00</span></td>
+                </tr>
+            </table>
+        </td>
+        <td class="chartcell">
+            <img class="chart" th:if="${chartOcupacionPct}" th:src="${chartOcupacionPct}" alt="% Ocupación por tipo" />
+            <img class="chart" th:if="${chartTarifas}" th:src="${chartTarifas}" alt="ADR y RevPAR por tipo" style="margin-top:8px;" />
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

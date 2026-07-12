@@ -17,6 +17,7 @@ import com.sanfrancisco.api.modules.reportes.dto.response.OccupancyReportRespons
 import com.sanfrancisco.api.modules.reportes.dto.response.ReservationsReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.RevenueReportResponse;
 import com.sanfrancisco.api.modules.reportes.export.ExcelReportExporter;
+import com.sanfrancisco.api.modules.reportes.export.PdfReportExporter;
 import com.sanfrancisco.api.modules.reportes.service.interfaces.ReportService;
 import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import org.springframework.stereotype.Service;
@@ -55,17 +56,20 @@ public class ReportServiceImpl implements ReportService {
     private final ReservaHabitacionRepository reservaHabitacionRepository;
     private final HabitacionRepository habitacionRepository;
     private final ExcelReportExporter excelExporter;
+    private final PdfReportExporter pdfExporter;
 
     public ReportServiceImpl(PagoRepository pagoRepository,
                               ReservaRepository reservaRepository,
                               ReservaHabitacionRepository reservaHabitacionRepository,
                               HabitacionRepository habitacionRepository,
-                              ExcelReportExporter excelExporter) {
+                              ExcelReportExporter excelExporter,
+                              PdfReportExporter pdfExporter) {
         this.pagoRepository = pagoRepository;
         this.reservaRepository = reservaRepository;
         this.reservaHabitacionRepository = reservaHabitacionRepository;
         this.habitacionRepository = habitacionRepository;
         this.excelExporter = excelExporter;
+        this.pdfExporter = pdfExporter;
     }
 
     // =====================================================================
@@ -324,7 +328,7 @@ public class ReportServiceImpl implements ReportService {
         return switch (request.formatoNormalizado()) {
             case "CSV" -> exportarCsv(tipo, range);
             case "EXCEL" -> exportarExcel(tipo, range);
-            case "PDF" -> throw new IllegalArgumentException("Formato PDF aún no disponible");
+            case "PDF" -> exportarPdf(tipo, range);
             default -> throw new IllegalArgumentException("Formato no válido: " + request.formato());
         };
     }
@@ -347,6 +351,14 @@ public class ReportServiceImpl implements ReportService {
             case "ocupacion" -> excelExporter.ocupacion(buildOccupancyReport(range));
             case "gerencial" -> excelExporter.gerencial(buildManagementDashboard(range));
             default -> throw new IllegalArgumentException("Tipo de reporte no válido: " + tipo);
+        };
+    }
+
+    private byte[] exportarPdf(String tipo, ReportRangeRequest range) {
+        return switch (tipo) {
+            case "gerencial" -> pdfExporter.gerencial(buildManagementDashboard(range));
+            default -> throw new IllegalArgumentException(
+                    "Exportación PDF disponible por ahora solo para 'gerencial'; recibido: " + tipo);
         };
     }
 
