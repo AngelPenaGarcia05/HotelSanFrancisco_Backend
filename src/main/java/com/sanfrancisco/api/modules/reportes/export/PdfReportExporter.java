@@ -6,7 +6,9 @@ import com.sanfrancisco.api.modules.reportes.dto.response.OccupancyReportRespons
 import com.sanfrancisco.api.modules.reportes.dto.response.ReservationsReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.RevenueReportResponse;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
+import com.sanfrancisco.api.modules.seguridad.repository.UsuarioRepository;
 import com.sanfrancisco.api.modules.seguridad.security.CustomUserDetails;
+import com.sanfrancisco.api.modules.seguridad.security.UserPrincipal;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -46,11 +48,14 @@ public class PdfReportExporter {
 
     private final TemplateEngine templateEngine;
     private final ChartImageService chartService;
+    private final UsuarioRepository usuarioRepository;
 
     public PdfReportExporter(TemplateEngine reportesTemplateEngine,
-                             ChartImageService chartService) {
+                             ChartImageService chartService,
+                             UsuarioRepository usuarioRepository) {
         this.templateEngine = reportesTemplateEngine;
         this.chartService = chartService;
+        this.usuarioRepository = usuarioRepository;
     }
 
     public byte[] gerencial(ManagementDashboardResponse r) {
@@ -108,6 +113,8 @@ public class PdfReportExporter {
     private void graficosReservas(Context ctx, ReservationsReportResponse r) {
         ctx.setVariable("chartReservasEstado",
                 r.porEstado().isEmpty() ? null : chartService.reservasPorEstado(r.porEstado()));
+        ctx.setVariable("chartCanal",
+                r.porCanal().isEmpty() ? null : chartService.ingresosPorCanal(r.porCanal()));
     }
 
     private void graficosOcupacion(Context ctx, OccupancyReportResponse r) {
@@ -123,24 +130,24 @@ public class PdfReportExporter {
     private String usuarioActual() {
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth == null || !(auth.getPrincipal() instanceof CustomUserDetails cud)) {
-                return "—";
+            if (auth == null) return "—";
+
+            // Resuelve la entidad Usuario según el tipo de principal: el login
+            // por cookie pone un UserPrincipal (solo userId/correo), mientras
+            // que otros flujos usan CustomUserDetails con la entidad completa.
+            Usuario u = null;
+            if (auth.getPrincipal() instanceof CustomUserDetails cud) {
+                u = cud.getUsuario();
+            } else if (auth.getPrincipal() instanceof UserPrincipal up && up.userId() != null) {
+                u = usuarioRepository.findById(up.userId()).orElse(null);
             }
-            Usuario u = cud.getUsuario();
+            if (u == null) return "—";
+
             String nombre = Stream.of(u.getNombre(), u.getApellidoPaterno(), u.getApellidoMaterno())
                     .filter(Objects::nonNull)
                     .filter(s -> !s.isBlank())
                     .collect(Collectors.joining(" "));
-            // El rol se toma de las authorities (evita cargar la relación lazy
-            // de una entidad detached proveniente del token de autenticación).
-            String rol = auth.getAuthorities().stream()
-                    .map(a -> a.getAuthority())
-                    .filter(a -> a.startsWith("ROLE_"))
-                    .map(a -> a.substring(5))
-                    .findFirst()
-                    .orElse(null);
-            if (nombre.isBlank()) return "—";
-            return (rol != null && !rol.isBlank()) ? nombre + " (" + rol + ")" : nombre;
+            return nombre.isBlank() ? "—" : nombre;
         } catch (Exception e) {
             return "—";
         }

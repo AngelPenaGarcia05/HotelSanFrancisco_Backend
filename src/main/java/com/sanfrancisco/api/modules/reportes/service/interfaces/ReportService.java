@@ -17,5 +17,8 @@ public interface ReportService {
 
     ManagementDashboardResponse buildManagementDashboard(ReportRangeRequest range);
 
+    /** Ocupación proyectada para los próximos {@code dias} días (1..90). */
+    OccupancyReportResponse buildOccupancyForecast(int dias);
+
     byte[] exportar(ExportReporteRequest request);
 }

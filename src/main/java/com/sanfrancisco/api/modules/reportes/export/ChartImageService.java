@@ -137,6 +137,15 @@ public class ChartImageService {
         return toDataUri(chart, 520, 220);
     }
 
+    /** Ingresos por canal de venta — dona. */
+    public String ingresosPorCanal(List<ReservationsReportResponse.ReservationsByChannel> canales) {
+        DefaultPieDataset<String> ds = new DefaultPieDataset<>();
+        for (ReservationsReportResponse.ReservationsByChannel c : canales) {
+            ds.setValue(c.canal(), c.ingresos());
+        }
+        return dona(ds, 300, 220);
+    }
+
     /** Reservas por tipo de habitación (cantidad) — dona. */
     public String reservasPorTipo(List<ReservationsReportResponse.ReservationsByRoomType> tipos) {
         DefaultPieDataset<String> ds = new DefaultPieDataset<>();

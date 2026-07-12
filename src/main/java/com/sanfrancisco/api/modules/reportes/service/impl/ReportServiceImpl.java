@@ -32,6 +32,7 @@ import java.util.Comparator;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -140,6 +141,14 @@ public class ReportServiceImpl implements ReportService {
                 : BigDecimal.valueOf(canceladas).multiply(CIEN)
                     .divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP);
 
+        // Ingresos que se dejaron de percibir por cancelaciones y no-shows del
+        // período: convierte la tasa de cancelación en un impacto monetario.
+        BigDecimal ingresosPerdidos = reservas.stream()
+                .filter(r -> r.getEstado() == EstadoReserva.CANCELADA || r.getEstado() == EstadoReserva.NO_SHOW)
+                .map(Reserva::getMontoTotal)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         List<ReservaHabitacion> habitacionesDeReservas = reservas.stream()
                 .flatMap(r -> reservaHabitacionRepository.findByReservaReservaId(r.getReservaId()).stream())
                 .toList();
@@ -174,6 +183,36 @@ public class ReportServiceImpl implements ReportService {
                 .sorted(Comparator.comparing(ReservationsReportResponse.ReservationsByRoomType::ingresos).reversed())
                 .toList();
 
+        // Rendimiento por canal de venta: reservas, ingresos (excluye canceladas
+        // y no-shows) y tasa de cancelación por canal. Sin canal => "Directo".
+        Map<String, List<Reserva>> reservasPorCanal = reservas.stream()
+                .collect(Collectors.groupingBy(r ->
+                        r.getCanal() != null && r.getCanal().getNombre() != null
+                                ? r.getCanal().getNombre() : "Directo"));
+
+        List<ReservationsReportResponse.ReservationsByChannel> porCanal = reservasPorCanal.entrySet().stream()
+                .map(e -> {
+                    List<Reserva> lista = e.getValue();
+                    long cantidad = lista.size();
+                    long canceladasCanal = lista.stream()
+                            .filter(r -> r.getEstado() == EstadoReserva.CANCELADA
+                                    || r.getEstado() == EstadoReserva.NO_SHOW)
+                            .count();
+                    BigDecimal ingresosCanal = lista.stream()
+                            .filter(r -> r.getEstado() != EstadoReserva.CANCELADA
+                                    && r.getEstado() != EstadoReserva.NO_SHOW)
+                            .map(Reserva::getMontoTotal)
+                            .filter(Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    BigDecimal tasaCanal = cantidad == 0 ? BigDecimal.ZERO
+                            : BigDecimal.valueOf(canceladasCanal).multiply(CIEN)
+                                .divide(BigDecimal.valueOf(cantidad), 1, RoundingMode.HALF_UP);
+                    return new ReservationsReportResponse.ReservationsByChannel(
+                            e.getKey(), cantidad, ingresosCanal, canceladasCanal, tasaCanal);
+                })
+                .sorted(Comparator.comparing(ReservationsReportResponse.ReservationsByChannel::ingresos).reversed())
+                .toList();
+
         Map<LocalDate, List<Reserva>> porFecha = reservas.stream()
                 .collect(Collectors.groupingBy(r -> r.getFechaCreacion().toLocalDate()));
 
@@ -188,8 +227,8 @@ public class ReportServiceImpl implements ReportService {
                 .toList();
 
         return new ReservationsReportResponse(
-                total, canceladas, tasaCancelacion, estanciaPromedio,
-                porEstado, porTipoHabitacion, serie);
+                total, canceladas, tasaCancelacion, estanciaPromedio, ingresosPerdidos,
+                porEstado, porTipoHabitacion, porCanal, serie);
     }
 
     // =====================================================================
@@ -317,6 +356,21 @@ public class ReportServiceImpl implements ReportService {
                 DateTimeUtils.now(), kpis, ingresosMesActual, reservasMesActual, ocupacionMesActual);
     }
 
+    /**
+     * Forecast de ocupación: proyección para los próximos {@code dias} días a
+     * partir de las reservas ya confirmadas. Reutiliza el cálculo estándar de
+     * ocupación (prorrateo, exclusión de canceladas/no-show y de cuartos fuera
+     * de servicio) sobre un rango futuro [mañana, hoy + dias].
+     */
+    @Override
+    public OccupancyReportResponse buildOccupancyForecast(int dias) {
+        int diasEfectivos = Math.max(1, Math.min(90, dias));
+        LocalDate hoy = DateTimeUtils.today();
+        ReportRangeRequest rango = new ReportRangeRequest(
+                "CUSTOM", "DAY", hoy.plusDays(1), hoy.plusDays(diasEfectivos));
+        return buildOccupancyReport(rango);
+    }
+
     // =====================================================================
     // EXPORTAR CSV
     // =====================================================================
@@ -396,11 +450,12 @@ public class ReportServiceImpl implements ReportService {
     private String buildReservasCSV(ReservationsReportResponse r) {
         StringBuilder sb = new StringBuilder();
         sb.append("# REPORTE DE RESERVAS\n");
-        sb.append("total_reservas,total_canceladas,tasa_cancelacion,estancia_promedio_noches\n");
+        sb.append("total_reservas,total_canceladas,tasa_cancelacion,estancia_promedio_noches,ingresos_perdidos_cancelaciones\n");
         sb.append(r.totalReservas()).append(',')
           .append(r.totalCanceladas()).append(',')
           .append(r.tasaCancelacion()).append(',')
-          .append(r.estanciaPromedioNoches()).append('\n');
+          .append(r.estanciaPromedioNoches()).append(',')
+          .append(r.ingresosPerdidosCancelaciones()).append('\n');
         sb.append('\n');
         sb.append("# SERIE DIARIA\n");
         sb.append("fecha,nuevas,canceladas,check_ins,check_outs\n");
@@ -418,6 +473,16 @@ public class ReportServiceImpl implements ReportService {
             sb.append(escape(s.estado())).append(',')
               .append(s.cantidad()).append(',')
               .append(s.porcentaje()).append('\n');
+        }
+        sb.append('\n');
+        sb.append("# POR CANAL DE VENTA\n");
+        sb.append("canal,reservas,ingresos,canceladas,tasa_cancelacion\n");
+        for (ReservationsReportResponse.ReservationsByChannel c : r.porCanal()) {
+            sb.append(escape(c.canal())).append(',')
+              .append(c.reservas()).append(',')
+              .append(c.ingresos()).append(',')
+              .append(c.canceladas()).append(',')
+              .append(c.tasaCancelacion()).append('\n');
         }
         return sb.toString();
     }

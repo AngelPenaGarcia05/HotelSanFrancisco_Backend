@@ -47,6 +47,12 @@ public class ReportController {
         return ApiResponse.ok(reportService.buildManagementDashboard(range));
     }
 
+    @GetMapping("/forecast")
+    public ApiResponse<OccupancyReportResponse> forecast(
+            @RequestParam(name = "dias", defaultValue = "30") int dias) {
+        return ApiResponse.ok(reportService.buildOccupancyForecast(dias));
+    }
+
     @PostMapping("/exportar")
     public ResponseEntity<byte[]> exportar(@RequestBody ExportReporteRequest request) {
         byte[] contenido = reportService.exportar(request);

@@ -174,6 +174,7 @@ public class ExcelReportExporter {
         rn = filaEntero(resumen, e, rn, "Total canceladas", r.totalCanceladas());
         rn = filaPct(resumen, e, rn, "Tasa de cancelación", r.tasaCancelacion());
         rn = filaNumero(resumen, e, rn, "Estancia promedio (noches)", r.estanciaPromedioNoches());
+        rn = filaMoneda(resumen, e, rn, "Ingresos perdidos (cancel./no-show)", r.ingresosPerdidosCancelaciones());
 
         Sheet estados = nuevaHoja(wb, "Reservas - Estados");
         int er = titulo(estados, e, "Reservas por estado");
@@ -193,6 +194,18 @@ public class ExcelReportExporter {
             texto(row, 0, t.tipoHabitacion());
             entero(e, row, 1, t.cantidad());
             moneda(e, row, 2, t.ingresos());
+        }
+
+        Sheet canales = nuevaHoja(wb, "Reservas - Canales");
+        int cr = titulo(canales, e, "Rendimiento por canal de venta");
+        header(canales, e, cr++, "Canal", "Reservas", "Ingresos", "Canceladas", "Tasa cancelación");
+        for (ReservationsReportResponse.ReservationsByChannel c : r.porCanal()) {
+            Row row = canales.createRow(cr++);
+            texto(row, 0, c.canal());
+            entero(e, row, 1, c.reservas());
+            moneda(e, row, 2, c.ingresos());
+            entero(e, row, 3, c.canceladas());
+            pct(e, row, 4, c.tasaCancelacion());
         }
 
         Sheet serie = nuevaHoja(wb, "Reservas - Serie");
