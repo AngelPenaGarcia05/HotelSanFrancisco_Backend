@@ -356,9 +356,11 @@ public class ReportServiceImpl implements ReportService {
 
     private byte[] exportarPdf(String tipo, ReportRangeRequest range) {
         return switch (tipo) {
+            case "ingresos" -> pdfExporter.ingresos(buildRevenueReport(range));
+            case "reservas" -> pdfExporter.reservas(buildReservationsReport(range));
+            case "ocupacion" -> pdfExporter.ocupacion(buildOccupancyReport(range));
             case "gerencial" -> pdfExporter.gerencial(buildManagementDashboard(range));
-            default -> throw new IllegalArgumentException(
-                    "Exportación PDF disponible por ahora solo para 'gerencial'; recibido: " + tipo);
+            default -> throw new IllegalArgumentException("Tipo de reporte no válido: " + tipo);
         };
     }
 

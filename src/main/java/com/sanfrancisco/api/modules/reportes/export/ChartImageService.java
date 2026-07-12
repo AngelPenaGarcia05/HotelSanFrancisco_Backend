@@ -7,22 +7,28 @@ import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartUtils;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.CategoryLabelPositions;
+import org.jfree.chart.axis.DateAxis;
 import org.jfree.chart.labels.StandardPieSectionLabelGenerator;
 import org.jfree.chart.plot.CategoryPlot;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.chart.plot.RingPlot;
+import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.category.BarRenderer;
 import org.jfree.chart.renderer.category.StandardBarPainter;
 import org.jfree.data.category.DefaultCategoryDataset;
 import org.jfree.data.general.DefaultPieDataset;
+import org.jfree.data.time.Day;
+import org.jfree.data.time.TimeSeries;
+import org.jfree.data.time.TimeSeriesCollection;
 import org.springframework.stereotype.Component;
 
 import java.awt.Color;
 import java.awt.Font;
-import java.awt.Paint;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
@@ -50,19 +56,32 @@ public class ChartImageService {
             new Color(201, 162, 39),
     };
 
-    /** Curva de ocupación diaria (% por día) — líneas. */
+    /**
+     * Curva de ocupación diaria (% por día) — serie de tiempo con eje de fecha.
+     * El DateAxis elige automáticamente cuántas fechas mostrar (horizontales,
+     * legibles), evitando el amontonamiento de un eje de categorías con 30 días.
+     */
     public String ocupacionDiaria(List<OccupancyReportResponse.OccupancyPoint> serie) {
-        DefaultCategoryDataset ds = new DefaultCategoryDataset();
+        TimeSeries ts = new TimeSeries("% Ocupación");
         for (OccupancyReportResponse.OccupancyPoint p : serie) {
-            ds.addValue(p.porcentajeOcupacion(), "% Ocupación", p.fecha().format(DIA_MES));
+            LocalDate d = p.fecha();
+            ts.addOrUpdate(new Day(d.getDayOfMonth(), d.getMonthValue(), d.getYear()),
+                    p.porcentajeOcupacion());
         }
-        JFreeChart chart = ChartFactory.createLineChart(
-                null, null, "% Ocupación", ds, PlotOrientation.VERTICAL, false, false, false);
-        estiloCategoria(chart);
-        chart.getCategoryPlot().getDomainAxis()
-                .setCategoryLabelPositions(CategoryLabelPositions.UP_45);
-        chart.getCategoryPlot().getRenderer().setSeriesPaint(0, ORO);
-        return toDataUri(chart, 520, 200);
+        TimeSeriesCollection ds = new TimeSeriesCollection(ts);
+        JFreeChart chart = ChartFactory.createTimeSeriesChart(
+                null, null, "% Ocupación", ds, false, false, false);
+        chart.setBackgroundPaint(Color.WHITE);
+        XYPlot plot = chart.getXYPlot();
+        plot.setBackgroundPaint(new Color(250, 248, 244));
+        plot.setRangeGridlinePaint(new Color(220, 213, 198));
+        plot.setDomainGridlinesVisible(false);
+        plot.setOutlineVisible(false);
+        plot.getRenderer().setSeriesPaint(0, ORO);
+        DateAxis eje = (DateAxis) plot.getDomainAxis();
+        eje.setDateFormatOverride(new SimpleDateFormat("dd/MM"));
+        eje.setTickLabelFont(new Font("SansSerif", Font.PLAIN, 9));
+        return toDataUri(chart, 560, 220);
     }
 
     /** Ingresos por método de pago — dona. */
@@ -102,6 +121,29 @@ public class ChartImageService {
         }
         JFreeChart chart = barras(ds, "S/", ORO, AZUL);
         return toDataUri(chart, 300, 220);
+    }
+
+    /** Ingresos diarios (anticipos vs saldos) — barras por día. */
+    public String ingresosDiarios(List<RevenueReportResponse.RevenuePoint> serie) {
+        DefaultCategoryDataset ds = new DefaultCategoryDataset();
+        for (RevenueReportResponse.RevenuePoint p : serie) {
+            String dia = p.fecha().format(DIA_MES);
+            ds.addValue(p.ingresosAnticipos(), "Anticipos", dia);
+            ds.addValue(p.ingresosSaldos(), "Saldos", dia);
+        }
+        JFreeChart chart = barras(ds, "S/", ORO, AZUL);
+        chart.getCategoryPlot().getDomainAxis()
+                .setCategoryLabelPositions(CategoryLabelPositions.UP_45);
+        return toDataUri(chart, 520, 220);
+    }
+
+    /** Reservas por tipo de habitación (cantidad) — dona. */
+    public String reservasPorTipo(List<ReservationsReportResponse.ReservationsByRoomType> tipos) {
+        DefaultPieDataset<String> ds = new DefaultPieDataset<>();
+        for (ReservationsReportResponse.ReservationsByRoomType t : tipos) {
+            ds.setValue(t.tipoHabitacion(), t.cantidad());
+        }
+        return dona(ds, 300, 220);
     }
 
     // ---------------------------------------------------------------

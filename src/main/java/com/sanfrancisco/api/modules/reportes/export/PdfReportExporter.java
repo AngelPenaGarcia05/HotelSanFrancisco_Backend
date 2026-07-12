@@ -2,6 +2,9 @@ package com.sanfrancisco.api.modules.reportes.export;
 
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.sanfrancisco.api.modules.reportes.dto.response.ManagementDashboardResponse;
+import com.sanfrancisco.api.modules.reportes.dto.response.OccupancyReportResponse;
+import com.sanfrancisco.api.modules.reportes.dto.response.ReservationsReportResponse;
+import com.sanfrancisco.api.modules.reportes.dto.response.RevenueReportResponse;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
 import com.sanfrancisco.api.modules.seguridad.security.CustomUserDetails;
 import org.springframework.core.io.ClassPathResource;
@@ -15,6 +18,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.Locale;
@@ -50,34 +54,68 @@ public class PdfReportExporter {
     }
 
     public byte[] gerencial(ManagementDashboardResponse r) {
-        Context ctx = new Context(ES_PE);
-        // Encabezado común
-        ctx.setVariable("logo", LOGO_DATA_URI);
-        ctx.setVariable("titulo", "Reporte gerencial — Resumen ejecutivo");
-        ctx.setVariable("generadoEn", r.generadoEn().format(FECHA_HORA));
-        ctx.setVariable("generadoPor", usuarioActual());
-        // Datos
+        Context ctx = baseContext(r.generadoEn());
         ctx.setVariable("kpis", r.kpis());
         ctx.setVariable("ingresos", r.ingresos());
         ctx.setVariable("reservas", r.reservas());
         ctx.setVariable("ocupacion", r.ocupacion());
-        // Gráficos (data-URI PNG), cada uno junto a su tabla
-        ctx.setVariable("chartOcupacionDiaria", chartService.ocupacionDiaria(r.ocupacion().serie()));
-        ctx.setVariable("chartMetodoPago",
-                r.ingresos().porMetodoPago().isEmpty() ? null
-                        : chartService.metodoPago(r.ingresos().porMetodoPago()));
-        ctx.setVariable("chartReservasEstado",
-                r.reservas().porEstado().isEmpty() ? null
-                        : chartService.reservasPorEstado(r.reservas().porEstado()));
-        ctx.setVariable("chartOcupacionPct",
-                r.ocupacion().porTipoHabitacion().isEmpty() ? null
-                        : chartService.ocupacionPctPorTipo(r.ocupacion().porTipoHabitacion()));
-        ctx.setVariable("chartTarifas",
-                r.ocupacion().porTipoHabitacion().isEmpty() ? null
-                        : chartService.tarifasPorTipo(r.ocupacion().porTipoHabitacion()));
+        graficosIngresos(ctx, r.ingresos());
+        graficosReservas(ctx, r.reservas());
+        graficosOcupacion(ctx, r.ocupacion());
+        return render(templateEngine.process("reportes/gerencial", ctx));
+    }
 
-        String html = templateEngine.process("reportes/gerencial", ctx);
-        return render(html);
+    public byte[] ingresos(RevenueReportResponse r) {
+        Context ctx = baseContext(LocalDateTime.now());
+        ctx.setVariable("ingresos", r);
+        graficosIngresos(ctx, r);
+        ctx.setVariable("chartIngresosDiarios",
+                r.serie().isEmpty() ? null : chartService.ingresosDiarios(r.serie()));
+        return render(templateEngine.process("reportes/ingresos", ctx));
+    }
+
+    public byte[] reservas(ReservationsReportResponse r) {
+        Context ctx = baseContext(LocalDateTime.now());
+        ctx.setVariable("reservas", r);
+        graficosReservas(ctx, r);
+        ctx.setVariable("chartReservasTipo",
+                r.porTipoHabitacion().isEmpty() ? null : chartService.reservasPorTipo(r.porTipoHabitacion()));
+        return render(templateEngine.process("reportes/reservas", ctx));
+    }
+
+    public byte[] ocupacion(OccupancyReportResponse r) {
+        Context ctx = baseContext(LocalDateTime.now());
+        ctx.setVariable("ocupacion", r);
+        graficosOcupacion(ctx, r);
+        return render(templateEngine.process("reportes/ocupacion", ctx));
+    }
+
+    // ---------------------------------------------------------------
+
+    private Context baseContext(LocalDateTime generadoEn) {
+        Context ctx = new Context(ES_PE);
+        ctx.setVariable("logo", LOGO_DATA_URI);
+        ctx.setVariable("generadoEn", generadoEn.format(FECHA_HORA));
+        ctx.setVariable("generadoPor", usuarioActual());
+        return ctx;
+    }
+
+    private void graficosIngresos(Context ctx, RevenueReportResponse r) {
+        ctx.setVariable("chartMetodoPago",
+                r.porMetodoPago().isEmpty() ? null : chartService.metodoPago(r.porMetodoPago()));
+    }
+
+    private void graficosReservas(Context ctx, ReservationsReportResponse r) {
+        ctx.setVariable("chartReservasEstado",
+                r.porEstado().isEmpty() ? null : chartService.reservasPorEstado(r.porEstado()));
+    }
+
+    private void graficosOcupacion(Context ctx, OccupancyReportResponse r) {
+        ctx.setVariable("chartOcupacionDiaria", chartService.ocupacionDiaria(r.serie()));
+        ctx.setVariable("chartOcupacionPct",
+                r.porTipoHabitacion().isEmpty() ? null : chartService.ocupacionPctPorTipo(r.porTipoHabitacion()));
+        ctx.setVariable("chartTarifas",
+                r.porTipoHabitacion().isEmpty() ? null : chartService.tarifasPorTipo(r.porTipoHabitacion()));
     }
 
     // ---------------------------------------------------------------
