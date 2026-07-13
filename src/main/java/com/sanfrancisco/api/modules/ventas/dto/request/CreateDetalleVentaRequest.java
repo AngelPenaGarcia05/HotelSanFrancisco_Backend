@@ -14,7 +14,10 @@ public record CreateDetalleVentaRequest(
         @Digits(integer = 8, fraction = 2, message = "Formato de cantidad inválido")
         BigDecimal cantidad,
 
-        @NotNull(message = "El precio unitario es obligatorio")
+        // Opcional e ignorado por el servidor: el precio autoritativo es el del
+        // catálogo (producto.precioVenta), no el que envíe el cliente. Se acepta
+        // por compatibilidad con clientes que aún lo mandan; si viene, solo se
+        // valida su formato.
         @PositiveOrZero(message = "El precio unitario no puede ser negativo")
         @Digits(integer = 10, fraction = 2, message = "Formato de precio inválido")
         BigDecimal precioUnitario,
