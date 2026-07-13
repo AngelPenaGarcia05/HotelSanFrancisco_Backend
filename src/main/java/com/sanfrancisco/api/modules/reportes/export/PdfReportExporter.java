@@ -1,6 +1,7 @@
 package com.sanfrancisco.api.modules.reportes.export;
 
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
+import com.sanfrancisco.api.modules.reportes.dto.response.AttendanceReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.ManagementDashboardResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.OccupancyReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.PayrollReportResponse;
@@ -94,6 +95,16 @@ public class PdfReportExporter {
         ctx.setVariable("ocupacion", r);
         graficosOcupacion(ctx, r);
         return render(templateEngine.process("reportes/ocupacion", ctx));
+    }
+
+    public byte[] asistencia(AttendanceReportResponse r) {
+        Context ctx = baseContext(LocalDateTime.now());
+        ctx.setVariable("asistencia", r);
+        ctx.setVariable("chartAsistenciaTipo",
+                r.totalRegistros() == 0 ? null : chartService.asistenciaPorTipo(r));
+        ctx.setVariable("chartIncidencias",
+                r.porEmpleado().isEmpty() ? null : chartService.incidenciasPorEmpleado(r.porEmpleado()));
+        return render(templateEngine.process("reportes/asistencia", ctx));
     }
 
     public byte[] nomina(PayrollReportResponse r) {

@@ -269,6 +269,9 @@ public class SecurityConfig {
                 .requestMatchers(EndpointPaths.REPORTES_BASE + "/nomina",
                                  EndpointPaths.REPORTES_BASE + "/nomina/**")
                     .hasAuthority(Permissions.NOMINA_READ)
+                .requestMatchers(EndpointPaths.REPORTES_BASE + "/asistencia",
+                                 EndpointPaths.REPORTES_BASE + "/asistencia/**")
+                    .hasAuthority(Permissions.ASISTENCIA_READ)
                 .requestMatchers(EndpointPaths.REPORTES_BASE + "/**")
                     .hasAuthority(Permissions.REPORTE_READ)
 

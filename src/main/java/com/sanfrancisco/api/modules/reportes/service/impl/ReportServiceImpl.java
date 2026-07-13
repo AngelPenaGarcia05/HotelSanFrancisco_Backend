@@ -16,10 +16,15 @@ import com.sanfrancisco.api.modules.reportes.dto.response.ManagementDashboardRes
 import com.sanfrancisco.api.modules.reportes.dto.response.OccupancyReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.ReservationsReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.RevenueReportResponse;
+import com.sanfrancisco.api.modules.reportes.dto.response.AttendanceReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.PayrollReportResponse;
 import com.sanfrancisco.api.modules.reportes.export.ExcelReportExporter;
+import com.sanfrancisco.api.modules.rrhh.entity.Asistencia;
 import com.sanfrancisco.api.modules.rrhh.entity.PagoNomina;
+import com.sanfrancisco.api.modules.rrhh.enums.TipoAsistencia;
+import com.sanfrancisco.api.modules.rrhh.repository.AsistenciaRepository;
 import com.sanfrancisco.api.modules.rrhh.repository.PagoNominaRepository;
+import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
 import com.sanfrancisco.api.modules.reportes.export.PdfReportExporter;
 import com.sanfrancisco.api.modules.reportes.service.interfaces.ReportService;
 import com.sanfrancisco.api.shared.utils.DateTimeUtils;
@@ -60,6 +65,7 @@ public class ReportServiceImpl implements ReportService {
     private final ReservaHabitacionRepository reservaHabitacionRepository;
     private final HabitacionRepository habitacionRepository;
     private final PagoNominaRepository pagoNominaRepository;
+    private final AsistenciaRepository asistenciaRepository;
     private final ExcelReportExporter excelExporter;
     private final PdfReportExporter pdfExporter;
 
@@ -68,6 +74,7 @@ public class ReportServiceImpl implements ReportService {
                               ReservaHabitacionRepository reservaHabitacionRepository,
                               HabitacionRepository habitacionRepository,
                               PagoNominaRepository pagoNominaRepository,
+                              AsistenciaRepository asistenciaRepository,
                               ExcelReportExporter excelExporter,
                               PdfReportExporter pdfExporter) {
         this.pagoRepository = pagoRepository;
@@ -75,6 +82,7 @@ public class ReportServiceImpl implements ReportService {
         this.reservaHabitacionRepository = reservaHabitacionRepository;
         this.habitacionRepository = habitacionRepository;
         this.pagoNominaRepository = pagoNominaRepository;
+        this.asistenciaRepository = asistenciaRepository;
         this.excelExporter = excelExporter;
         this.pdfExporter = pdfExporter;
     }
@@ -476,6 +484,110 @@ public class ReportServiceImpl implements ReportService {
                 .map(extractor)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    // =====================================================================
+    // ASISTENCIA (ausentismo y puntualidad)
+    // =====================================================================
+
+    @Override
+    public AttendanceReportResponse buildAttendanceReport(ReportRangeRequest range) {
+        LocalDate desde = range.resolveDesde();
+        LocalDate hasta = range.resolveHasta();
+        List<Asistencia> asistencias = asistenciaRepository.findByFechaBetween(desde, hasta);
+
+        Map<String, List<Asistencia>> porEmpleadoMap = asistencias.stream()
+                .collect(Collectors.groupingBy(a -> nombreEmpleado(a.getUsuario())));
+
+        List<AttendanceReportResponse.AttendanceByEmployee> porEmpleado = porEmpleadoMap.entrySet().stream()
+                .map(e -> resumenEmpleado(e.getKey(), e.getValue()))
+                .sorted(Comparator
+                        .comparingLong((AttendanceReportResponse.AttendanceByEmployee a) ->
+                                a.tardanzas() + a.faltasJustificadas() + a.faltasInjustificadas())
+                        .reversed())
+                .toList();
+
+        AttendanceReportResponse.AttendanceByEmployee totales = resumenEmpleado("TOTAL", asistencias);
+        return new AttendanceReportResponse(
+                totales.registros(), totales.normales(), totales.tardanzas(),
+                totales.faltasJustificadas(), totales.faltasInjustificadas(), totales.permisos(),
+                totales.puntualidad(), totales.horasTrabajadas(), porEmpleado);
+    }
+
+    private AttendanceReportResponse.AttendanceByEmployee resumenEmpleado(
+            String nombre, List<Asistencia> lista) {
+        long registros = lista.size();
+        long normales = contarTipo(lista, TipoAsistencia.NORMAL);
+        long tardanzas = contarTipo(lista, TipoAsistencia.TARDANZA);
+        long faltasJust = contarTipo(lista, TipoAsistencia.FALTA_JUSTIFICADA);
+        long faltasInjust = contarTipo(lista, TipoAsistencia.FALTA_INJUSTIFICADA);
+        long permisos = contarTipo(lista, TipoAsistencia.PERMISO);
+        // Puntualidad: asistencias NORMALES sobre los días en que correspondía
+        // presentarse (excluye permisos del denominador).
+        long exigibles = registros - permisos;
+        BigDecimal puntualidad = exigibles <= 0 ? BigDecimal.ZERO
+                : BigDecimal.valueOf(normales).multiply(CIEN)
+                    .divide(BigDecimal.valueOf(exigibles), 1, RoundingMode.HALF_UP);
+        BigDecimal horas = lista.stream()
+                .map(Asistencia::getHorasTrabajadas)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new AttendanceReportResponse.AttendanceByEmployee(
+                nombre, registros, normales, tardanzas, faltasJust, faltasInjust,
+                permisos, puntualidad, horas);
+    }
+
+    private long contarTipo(List<Asistencia> lista, TipoAsistencia tipo) {
+        return lista.stream().filter(a -> a.getTipo() == tipo).count();
+    }
+
+    private String nombreEmpleado(Usuario u) {
+        if (u == null) return "—";
+        return Stream.of(u.getNombre(), u.getApellidoPaterno())
+                .filter(Objects::nonNull)
+                .filter(s -> !s.isBlank())
+                .collect(Collectors.joining(" "));
+    }
+
+    @Override
+    public byte[] exportarAsistencia(String formato, ReportRangeRequest range) {
+        AttendanceReportResponse reporte = buildAttendanceReport(range);
+        String fmt = (formato == null || formato.isBlank()) ? "CSV" : formato.trim().toUpperCase();
+        return switch (fmt) {
+            case "CSV" -> buildAsistenciaCSV(reporte).getBytes(StandardCharsets.UTF_8);
+            case "EXCEL" -> excelExporter.asistencia(reporte);
+            case "PDF" -> pdfExporter.asistencia(reporte);
+            default -> throw new IllegalArgumentException("Formato no válido: " + formato);
+        };
+    }
+
+    private String buildAsistenciaCSV(AttendanceReportResponse r) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("# REPORTE DE AUSENTISMO Y PUNTUALIDAD\n");
+        sb.append("total_registros,normales,tardanzas,faltas_justificadas,faltas_injustificadas,permisos,puntualidad,horas_trabajadas\n");
+        sb.append(r.totalRegistros()).append(',')
+          .append(r.normales()).append(',')
+          .append(r.tardanzas()).append(',')
+          .append(r.faltasJustificadas()).append(',')
+          .append(r.faltasInjustificadas()).append(',')
+          .append(r.permisos()).append(',')
+          .append(r.puntualidad()).append(',')
+          .append(r.horasTrabajadas()).append('\n');
+        sb.append('\n');
+        sb.append("# POR EMPLEADO\n");
+        sb.append("empleado,registros,normales,tardanzas,faltas_justificadas,faltas_injustificadas,permisos,puntualidad,horas_trabajadas\n");
+        for (AttendanceReportResponse.AttendanceByEmployee e : r.porEmpleado()) {
+            sb.append(escape(e.empleado())).append(',')
+              .append(e.registros()).append(',')
+              .append(e.normales()).append(',')
+              .append(e.tardanzas()).append(',')
+              .append(e.faltasJustificadas()).append(',')
+              .append(e.faltasInjustificadas()).append(',')
+              .append(e.permisos()).append(',')
+              .append(e.puntualidad()).append(',')
+              .append(e.horasTrabajadas()).append('\n');
+        }
+        return sb.toString();
     }
 
     // =====================================================================

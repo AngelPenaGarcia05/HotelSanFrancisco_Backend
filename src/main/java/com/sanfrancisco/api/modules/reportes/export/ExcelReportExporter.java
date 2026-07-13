@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.reportes.export;
 
+import com.sanfrancisco.api.modules.reportes.dto.response.AttendanceReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.ManagementDashboardResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.OccupancyReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.PayrollReportResponse;
@@ -123,6 +124,44 @@ public class ExcelReportExporter {
                 moneda(e, row, 3, p.descuentos());
                 moneda(e, row, 4, p.neto());
                 entero(e, row, 5, p.empleados());
+            }
+            return toBytes(wb);
+        } catch (IOException ex) {
+            throw new UncheckedIOException(ex);
+        }
+    }
+
+    public byte[] asistencia(AttendanceReportResponse r) {
+        try (Workbook wb = new XSSFWorkbook()) {
+            Estilos e = new Estilos(wb);
+            Sheet resumen = nuevaHoja(wb, "Asistencia");
+            int rn = titulo(resumen, e, "Reporte de ausentismo y puntualidad");
+            header(resumen, e, rn++, "Concepto", "Valor");
+            rn = filaEntero(resumen, e, rn, "Total registros", r.totalRegistros());
+            rn = filaEntero(resumen, e, rn, "Normales", r.normales());
+            rn = filaEntero(resumen, e, rn, "Tardanzas", r.tardanzas());
+            rn = filaEntero(resumen, e, rn, "Faltas justificadas", r.faltasJustificadas());
+            rn = filaEntero(resumen, e, rn, "Faltas injustificadas", r.faltasInjustificadas());
+            rn = filaEntero(resumen, e, rn, "Permisos", r.permisos());
+            rn = filaPct(resumen, e, rn, "Puntualidad", r.puntualidad());
+            rn = filaNumero(resumen, e, rn, "Horas trabajadas", r.horasTrabajadas());
+
+            Sheet empleados = nuevaHoja(wb, "Asistencia - Empleados");
+            int er = titulo(empleados, e, "Ausentismo y puntualidad por empleado");
+            header(empleados, e, er++, "Empleado", "Registros", "Normales", "Tardanzas",
+                    "Faltas just.", "Faltas injust.", "Permisos", "Puntualidad", "Horas");
+            for (AttendanceReportResponse.AttendanceByEmployee emp : r.porEmpleado()) {
+                Row row = empleados.createRow(er++);
+                texto(row, 0, emp.empleado());
+                entero(e, row, 1, emp.registros());
+                entero(e, row, 2, emp.normales());
+                entero(e, row, 3, emp.tardanzas());
+                entero(e, row, 4, emp.faltasJustificadas());
+                entero(e, row, 5, emp.faltasInjustificadas());
+                entero(e, row, 6, emp.permisos());
+                pct(e, row, 7, emp.puntualidad());
+                Cell horas = row.createCell(8);
+                if (emp.horasTrabajadas() != null) horas.setCellValue(emp.horasTrabajadas().doubleValue());
             }
             return toBytes(wb);
         } catch (IOException ex) {

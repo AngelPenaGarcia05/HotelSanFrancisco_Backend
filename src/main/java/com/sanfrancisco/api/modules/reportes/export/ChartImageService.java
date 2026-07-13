@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.reportes.export;
 
+import com.sanfrancisco.api.modules.reportes.dto.response.AttendanceReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.OccupancyReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.PayrollReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.ReservationsReportResponse;
@@ -151,6 +152,30 @@ public class ChartImageService {
         eje.setDateFormatOverride(new SimpleDateFormat("dd/MM"));
         eje.setTickLabelFont(new Font("SansSerif", Font.PLAIN, 9));
         return toDataUri(chart, 560, 220);
+    }
+
+    /** Distribución de asistencias por tipo — dona. */
+    public String asistenciaPorTipo(AttendanceReportResponse r) {
+        DefaultPieDataset<String> ds = new DefaultPieDataset<>();
+        if (r.normales() > 0) ds.setValue("Normales", r.normales());
+        if (r.tardanzas() > 0) ds.setValue("Tardanzas", r.tardanzas());
+        if (r.faltasJustificadas() > 0) ds.setValue("Faltas just.", r.faltasJustificadas());
+        if (r.faltasInjustificadas() > 0) ds.setValue("Faltas injust.", r.faltasInjustificadas());
+        if (r.permisos() > 0) ds.setValue("Permisos", r.permisos());
+        return dona(ds, 300, 220);
+    }
+
+    /** Tardanzas y faltas por empleado — barras. */
+    public String incidenciasPorEmpleado(List<AttendanceReportResponse.AttendanceByEmployee> empleados) {
+        DefaultCategoryDataset ds = new DefaultCategoryDataset();
+        for (AttendanceReportResponse.AttendanceByEmployee e : empleados) {
+            ds.addValue(e.tardanzas(), "Tardanzas", e.empleado());
+            ds.addValue(e.faltasJustificadas() + e.faltasInjustificadas(), "Faltas", e.empleado());
+        }
+        JFreeChart chart = barras(ds, "Cantidad", ORO, new Color(181, 101, 29));
+        chart.getCategoryPlot().getDomainAxis()
+                .setCategoryLabelPositions(CategoryLabelPositions.UP_45);
+        return toDataUri(chart, 520, 220);
     }
 
     /** Costo de nómina por período (sueldo base, bonos, descuentos) — barras. */

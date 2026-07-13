@@ -3,6 +3,7 @@ package com.sanfrancisco.api.modules.reportes.Controller;
 import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.modules.reportes.dto.request.ExportReporteRequest;
 import com.sanfrancisco.api.modules.reportes.dto.request.ReportRangeRequest;
+import com.sanfrancisco.api.modules.reportes.dto.response.AttendanceReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.ManagementDashboardResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.OccupancyReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.PayrollReportResponse;
@@ -57,6 +58,33 @@ public class ReportController {
     @GetMapping("/nomina")
     public ApiResponse<PayrollReportResponse> nomina() {
         return ApiResponse.ok(reportService.buildPayrollReport());
+    }
+
+    @GetMapping("/asistencia")
+    public ApiResponse<AttendanceReportResponse> asistencia(ReportRangeRequest range) {
+        return ApiResponse.ok(reportService.buildAttendanceReport(range));
+    }
+
+    /**
+     * Al igual que la nómina, la asistencia es información de personal: su
+     * exportación va separada de /exportar y exige asistencia:read (ADMIN/RRHH).
+     */
+    @GetMapping("/asistencia/exportar")
+    public ResponseEntity<byte[]> exportarAsistencia(
+            @RequestParam(name = "formato", defaultValue = "PDF") String formato,
+            ReportRangeRequest range) {
+        byte[] contenido = reportService.exportarAsistencia(formato, range);
+        String[] meta = switch (formato == null ? "PDF" : formato.trim().toUpperCase()) {
+            case "CSV" -> new String[]{"csv", "text/csv; charset=UTF-8"};
+            case "EXCEL" -> new String[]{"xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"};
+            default -> new String[]{"pdf", "application/pdf"};
+        };
+        String filename = "reporte-asistencia-" + DateTimeUtils.today() + "." + meta[0];
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(meta[1]));
+        headers.setContentDisposition(ContentDisposition.attachment().filename(filename).build());
+        return ResponseEntity.ok().headers(headers).body(contenido);
     }
 
     /**
