@@ -22,11 +22,14 @@ public interface ReportService {
     /** Ocupación proyectada para los próximos {@code dias} días (1..90). */
     OccupancyReportResponse buildOccupancyForecast(int dias);
 
-    /** Costo de nómina agrupado por período (restringido a nomina:read). */
-    PayrollReportResponse buildPayrollReport();
+    /**
+     * Costo de nómina agrupado por período (restringido a nomina:read).
+     * @param periodo filtro opcional por período exacto (YYYY-MM); null/blank = todos.
+     */
+    PayrollReportResponse buildPayrollReport(String periodo);
 
     /** Exporta el reporte de nómina en CSV/EXCEL/PDF (restringido a nomina:read). */
-    byte[] exportarNomina(String formato);
+    byte[] exportarNomina(String formato, String periodo);
 
     /** Ausentismo y puntualidad por empleado (restringido a asistencia:read). */
     AttendanceReportResponse buildAttendanceReport(ReportRangeRequest range);

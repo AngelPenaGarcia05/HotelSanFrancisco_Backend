@@ -56,8 +56,9 @@ public class ReportController {
     }
 
     @GetMapping("/nomina")
-    public ApiResponse<PayrollReportResponse> nomina() {
-        return ApiResponse.ok(reportService.buildPayrollReport());
+    public ApiResponse<PayrollReportResponse> nomina(
+            @RequestParam(name = "periodo", required = false) String periodo) {
+        return ApiResponse.ok(reportService.buildPayrollReport(periodo));
     }
 
     @GetMapping("/asistencia")
@@ -94,8 +95,9 @@ public class ReportController {
      */
     @GetMapping("/nomina/exportar")
     public ResponseEntity<byte[]> exportarNomina(
-            @RequestParam(name = "formato", defaultValue = "PDF") String formato) {
-        byte[] contenido = reportService.exportarNomina(formato);
+            @RequestParam(name = "formato", defaultValue = "PDF") String formato,
+            @RequestParam(name = "periodo", required = false) String periodo) {
+        byte[] contenido = reportService.exportarNomina(formato, periodo);
         String[] meta = switch (formato == null ? "PDF" : formato.trim().toUpperCase()) {
             case "CSV" -> new String[]{"csv", "text/csv; charset=UTF-8"};
             case "EXCEL" -> new String[]{"xlsx",

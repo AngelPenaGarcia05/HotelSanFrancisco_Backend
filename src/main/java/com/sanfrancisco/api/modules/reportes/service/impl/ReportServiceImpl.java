@@ -408,8 +408,12 @@ public class ReportServiceImpl implements ReportService {
     // =====================================================================
 
     @Override
-    public PayrollReportResponse buildPayrollReport() {
+    public PayrollReportResponse buildPayrollReport(String periodo) {
         List<PagoNomina> nominas = pagoNominaRepository.findAll();
+        if (periodo != null && !periodo.isBlank()) {
+            String p = periodo.trim();
+            nominas = nominas.stream().filter(n -> p.equals(n.getPeriodo())).toList();
+        }
 
         BigDecimal totalSueldo = sumarNomina(nominas, PagoNomina::getSueldoBase);
         BigDecimal totalBonos = sumarNomina(nominas, PagoNomina::getTotalBonos);
@@ -444,8 +448,8 @@ public class ReportServiceImpl implements ReportService {
     }
 
     @Override
-    public byte[] exportarNomina(String formato) {
-        PayrollReportResponse reporte = buildPayrollReport();
+    public byte[] exportarNomina(String formato, String periodo) {
+        PayrollReportResponse reporte = buildPayrollReport(periodo);
         String fmt = (formato == null || formato.isBlank()) ? "CSV" : formato.trim().toUpperCase();
         return switch (fmt) {
             case "CSV" -> buildNominaCSV(reporte).getBytes(StandardCharsets.UTF_8);
