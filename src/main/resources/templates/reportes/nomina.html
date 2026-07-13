@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+    <meta charset="utf-8" />
+    <style th:replace="~{reportes/fragments :: estilos}"></style>
+</head>
+<body>
+
+<div th:replace="~{reportes/fragments :: header('Reporte de costo de nómina')}"></div>
+
+<table class="data">
+    <tr><th>Sueldo base</th><th>Bonos</th><th>Descuentos</th><th>Neto</th><th>Empleados</th></tr>
+    <tr>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(nomina.totalSueldoBase,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(nomina.totalBonos,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(nomina.totalDescuentos,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(nomina.totalNeto,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num" th:text="${#numbers.formatInteger(nomina.empleadosPagados,1,'COMMA')}">0</td>
+    </tr>
+</table>
+
+<h2>Por período</h2>
+<table class="data" th:if="${!nomina.porPeriodo.isEmpty()}">
+    <tr><th>Período</th><th>Sueldo base</th><th>Bonos</th><th>Descuentos</th><th>Neto</th><th>Empleados</th></tr>
+    <tr th:each="p : ${nomina.porPeriodo}">
+        <td th:text="${p.periodo}">--</td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(p.sueldoBase,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(p.bonos,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(p.descuentos,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(p.neto,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num" th:text="${#numbers.formatInteger(p.empleados,1,'COMMA')}">0</td>
+    </tr>
+</table>
+
+<img class="chart-wide" th:if="${chartNomina}" th:src="${chartNomina}" alt="Costo de nómina por período" />
+<p class="muted" th:if="${nomina.porPeriodo.isEmpty()}">Sin pagos de nómina registrados.</p>
+
+</body>
+</html>

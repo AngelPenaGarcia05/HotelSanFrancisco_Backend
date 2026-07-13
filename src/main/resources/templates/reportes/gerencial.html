@@ -82,6 +82,24 @@
     </tr>
 </table>
 
+<table class="layout" th:if="${!ingresos.porFuente.isEmpty()}">
+    <tr>
+        <td class="tablecell">
+            <table class="data">
+                <tr><th>Fuente</th><th>Monto</th><th>Porcentaje</th></tr>
+                <tr th:each="f : ${ingresos.porFuente}">
+                    <td th:text="${f.fuente}">Fuente</td>
+                    <td class="num">S/ <span th:text="${#numbers.formatDecimal(f.monto,1,'COMMA',2,'POINT')}">0.00</span></td>
+                    <td class="num"><span th:text="${#numbers.formatDecimal(f.porcentaje,1,'COMMA',1,'POINT')}">0</span>%</td>
+                </tr>
+            </table>
+        </td>
+        <td class="chartcell">
+            <img class="chart" th:if="${chartFuente}" th:src="${chartFuente}" alt="Ingresos por fuente" />
+        </td>
+    </tr>
+</table>
+
 <!-- ============ Reservas ============ -->
 <h2>Reservas del mes</h2>
 <table class="data">

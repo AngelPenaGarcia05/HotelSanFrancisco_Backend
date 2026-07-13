@@ -2,6 +2,7 @@ package com.sanfrancisco.api.modules.reportes.export;
 
 import com.sanfrancisco.api.modules.reportes.dto.response.ManagementDashboardResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.OccupancyReportResponse;
+import com.sanfrancisco.api.modules.reportes.dto.response.PayrollReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.ReservationsReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.RevenueReportResponse;
 import org.apache.poi.ss.usermodel.*;
@@ -99,6 +100,36 @@ public class ExcelReportExporter {
         }
     }
 
+    public byte[] nomina(PayrollReportResponse r) {
+        try (Workbook wb = new XSSFWorkbook()) {
+            Estilos e = new Estilos(wb);
+            Sheet resumen = nuevaHoja(wb, "Nómina");
+            int rn = titulo(resumen, e, "Reporte de costo de nómina");
+            header(resumen, e, rn++, "Concepto", "Valor");
+            rn = filaMoneda(resumen, e, rn, "Total sueldo base", r.totalSueldoBase());
+            rn = filaMoneda(resumen, e, rn, "Total bonos", r.totalBonos());
+            rn = filaMoneda(resumen, e, rn, "Total descuentos", r.totalDescuentos());
+            rn = filaMoneda(resumen, e, rn, "Total neto", r.totalNeto());
+            rn = filaEntero(resumen, e, rn, "Empleados pagados", r.empleadosPagados());
+
+            Sheet periodos = nuevaHoja(wb, "Nómina - Períodos");
+            int pr = titulo(periodos, e, "Costo de nómina por período");
+            header(periodos, e, pr++, "Período", "Sueldo base", "Bonos", "Descuentos", "Neto", "Empleados");
+            for (PayrollReportResponse.PayrollByPeriod p : r.porPeriodo()) {
+                Row row = periodos.createRow(pr++);
+                texto(row, 0, p.periodo());
+                moneda(e, row, 1, p.sueldoBase());
+                moneda(e, row, 2, p.bonos());
+                moneda(e, row, 3, p.descuentos());
+                moneda(e, row, 4, p.neto());
+                entero(e, row, 5, p.empleados());
+            }
+            return toBytes(wb);
+        } catch (IOException ex) {
+            throw new UncheckedIOException(ex);
+        }
+    }
+
     public byte[] gerencial(ManagementDashboardResponse r) {
         try (Workbook wb = new XSSFWorkbook()) {
             Estilos e = new Estilos(wb);
@@ -163,6 +194,16 @@ public class ExcelReportExporter {
             texto(row, 0, m.metodoPago());
             moneda(e, row, 1, m.monto());
             pct(e, row, 2, m.porcentaje());
+        }
+
+        Sheet fuentes = nuevaHoja(wb, "Ingresos - Fuentes");
+        int fr = titulo(fuentes, e, "Ingresos por fuente");
+        header(fuentes, e, fr++, "Fuente", "Monto", "Porcentaje");
+        for (RevenueReportResponse.RevenueBySource f : r.porFuente()) {
+            Row row = fuentes.createRow(fr++);
+            texto(row, 0, f.fuente());
+            moneda(e, row, 1, f.monto());
+            pct(e, row, 2, f.porcentaje());
         }
     }
 

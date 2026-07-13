@@ -1,6 +1,7 @@
 package com.sanfrancisco.api.modules.reportes.export;
 
 import com.sanfrancisco.api.modules.reportes.dto.response.OccupancyReportResponse;
+import com.sanfrancisco.api.modules.reportes.dto.response.PayrollReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.ReservationsReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.RevenueReportResponse;
 import org.jfree.chart.ChartFactory;
@@ -123,18 +124,54 @@ public class ChartImageService {
         return toDataUri(chart, 300, 220);
     }
 
-    /** Ingresos diarios (anticipos vs saldos) — barras por día. */
+    /** Ingresos diarios (anticipos vs saldos) — serie de tiempo con eje de fecha. */
     public String ingresosDiarios(List<RevenueReportResponse.RevenuePoint> serie) {
-        DefaultCategoryDataset ds = new DefaultCategoryDataset();
+        TimeSeries anticipos = new TimeSeries("Anticipos");
+        TimeSeries saldos = new TimeSeries("Saldos");
         for (RevenueReportResponse.RevenuePoint p : serie) {
-            String dia = p.fecha().format(DIA_MES);
-            ds.addValue(p.ingresosAnticipos(), "Anticipos", dia);
-            ds.addValue(p.ingresosSaldos(), "Saldos", dia);
+            LocalDate d = p.fecha();
+            Day dia = new Day(d.getDayOfMonth(), d.getMonthValue(), d.getYear());
+            anticipos.addOrUpdate(dia, p.ingresosAnticipos());
+            saldos.addOrUpdate(dia, p.ingresosSaldos());
         }
-        JFreeChart chart = barras(ds, "S/", ORO, AZUL);
-        chart.getCategoryPlot().getDomainAxis()
-                .setCategoryLabelPositions(CategoryLabelPositions.UP_45);
+        TimeSeriesCollection ds = new TimeSeriesCollection();
+        ds.addSeries(anticipos);
+        ds.addSeries(saldos);
+        JFreeChart chart = ChartFactory.createTimeSeriesChart(
+                null, null, "S/", ds, true, false, false);
+        chart.setBackgroundPaint(Color.WHITE);
+        XYPlot plot = chart.getXYPlot();
+        plot.setBackgroundPaint(new Color(250, 248, 244));
+        plot.setRangeGridlinePaint(new Color(220, 213, 198));
+        plot.setDomainGridlinesVisible(false);
+        plot.setOutlineVisible(false);
+        plot.getRenderer().setSeriesPaint(0, ORO);
+        plot.getRenderer().setSeriesPaint(1, AZUL);
+        DateAxis eje = (DateAxis) plot.getDomainAxis();
+        eje.setDateFormatOverride(new SimpleDateFormat("dd/MM"));
+        eje.setTickLabelFont(new Font("SansSerif", Font.PLAIN, 9));
+        return toDataUri(chart, 560, 220);
+    }
+
+    /** Costo de nómina por período (sueldo base, bonos, descuentos) — barras. */
+    public String nominaPorPeriodo(List<PayrollReportResponse.PayrollByPeriod> periodos) {
+        DefaultCategoryDataset ds = new DefaultCategoryDataset();
+        for (PayrollReportResponse.PayrollByPeriod p : periodos) {
+            ds.addValue(p.sueldoBase(), "Sueldo base", p.periodo());
+            ds.addValue(p.bonos(), "Bonos", p.periodo());
+            ds.addValue(p.descuentos(), "Descuentos", p.periodo());
+        }
+        JFreeChart chart = barras(ds, "S/", ORO, AZUL, new Color(181, 101, 29));
         return toDataUri(chart, 520, 220);
+    }
+
+    /** Ingresos por fuente (habitaciones / ventas / otros) — dona. */
+    public String ingresosPorFuente(List<RevenueReportResponse.RevenueBySource> fuentes) {
+        DefaultPieDataset<String> ds = new DefaultPieDataset<>();
+        for (RevenueReportResponse.RevenueBySource f : fuentes) {
+            ds.setValue(f.fuente(), f.monto());
+        }
+        return dona(ds, 300, 220);
     }
 
     /** Ingresos por canal de venta — dona. */

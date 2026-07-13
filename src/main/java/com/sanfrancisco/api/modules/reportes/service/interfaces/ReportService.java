@@ -4,6 +4,7 @@ import com.sanfrancisco.api.modules.reportes.dto.request.ExportReporteRequest;
 import com.sanfrancisco.api.modules.reportes.dto.request.ReportRangeRequest;
 import com.sanfrancisco.api.modules.reportes.dto.response.ManagementDashboardResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.OccupancyReportResponse;
+import com.sanfrancisco.api.modules.reportes.dto.response.PayrollReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.ReservationsReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.RevenueReportResponse;
 
@@ -19,6 +20,12 @@ public interface ReportService {
 
     /** Ocupación proyectada para los próximos {@code dias} días (1..90). */
     OccupancyReportResponse buildOccupancyForecast(int dias);
+
+    /** Costo de nómina agrupado por período (restringido a nomina:read). */
+    PayrollReportResponse buildPayrollReport();
+
+    /** Exporta el reporte de nómina en CSV/EXCEL/PDF (restringido a nomina:read). */
+    byte[] exportarNomina(String formato);
 
     byte[] exportar(ExportReporteRequest request);
 }

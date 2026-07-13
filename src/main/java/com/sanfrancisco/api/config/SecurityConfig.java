@@ -263,7 +263,12 @@ public class SecurityConfig {
                 // REPORTES — Ingresos, reservas, ocupación, dashboard gerencial.
                 // Permiso dedicado reporte:read (ADMIN, CAJA). Desacoplado de
                 // pago:read para que RECEPCION no acceda a reportes financieros.
+                // El de nómina es información salarial: exige nomina:read
+                // (ADMIN/RRHH) y debe declararse ANTES de la regla general.
                 // =============================================================
+                .requestMatchers(EndpointPaths.REPORTES_BASE + "/nomina",
+                                 EndpointPaths.REPORTES_BASE + "/nomina/**")
+                    .hasAuthority(Permissions.NOMINA_READ)
                 .requestMatchers(EndpointPaths.REPORTES_BASE + "/**")
                     .hasAuthority(Permissions.REPORTE_READ)
 

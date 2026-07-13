@@ -3,6 +3,7 @@ package com.sanfrancisco.api.modules.reportes.export;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.sanfrancisco.api.modules.reportes.dto.response.ManagementDashboardResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.OccupancyReportResponse;
+import com.sanfrancisco.api.modules.reportes.dto.response.PayrollReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.ReservationsReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.RevenueReportResponse;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
@@ -95,6 +96,14 @@ public class PdfReportExporter {
         return render(templateEngine.process("reportes/ocupacion", ctx));
     }
 
+    public byte[] nomina(PayrollReportResponse r) {
+        Context ctx = baseContext(LocalDateTime.now());
+        ctx.setVariable("nomina", r);
+        ctx.setVariable("chartNomina",
+                r.porPeriodo().isEmpty() ? null : chartService.nominaPorPeriodo(r.porPeriodo()));
+        return render(templateEngine.process("reportes/nomina", ctx));
+    }
+
     // ---------------------------------------------------------------
 
     private Context baseContext(LocalDateTime generadoEn) {
@@ -108,6 +117,8 @@ public class PdfReportExporter {
     private void graficosIngresos(Context ctx, RevenueReportResponse r) {
         ctx.setVariable("chartMetodoPago",
                 r.porMetodoPago().isEmpty() ? null : chartService.metodoPago(r.porMetodoPago()));
+        ctx.setVariable("chartFuente",
+                r.porFuente().isEmpty() ? null : chartService.ingresosPorFuente(r.porFuente()));
     }
 
     private void graficosReservas(Context ctx, ReservationsReportResponse r) {

@@ -16,7 +16,10 @@ import com.sanfrancisco.api.modules.reportes.dto.response.ManagementDashboardRes
 import com.sanfrancisco.api.modules.reportes.dto.response.OccupancyReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.ReservationsReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.RevenueReportResponse;
+import com.sanfrancisco.api.modules.reportes.dto.response.PayrollReportResponse;
 import com.sanfrancisco.api.modules.reportes.export.ExcelReportExporter;
+import com.sanfrancisco.api.modules.rrhh.entity.PagoNomina;
+import com.sanfrancisco.api.modules.rrhh.repository.PagoNominaRepository;
 import com.sanfrancisco.api.modules.reportes.export.PdfReportExporter;
 import com.sanfrancisco.api.modules.reportes.service.interfaces.ReportService;
 import com.sanfrancisco.api.shared.utils.DateTimeUtils;
@@ -56,6 +59,7 @@ public class ReportServiceImpl implements ReportService {
     private final ReservaRepository reservaRepository;
     private final ReservaHabitacionRepository reservaHabitacionRepository;
     private final HabitacionRepository habitacionRepository;
+    private final PagoNominaRepository pagoNominaRepository;
     private final ExcelReportExporter excelExporter;
     private final PdfReportExporter pdfExporter;
 
@@ -63,12 +67,14 @@ public class ReportServiceImpl implements ReportService {
                               ReservaRepository reservaRepository,
                               ReservaHabitacionRepository reservaHabitacionRepository,
                               HabitacionRepository habitacionRepository,
+                              PagoNominaRepository pagoNominaRepository,
                               ExcelReportExporter excelExporter,
                               PdfReportExporter pdfExporter) {
         this.pagoRepository = pagoRepository;
         this.reservaRepository = reservaRepository;
         this.reservaHabitacionRepository = reservaHabitacionRepository;
         this.habitacionRepository = habitacionRepository;
+        this.pagoNominaRepository = pagoNominaRepository;
         this.excelExporter = excelExporter;
         this.pdfExporter = pdfExporter;
     }
@@ -119,9 +125,27 @@ public class ReportServiceImpl implements ReportService {
                 .sorted(Comparator.comparing(RevenueReportResponse.RevenueByMethod::monto).reversed())
                 .toList();
 
+        // Ingresos por fuente (base caja, igual que el resto del reporte): cada
+        // pago se clasifica según su vínculo. Los servicios adicionales se
+        // cobran como cargo a la habitación, por lo que fluyen dentro de la
+        // fuente "Habitaciones".
+        Map<String, BigDecimal> fuentes = pagos.stream()
+                .filter(p -> p.getTipoPago() != TipoPago.REEMBOLSO)
+                .collect(Collectors.groupingBy(
+                        p -> p.getReserva() != null ? "Habitaciones"
+                                : p.getVenta() != null ? "Ventas (bar/tienda)" : "Otros",
+                        Collectors.reducing(BigDecimal.ZERO, Pago::getMonto, BigDecimal::add)));
+
+        BigDecimal baseFuentes = fuentes.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        List<RevenueReportResponse.RevenueBySource> porFuente = fuentes.entrySet().stream()
+                .map(e -> new RevenueReportResponse.RevenueBySource(
+                        e.getKey(), e.getValue(), porcentaje(e.getValue(), baseFuentes)))
+                .sorted(Comparator.comparing(RevenueReportResponse.RevenueBySource::monto).reversed())
+                .toList();
+
         return new RevenueReportResponse(
                 totalIngresos, totalAnticipos, totalSaldos, totalReembolsos,
-                ingresoPromedioDiario, serie, porMetodoPago);
+                ingresoPromedioDiario, serie, porMetodoPago, porFuente);
     }
 
     // =====================================================================
@@ -372,6 +396,89 @@ public class ReportServiceImpl implements ReportService {
     }
 
     // =====================================================================
+    // NÓMINA
+    // =====================================================================
+
+    @Override
+    public PayrollReportResponse buildPayrollReport() {
+        List<PagoNomina> nominas = pagoNominaRepository.findAll();
+
+        BigDecimal totalSueldo = sumarNomina(nominas, PagoNomina::getSueldoBase);
+        BigDecimal totalBonos = sumarNomina(nominas, PagoNomina::getTotalBonos);
+        BigDecimal totalDescuentos = sumarNomina(nominas, PagoNomina::getTotalDescuentos);
+        BigDecimal totalNeto = sumarNomina(nominas, PagoNomina::getMontoNeto);
+        long empleados = nominas.stream()
+                .map(n -> n.getUsuario() != null ? n.getUsuario().getUsuarioId() : null)
+                .filter(Objects::nonNull)
+                .distinct()
+                .count();
+
+        Map<String, List<PagoNomina>> porPeriodoMap = nominas.stream()
+                .collect(Collectors.groupingBy(n -> n.getPeriodo() != null ? n.getPeriodo() : "—"));
+
+        List<PayrollReportResponse.PayrollByPeriod> porPeriodo = porPeriodoMap.entrySet().stream()
+                .map(e -> new PayrollReportResponse.PayrollByPeriod(
+                        e.getKey(),
+                        sumarNomina(e.getValue(), PagoNomina::getSueldoBase),
+                        sumarNomina(e.getValue(), PagoNomina::getTotalBonos),
+                        sumarNomina(e.getValue(), PagoNomina::getTotalDescuentos),
+                        sumarNomina(e.getValue(), PagoNomina::getMontoNeto),
+                        e.getValue().stream()
+                                .map(n -> n.getUsuario() != null ? n.getUsuario().getUsuarioId() : null)
+                                .filter(Objects::nonNull)
+                                .distinct()
+                                .count()))
+                .sorted(Comparator.comparing(PayrollReportResponse.PayrollByPeriod::periodo))
+                .toList();
+
+        return new PayrollReportResponse(
+                totalSueldo, totalBonos, totalDescuentos, totalNeto, empleados, porPeriodo);
+    }
+
+    @Override
+    public byte[] exportarNomina(String formato) {
+        PayrollReportResponse reporte = buildPayrollReport();
+        String fmt = (formato == null || formato.isBlank()) ? "CSV" : formato.trim().toUpperCase();
+        return switch (fmt) {
+            case "CSV" -> buildNominaCSV(reporte).getBytes(StandardCharsets.UTF_8);
+            case "EXCEL" -> excelExporter.nomina(reporte);
+            case "PDF" -> pdfExporter.nomina(reporte);
+            default -> throw new IllegalArgumentException("Formato no válido: " + formato);
+        };
+    }
+
+    private String buildNominaCSV(PayrollReportResponse r) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("# REPORTE DE COSTO DE NÓMINA\n");
+        sb.append("total_sueldo_base,total_bonos,total_descuentos,total_neto,empleados_pagados\n");
+        sb.append(r.totalSueldoBase()).append(',')
+          .append(r.totalBonos()).append(',')
+          .append(r.totalDescuentos()).append(',')
+          .append(r.totalNeto()).append(',')
+          .append(r.empleadosPagados()).append('\n');
+        sb.append('\n');
+        sb.append("# POR PERÍODO\n");
+        sb.append("periodo,sueldo_base,bonos,descuentos,neto,empleados\n");
+        for (PayrollReportResponse.PayrollByPeriod p : r.porPeriodo()) {
+            sb.append(escape(p.periodo())).append(',')
+              .append(p.sueldoBase()).append(',')
+              .append(p.bonos()).append(',')
+              .append(p.descuentos()).append(',')
+              .append(p.neto()).append(',')
+              .append(p.empleados()).append('\n');
+        }
+        return sb.toString();
+    }
+
+    private BigDecimal sumarNomina(List<PagoNomina> nominas,
+                                   java.util.function.Function<PagoNomina, BigDecimal> extractor) {
+        return nominas.stream()
+                .map(extractor)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    // =====================================================================
     // EXPORTAR CSV
     // =====================================================================
 
@@ -443,6 +550,14 @@ public class ReportServiceImpl implements ReportService {
             sb.append(escape(m.metodoPago())).append(',')
               .append(m.monto()).append(',')
               .append(m.porcentaje()).append('\n');
+        }
+        sb.append('\n');
+        sb.append("# POR FUENTE\n");
+        sb.append("fuente,monto,porcentaje\n");
+        for (RevenueReportResponse.RevenueBySource f : r.porFuente()) {
+            sb.append(escape(f.fuente())).append(',')
+              .append(f.monto()).append(',')
+              .append(f.porcentaje()).append('\n');
         }
         return sb.toString();
     }

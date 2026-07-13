@@ -5,6 +5,7 @@ import com.sanfrancisco.api.modules.reportes.dto.request.ExportReporteRequest;
 import com.sanfrancisco.api.modules.reportes.dto.request.ReportRangeRequest;
 import com.sanfrancisco.api.modules.reportes.dto.response.ManagementDashboardResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.OccupancyReportResponse;
+import com.sanfrancisco.api.modules.reportes.dto.response.PayrollReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.ReservationsReportResponse;
 import com.sanfrancisco.api.modules.reportes.dto.response.RevenueReportResponse;
 import com.sanfrancisco.api.modules.reportes.service.interfaces.ReportService;
@@ -51,6 +52,33 @@ public class ReportController {
     public ApiResponse<OccupancyReportResponse> forecast(
             @RequestParam(name = "dias", defaultValue = "30") int dias) {
         return ApiResponse.ok(reportService.buildOccupancyForecast(dias));
+    }
+
+    @GetMapping("/nomina")
+    public ApiResponse<PayrollReportResponse> nomina() {
+        return ApiResponse.ok(reportService.buildPayrollReport());
+    }
+
+    /**
+     * Exportación de nómina separada de /exportar a propósito: este endpoint
+     * exige nomina:read (ADMIN/RRHH), mientras que /exportar solo exige
+     * reporte:read y expondría información salarial a CAJA.
+     */
+    @GetMapping("/nomina/exportar")
+    public ResponseEntity<byte[]> exportarNomina(
+            @RequestParam(name = "formato", defaultValue = "PDF") String formato) {
+        byte[] contenido = reportService.exportarNomina(formato);
+        String[] meta = switch (formato == null ? "PDF" : formato.trim().toUpperCase()) {
+            case "CSV" -> new String[]{"csv", "text/csv; charset=UTF-8"};
+            case "EXCEL" -> new String[]{"xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"};
+            default -> new String[]{"pdf", "application/pdf"};
+        };
+        String filename = "reporte-nomina-" + DateTimeUtils.today() + "." + meta[0];
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(meta[1]));
+        headers.setContentDisposition(ContentDisposition.attachment().filename(filename).build());
+        return ResponseEntity.ok().headers(headers).body(contenido);
     }
 
     @PostMapping("/exportar")
