@@ -9,6 +9,7 @@ import com.sanfrancisco.api.modules.ventas.dto.response.DetalleVentaResponse;
 import com.sanfrancisco.api.modules.ventas.dto.response.VentaResponse;
 import com.sanfrancisco.api.modules.ventas.entity.Venta;
 import com.sanfrancisco.api.modules.ventas.enums.EstadoVenta;
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -16,23 +17,27 @@ import java.util.List;
 
 /**
  * Mapper manual. El monto_total se calcula como la suma de subtotales de detalles.
- * El estado inicial al crear es PENDIENTE; las transiciones de estado se gestionan
- * en el service vía operaciones dedicadas.
+ * El código de venta lo genera el service (único, server-side) y la fecha se fija
+ * con la hora del servidor. La venta de mostrador nace COMPLETADA: el POS confirma
+ * la venta en el mismo acto de crearla y el descuento de stock ocurre en la misma
+ * transacción. Las demás transiciones se gestionan en el service vía operaciones
+ * dedicadas.
  */
 @Component
 public class VentaMapper {
 
     public Venta toEntity(CreateVentaRequest request,
+                          String codigoVenta,
                           Usuario usuario,
                           Estancia estancia,
                           Huesped huesped,
                           BigDecimal montoTotal) {
         return Venta.builder()
-                .codigoVenta(request.codigoVenta())
+                .codigoVenta(codigoVenta)
                 .tipoVenta(request.tipoVenta())
                 .montoTotal(montoTotal)
-                .fechaVenta(request.fechaVenta())
-                .estado(EstadoVenta.PENDIENTE)
+                .fechaVenta(DateTimeUtils.now())
+                .estado(EstadoVenta.COMPLETADA)
                 .usuario(usuario)
                 .estancia(estancia)
                 .huesped(huesped)
@@ -44,7 +49,6 @@ public class VentaMapper {
                              Estancia estancia,
                              Huesped huesped) {
         if (request.tipoVenta() != null) target.setTipoVenta(request.tipoVenta());
-        if (request.fechaVenta() != null) target.setFechaVenta(request.fechaVenta());
         if (estancia != null) target.setEstancia(estancia);
         if (huesped != null) target.setHuesped(huesped);
     }

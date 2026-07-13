@@ -25,6 +25,10 @@ public interface ReservaHabitacionRepository extends JpaRepository<ReservaHabita
 
     List<ReservaHabitacion> findByEstado(EstadoReservaHabitacion estado);
 
+    /** Asignaciones vigentes de reservas en un estado dado (p.ej. CHECK_IN), excluyendo las liberadas. */
+    List<ReservaHabitacion> findByReservaEstadoAndEstadoNot(EstadoReserva reservaEstado,
+                                                            EstadoReservaHabitacion estadoExcluido);
+
     /** IDs de habitaciones que se solapan con el rango dado (para buscar disponibles). */
     @Query("""
             SELECT rh.habitacion.habitacionId FROM ReservaHabitacion rh

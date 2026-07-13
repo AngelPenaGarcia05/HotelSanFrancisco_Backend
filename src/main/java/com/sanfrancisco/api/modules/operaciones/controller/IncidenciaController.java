@@ -4,6 +4,7 @@ import com.sanfrancisco.api.modules.operaciones.dto.request.CambiarEstadoInciden
 import com.sanfrancisco.api.modules.operaciones.dto.request.CreateIncidenciaRequest;
 import com.sanfrancisco.api.modules.operaciones.dto.request.IncidenciaFilterRequest;
 import com.sanfrancisco.api.modules.operaciones.dto.request.UpdateIncidenciaRequest;
+import com.sanfrancisco.api.modules.operaciones.dto.response.HabitacionIncidenciaResponse;
 import com.sanfrancisco.api.modules.operaciones.dto.response.IncidenciaResponse;
 import com.sanfrancisco.api.modules.operaciones.service.interfaces.IncidenciaService;
 import com.sanfrancisco.api.shared.api.ApiResponse;
@@ -13,6 +14,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/incidencias")
@@ -41,6 +44,12 @@ public class IncidenciaController {
     public ApiResponse<IncidenciaResponse> cambiarEstado(@PathVariable Integer id,
                                                          @Valid @RequestBody CambiarEstadoIncidenciaRequest request) {
         return ApiResponse.ok(incidenciaService.cambiarEstado(id, request), "Estado de incidencia actualizado");
+    }
+
+    /** Opciones para el selector de habitación del formulario de incidencias. */
+    @GetMapping("/habitaciones")
+    public ApiResponse<List<HabitacionIncidenciaResponse>> habitacionesSeleccionables() {
+        return ApiResponse.ok(incidenciaService.findHabitacionesSeleccionables());
     }
 
     @GetMapping("/{id}")
