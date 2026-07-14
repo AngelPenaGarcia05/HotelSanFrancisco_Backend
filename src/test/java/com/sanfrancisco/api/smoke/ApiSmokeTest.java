@@ -22,6 +22,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.net.URI;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,6 +46,9 @@ class ApiSmokeTest {
 
     private static final String SMOKE_ADMIN_CORREO = "smoke.admin@test.local";
     private static final String SMOKE_ADMIN_PASSWORD = "SmokeTest123!";
+    // El backend fija fechaVenta con DateTimeUtils.now() (zona Peru); usar la
+    // misma zona aquí evita falsos negativos cerca de medianoche UTC en CI.
+    private static final ZoneId PERU_ZONE = ZoneId.of("America/Lima");
 
     @org.springframework.boot.test.web.server.LocalServerPort
     int port;
@@ -226,10 +230,10 @@ class ApiSmokeTest {
         String body = """
                 {"codigoVenta":"SMOKE-%d","tipoVenta":"DIRECTA","fechaVenta":"%s","usuarioId":%d,
                  "detalles":[{"productoId":%d,"cantidad":1,"precioUnitario":1.00}]}"""
-                .formatted(RUN, LocalDate.now(), adminId, productoId);
+                .formatted(RUN, LocalDate.now(PERU_ZONE), adminId, productoId);
         ResponseEntity<String> res = post("/api/v1/ventas", body);
         assertThat(res.getStatusCode().value()).as("venta con fecha sola: %s", res.getBody()).isEqualTo(201);
-        assertThat(json(res).path("data").path("fechaVenta").asString()).startsWith(LocalDate.now().toString());
+        assertThat(json(res).path("data").path("fechaVenta").asString()).startsWith(LocalDate.now(PERU_ZONE).toString());
         // Orden de borrado (respeta FKs): venta → producto → categoría.
         creadosParaLimpiar.add("/api/v1/ventas/" + json(res).path("data").path("ventaId").asInt());
         creadosParaLimpiar.add("/api/v1/productos/" + productoId);
