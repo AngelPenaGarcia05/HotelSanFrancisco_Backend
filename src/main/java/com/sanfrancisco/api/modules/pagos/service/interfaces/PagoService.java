@@ -4,6 +4,7 @@ import com.sanfrancisco.api.modules.pagos.dto.request.CreatePagoRequest;
 import com.sanfrancisco.api.modules.pagos.dto.request.PagoFilterRequest;
 import com.sanfrancisco.api.modules.pagos.dto.request.UpdatePagoRequest;
 import com.sanfrancisco.api.modules.pagos.dto.response.PagoResponse;
+import com.sanfrancisco.api.modules.pagos.dto.response.ResumenPagosReservaResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -20,6 +21,8 @@ public interface PagoService {
     Page<PagoResponse> search(PagoFilterRequest filter, Pageable pageable);
 
     List<PagoResponse> findByReserva(Integer reservaId);
+
+    ResumenPagosReservaResponse resumenByReserva(Integer reservaId);
 
     List<PagoResponse> findByVenta(Integer ventaId);
 

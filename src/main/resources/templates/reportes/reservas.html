@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+    <meta charset="utf-8" />
+    <style th:replace="~{reportes/fragments :: estilos}"></style>
+</head>
+<body>
+
+<div th:replace="~{reportes/fragments :: header('Reporte de reservas')}"></div>
+
+<table class="data">
+    <tr><th>Total reservas</th><th>Canceladas</th><th>Tasa cancelación</th><th>Estancia prom.</th><th>Ingresos perdidos</th></tr>
+    <tr>
+        <td class="num" th:text="${#numbers.formatInteger(reservas.totalReservas,1,'COMMA')}">0</td>
+        <td class="num" th:text="${#numbers.formatInteger(reservas.totalCanceladas,1,'COMMA')}">0</td>
+        <td class="num"><span th:text="${#numbers.formatDecimal(reservas.tasaCancelacion,1,'COMMA',1,'POINT')}">0</span>%</td>
+        <td class="num"><span th:text="${#numbers.formatDecimal(reservas.estanciaPromedioNoches,1,'COMMA',1,'POINT')}">0</span> noches</td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(reservas.ingresosPerdidosCancelaciones,1,'COMMA',2,'POINT')}">0.00</span></td>
+    </tr>
+</table>
+
+<h2>Por estado</h2>
+<table class="layout" th:if="${!reservas.porEstado.isEmpty()}">
+    <tr>
+        <td class="tablecell">
+            <table class="data">
+                <tr><th>Estado</th><th>Cantidad</th><th>Porcentaje</th></tr>
+                <tr th:each="s : ${reservas.porEstado}">
+                    <td th:text="${s.estado}">Estado</td>
+                    <td class="num" th:text="${#numbers.formatInteger(s.cantidad,1,'COMMA')}">0</td>
+                    <td class="num"><span th:text="${#numbers.formatDecimal(s.porcentaje,1,'COMMA',1,'POINT')}">0</span>%</td>
+                </tr>
+            </table>
+        </td>
+        <td class="chartcell">
+            <img class="chart" th:if="${chartReservasEstado}" th:src="${chartReservasEstado}" alt="Reservas por estado" />
+        </td>
+    </tr>
+</table>
+
+<h2>Por canal de venta</h2>
+<table class="layout" th:if="${!reservas.porCanal.isEmpty()}">
+    <tr>
+        <td class="tablecell">
+            <table class="data">
+                <tr><th>Canal</th><th>Reservas</th><th>Ingresos</th><th>Canceladas</th><th>Tasa cancel.</th></tr>
+                <tr th:each="c : ${reservas.porCanal}">
+                    <td th:text="${c.canal}">Canal</td>
+                    <td class="num" th:text="${#numbers.formatInteger(c.reservas,1,'COMMA')}">0</td>
+                    <td class="num">S/ <span th:text="${#numbers.formatDecimal(c.ingresos,1,'COMMA',2,'POINT')}">0.00</span></td>
+                    <td class="num" th:text="${#numbers.formatInteger(c.canceladas,1,'COMMA')}">0</td>
+                    <td class="num"><span th:text="${#numbers.formatDecimal(c.tasaCancelacion,1,'COMMA',1,'POINT')}">0</span>%</td>
+                </tr>
+            </table>
+        </td>
+        <td class="chartcell">
+            <img class="chart" th:if="${chartCanal}" th:src="${chartCanal}" alt="Ingresos por canal de venta" />
+        </td>
+    </tr>
+</table>
+
+<h2>Por tipo de habitación</h2>
+<table class="layout" th:if="${!reservas.porTipoHabitacion.isEmpty()}">
+    <tr>
+        <td class="tablecell">
+            <table class="data">
+                <tr><th>Tipo</th><th>Cantidad</th><th>Ingresos</th></tr>
+                <tr th:each="t : ${reservas.porTipoHabitacion}">
+                    <td th:text="${t.tipoHabitacion}">Tipo</td>
+                    <td class="num" th:text="${#numbers.formatInteger(t.cantidad,1,'COMMA')}">0</td>
+                    <td class="num">S/ <span th:text="${#numbers.formatDecimal(t.ingresos,1,'COMMA',2,'POINT')}">0.00</span></td>
+                </tr>
+            </table>
+        </td>
+        <td class="chartcell">
+            <img class="chart" th:if="${chartReservasTipo}" th:src="${chartReservasTipo}" alt="Reservas por tipo de habitación" />
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

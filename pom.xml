@@ -164,6 +164,42 @@
 			<artifactId>spring-security-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<!-- ============================================================
+		     Exportación de reportes (PDF / Excel). Todas son JARs planos
+		     sin autoconfiguración de Spring, por lo que no interfieren con
+		     el arranque de Spring Boot 4.
+		     ============================================================ -->
+
+		<!-- Motor de plantillas para el HTML del PDF. Se usa standalone
+		     (TemplateEngine propio), sin el starter MVC. Versión gestionada
+		     por el BOM de Spring Boot. -->
+		<dependency>
+			<groupId>org.thymeleaf</groupId>
+			<artifactId>thymeleaf</artifactId>
+		</dependency>
+
+		<!-- HTML+CSS -> PDF (fork de Flying Saucer, licencia LGPL). No
+		     gestionada por el BOM: versión explícita. -->
+		<dependency>
+			<groupId>com.openhtmltopdf</groupId>
+			<artifactId>openhtmltopdf-pdfbox</artifactId>
+			<version>1.0.10</version>
+		</dependency>
+
+		<!-- Gráficos server-side (LGPL): genera PNG que se incrustan en el PDF. -->
+		<dependency>
+			<groupId>org.jfree</groupId>
+			<artifactId>jfreechart</artifactId>
+			<version>1.5.5</version>
+		</dependency>
+
+		<!-- Generación de Excel .xlsx (Apache 2.0). -->
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>5.5.1</version>
+		</dependency>
 	</dependencies>
 
 	<build>

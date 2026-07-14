@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+    <meta charset="utf-8" />
+    <style th:replace="~{reportes/fragments :: estilos}"></style>
+</head>
+<body>
+
+<div th:replace="~{reportes/fragments :: header('Reporte de ausentismo y puntualidad')}"></div>
+
+<table class="layout">
+    <tr>
+        <td class="tablecell">
+            <table class="data">
+                <tr><th>Concepto</th><th>Valor</th></tr>
+                <tr><td>Total registros</td><td class="num" th:text="${#numbers.formatInteger(asistencia.totalRegistros,1,'COMMA')}">0</td></tr>
+                <tr><td>Normales</td><td class="num" th:text="${#numbers.formatInteger(asistencia.normales,1,'COMMA')}">0</td></tr>
+                <tr><td>Tardanzas</td><td class="num" th:text="${#numbers.formatInteger(asistencia.tardanzas,1,'COMMA')}">0</td></tr>
+                <tr><td>Faltas justificadas</td><td class="num" th:text="${#numbers.formatInteger(asistencia.faltasJustificadas,1,'COMMA')}">0</td></tr>
+                <tr><td>Faltas injustificadas</td><td class="num" th:text="${#numbers.formatInteger(asistencia.faltasInjustificadas,1,'COMMA')}">0</td></tr>
+                <tr><td>Permisos</td><td class="num" th:text="${#numbers.formatInteger(asistencia.permisos,1,'COMMA')}">0</td></tr>
+                <tr><td>Puntualidad</td><td class="num"><span th:text="${#numbers.formatDecimal(asistencia.puntualidad,1,'COMMA',1,'POINT')}">0</span>%</td></tr>
+                <tr><td>Horas trabajadas</td><td class="num" th:text="${#numbers.formatDecimal(asistencia.horasTrabajadas,1,'COMMA',1,'POINT')}">0</td></tr>
+            </table>
+        </td>
+        <td class="chartcell">
+            <img class="chart" th:if="${chartAsistenciaTipo}" th:src="${chartAsistenciaTipo}" alt="Distribución por tipo de asistencia" />
+        </td>
+    </tr>
+</table>
+
+<h2>Por empleado</h2>
+<table class="data" th:if="${!asistencia.porEmpleado.isEmpty()}">
+    <tr><th>Empleado</th><th>Registros</th><th>Normales</th><th>Tardanzas</th><th>Faltas just.</th><th>Faltas injust.</th><th>Permisos</th><th>Puntualidad</th><th>Horas</th></tr>
+    <tr th:each="e : ${asistencia.porEmpleado}">
+        <td th:text="${e.empleado}">--</td>
+        <td class="num" th:text="${#numbers.formatInteger(e.registros,1,'COMMA')}">0</td>
+        <td class="num" th:text="${#numbers.formatInteger(e.normales,1,'COMMA')}">0</td>
+        <td class="num" th:text="${#numbers.formatInteger(e.tardanzas,1,'COMMA')}">0</td>
+        <td class="num" th:text="${#numbers.formatInteger(e.faltasJustificadas,1,'COMMA')}">0</td>
+        <td class="num" th:text="${#numbers.formatInteger(e.faltasInjustificadas,1,'COMMA')}">0</td>
+        <td class="num" th:text="${#numbers.formatInteger(e.permisos,1,'COMMA')}">0</td>
+        <td class="num"><span th:text="${#numbers.formatDecimal(e.puntualidad,1,'COMMA',1,'POINT')}">0</span>%</td>
+        <td class="num" th:text="${#numbers.formatDecimal(e.horasTrabajadas,1,'COMMA',1,'POINT')}">0</td>
+    </tr>
+</table>
+
+<img class="chart-wide" th:if="${chartIncidencias}" th:src="${chartIncidencias}" alt="Tardanzas y faltas por empleado" />
+<p class="muted" th:if="${asistencia.porEmpleado.isEmpty()}">Sin registros de asistencia en el período.</p>
+
+</body>
+</html>

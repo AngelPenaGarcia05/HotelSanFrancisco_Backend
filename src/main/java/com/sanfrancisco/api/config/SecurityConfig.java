@@ -261,10 +261,19 @@ public class SecurityConfig {
 
                 // =============================================================
                 // REPORTES — Ingresos, reservas, ocupación, dashboard gerencial.
-                // Requiere pago:read (ADMIN, RECEPCIÓN, CAJA). Clientes excluidos.
+                // Permiso dedicado reporte:read (ADMIN, CAJA). Desacoplado de
+                // pago:read para que RECEPCION no acceda a reportes financieros.
+                // El de nómina es información salarial: exige nomina:read
+                // (ADMIN/RRHH) y debe declararse ANTES de la regla general.
                 // =============================================================
+                .requestMatchers(EndpointPaths.REPORTES_BASE + "/nomina",
+                                 EndpointPaths.REPORTES_BASE + "/nomina/**")
+                    .hasAuthority(Permissions.NOMINA_READ)
+                .requestMatchers(EndpointPaths.REPORTES_BASE + "/asistencia",
+                                 EndpointPaths.REPORTES_BASE + "/asistencia/**")
+                    .hasAuthority(Permissions.ASISTENCIA_READ)
                 .requestMatchers(EndpointPaths.REPORTES_BASE + "/**")
-                    .hasAuthority(Permissions.PAGO_READ)
+                    .hasAuthority(Permissions.REPORTE_READ)
 
                 // =============================================================
                 // VENTAS
@@ -571,7 +580,9 @@ public class SecurityConfig {
         config.setAllowedOrigins(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-XSRF-TOKEN", "Cache-Control", "X-Requested-With"));
-        config.setExposedHeaders(List.of("Set-Cookie"));
+        // Content-Disposition debe exponerse para que el frontend pueda leer el
+        // nombre del archivo en las descargas (exportación de reportes).
+        config.setExposedHeaders(List.of("Set-Cookie", "Content-Disposition"));
         config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

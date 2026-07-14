@@ -22,7 +22,6 @@ import com.sanfrancisco.api.modules.ventas.repository.VentaRepository;
 import com.sanfrancisco.api.modules.ventas.service.impl.VentaServiceImpl;
 import com.sanfrancisco.api.modules.ventas.websocket.VentaEventPublisher;
 import com.sanfrancisco.api.shared.exception.ValidationException;
-import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -88,8 +87,7 @@ class VentaServiceTest {
     private CreateVentaRequest buildCreate(BigDecimal precioEnviado, BigDecimal cantidad, BigDecimal descuento) {
         CreateDetalleVentaRequest detalle =
                 new CreateDetalleVentaRequest(7, cantidad, precioEnviado, descuento);
-        return new CreateVentaRequest("VEN-001", TipoVenta.DIRECTA,
-                DateTimeUtils.now(), 1, null, null, List.of(detalle));
+        return new CreateVentaRequest(TipoVenta.DIRECTA, 1, null, null, List.of(detalle));
     }
 
     // =========================================================================
@@ -100,25 +98,60 @@ class VentaServiceTest {
     class CrearVenta {
 
         @Test
-        @DisplayName("Exitoso: el total usa el precio del catálogo menos el descuento ((10 - 1) × 2 = 18)")
+        @DisplayName("Exitoso: el total usa el precio del catálogo menos el descuento ((10 - 1) × 2 = 18) y descuenta stock")
         void create_calculaTotalConPrecioDeCatalogoYDescuento() {
             CreateVentaRequest req = buildCreate(new BigDecimal("999.99"), // precio del request: se ignora
                     new BigDecimal("2"), new BigDecimal("1.00"));
+            DetalleVenta detalle = DetalleVenta.builder()
+                    .producto(producto)
+                    .cantidad(new BigDecimal("2"))
+                    .build();
 
-            when(ventaRepository.existsByCodigoVenta("VEN-001")).thenReturn(false);
             when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
             when(productoRepository.findById(7)).thenReturn(Optional.of(producto));
-            when(ventaMapper.toEntity(eq(req), eq(usuario), isNull(), isNull(), any(BigDecimal.class)))
+            // El código lo genera el servidor: se acepta cualquier VEN-... único
+            when(ventaRepository.existsByCodigoVenta(anyString())).thenReturn(false);
+            when(ventaMapper.toEntity(eq(req), anyString(), eq(usuario), isNull(), isNull(), any(BigDecimal.class)))
                     .thenReturn(venta);
             when(ventaRepository.save(venta)).thenReturn(venta);
-            when(detalleVentaMapper.toEntity(any(), eq(venta), eq(producto)))
-                    .thenReturn(DetalleVenta.builder().build());
+            when(detalleVentaMapper.toEntity(any(), eq(venta), eq(producto))).thenReturn(detalle);
+            // La venta nace COMPLETADA: el create descuenta stock en la misma transacción
+            when(detalleVentaRepository.findByIdVentaId(100)).thenReturn(List.of(detalle));
+            when(productoRepository.descontarStockAtomico(7, new BigDecimal("2"))).thenReturn(1);
 
             service.create(req);
 
             ArgumentCaptor<BigDecimal> montoCaptor = ArgumentCaptor.forClass(BigDecimal.class);
-            verify(ventaMapper).toEntity(eq(req), eq(usuario), isNull(), isNull(), montoCaptor.capture());
+            verify(ventaMapper).toEntity(eq(req), anyString(), eq(usuario), isNull(), isNull(), montoCaptor.capture());
             assertThat(montoCaptor.getValue()).isEqualByComparingTo("18.00");
+            verify(productoRepository).descontarStockAtomico(7, new BigDecimal("2"));
+        }
+
+        @Test
+        @DisplayName("Rechaza: stock insuficiente al crear (la venta completa se revierte)")
+        void create_stockInsuficiente_lanzaBusinessException() {
+            CreateVentaRequest req = buildCreate(null, new BigDecimal("2"), null);
+            DetalleVenta detalle = DetalleVenta.builder()
+                    .producto(producto)
+                    .cantidad(new BigDecimal("2"))
+                    .build();
+
+            when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
+            when(productoRepository.findById(7)).thenReturn(Optional.of(producto));
+            when(ventaRepository.existsByCodigoVenta(anyString())).thenReturn(false);
+            when(ventaMapper.toEntity(eq(req), anyString(), eq(usuario), isNull(), isNull(), any(BigDecimal.class)))
+                    .thenReturn(venta);
+            when(ventaRepository.save(venta)).thenReturn(venta);
+            when(detalleVentaMapper.toEntity(any(), eq(venta), eq(producto))).thenReturn(detalle);
+            when(detalleVentaRepository.findByIdVentaId(100)).thenReturn(List.of(detalle));
+            when(productoRepository.descontarStockAtomico(7, new BigDecimal("2"))).thenReturn(0);
+
+            assertThatThrownBy(() -> service.create(req))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("Stock insuficiente")
+                    .hasMessageContaining("Gaseosa 500ml");
+
+            verify(eventPublisher, never()).publishCreated(any());
         }
 
         @Test
@@ -127,7 +160,6 @@ class VentaServiceTest {
             CreateVentaRequest req = buildCreate(new BigDecimal("10.00"),
                     new BigDecimal("2"), new BigDecimal("15.00")); // descuento 15 > precio 10
 
-            when(ventaRepository.existsByCodigoVenta("VEN-001")).thenReturn(false);
             when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
             when(productoRepository.findById(7)).thenReturn(Optional.of(producto));
 

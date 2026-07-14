@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+    <meta charset="utf-8" />
+    <style th:replace="~{reportes/fragments :: estilos}"></style>
+</head>
+<body>
+
+<div th:replace="~{reportes/fragments :: header('Reporte gerencial — Resumen ejecutivo')}"></div>
+
+<!-- ============ KPIs ============ -->
+<table class="kpi-grid">
+    <tr>
+        <td>
+            <div class="kpi-label">Ingresos mes actual</div>
+            <div class="kpi-value">S/ <span th:text="${#numbers.formatDecimal(kpis.ingresosMesActual,1,'COMMA',2,'POINT')}">0.00</span></div>
+            <div class="kpi-delta">Mes anterior: S/ <span th:text="${#numbers.formatDecimal(kpis.ingresosMesAnterior,1,'COMMA',2,'POINT')}">0.00</span>
+                (<span th:text="${#numbers.formatDecimal(kpis.variacionIngresos,1,'COMMA',1,'POINT')}">0</span>%)</div>
+        </td>
+        <td>
+            <div class="kpi-label">Ocupación actual</div>
+            <div class="kpi-value"><span th:text="${#numbers.formatDecimal(kpis.ocupacionActual,1,'COMMA',1,'POINT')}">0</span>%</div>
+            <div class="kpi-delta">Mes anterior: <span th:text="${#numbers.formatDecimal(kpis.ocupacionMesAnterior,1,'COMMA',1,'POINT')}">0</span>%
+                (<span th:text="${#numbers.formatDecimal(kpis.variacionOcupacion,1,'COMMA',1,'POINT')}">0</span>%)</div>
+        </td>
+        <td>
+            <div class="kpi-label">ADR</div>
+            <div class="kpi-value">S/ <span th:text="${#numbers.formatDecimal(kpis.adrActual,1,'COMMA',2,'POINT')}">0.00</span></div>
+            <div class="kpi-delta">Tarifa promedio diaria</div>
+        </td>
+        <td>
+            <div class="kpi-label">RevPAR</div>
+            <div class="kpi-value">S/ <span th:text="${#numbers.formatDecimal(kpis.revparActual,1,'COMMA',2,'POINT')}">0.00</span></div>
+            <div class="kpi-delta">Ingreso por hab. disponible</div>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <div class="kpi-label">Reservas activas</div>
+            <div class="kpi-value" th:text="${#numbers.formatInteger(kpis.reservasActivas,1,'COMMA')}">0</div>
+        </td>
+        <td>
+            <div class="kpi-label">Pendientes de pago</div>
+            <div class="kpi-value" th:text="${#numbers.formatInteger(kpis.reservasPendientesPago,1,'COMMA')}">0</div>
+        </td>
+        <td>
+            <div class="kpi-label">Cancelaciones del mes</div>
+            <div class="kpi-value" th:text="${#numbers.formatInteger(kpis.cancelacionesMes,1,'COMMA')}">0</div>
+        </td>
+        <td></td>
+    </tr>
+</table>
+
+<!-- ============ Ingresos ============ -->
+<h2>Ingresos del mes</h2>
+<table class="data">
+    <tr><th>Total ingresos</th><th>Anticipos</th><th>Saldos</th><th>Reembolsos</th><th>Prom. diario</th></tr>
+    <tr>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ingresos.totalIngresos,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ingresos.totalAnticipos,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ingresos.totalSaldos,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ingresos.totalReembolsos,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ingresos.ingresoPromedioDiario,1,'COMMA',2,'POINT')}">0.00</span></td>
+    </tr>
+</table>
+
+<table class="layout" th:if="${!ingresos.porMetodoPago.isEmpty()}">
+    <tr>
+        <td class="tablecell">
+            <table class="data">
+                <tr><th>Método de pago</th><th>Monto</th><th>Porcentaje</th></tr>
+                <tr th:each="m : ${ingresos.porMetodoPago}">
+                    <td th:text="${m.metodoPago}">Método</td>
+                    <td class="num">S/ <span th:text="${#numbers.formatDecimal(m.monto,1,'COMMA',2,'POINT')}">0.00</span></td>
+                    <td class="num"><span th:text="${#numbers.formatDecimal(m.porcentaje,1,'COMMA',1,'POINT')}">0</span>%</td>
+                </tr>
+            </table>
+        </td>
+        <td class="chartcell">
+            <img class="chart" th:if="${chartMetodoPago}" th:src="${chartMetodoPago}" alt="Ingresos por método de pago" />
+        </td>
+    </tr>
+</table>
+
+<table class="layout" th:if="${!ingresos.porFuente.isEmpty()}">
+    <tr>
+        <td class="tablecell">
+            <table class="data">
+                <tr><th>Fuente</th><th>Monto</th><th>Porcentaje</th></tr>
+                <tr th:each="f : ${ingresos.porFuente}">
+                    <td th:text="${f.fuente}">Fuente</td>
+                    <td class="num">S/ <span th:text="${#numbers.formatDecimal(f.monto,1,'COMMA',2,'POINT')}">0.00</span></td>
+                    <td class="num"><span th:text="${#numbers.formatDecimal(f.porcentaje,1,'COMMA',1,'POINT')}">0</span>%</td>
+                </tr>
+            </table>
+        </td>
+        <td class="chartcell">
+            <img class="chart" th:if="${chartFuente}" th:src="${chartFuente}" alt="Ingresos por fuente" />
+        </td>
+    </tr>
+</table>
+
+<!-- ============ Reservas ============ -->
+<h2>Reservas del mes</h2>
+<table class="data">
+    <tr><th>Total</th><th>Canceladas</th><th>Tasa cancelación</th><th>Estancia prom.</th><th>Ingresos perdidos</th></tr>
+    <tr>
+        <td class="num" th:text="${#numbers.formatInteger(reservas.totalReservas,1,'COMMA')}">0</td>
+        <td class="num" th:text="${#numbers.formatInteger(reservas.totalCanceladas,1,'COMMA')}">0</td>
+        <td class="num"><span th:text="${#numbers.formatDecimal(reservas.tasaCancelacion,1,'COMMA',1,'POINT')}">0</span>%</td>
+        <td class="num"><span th:text="${#numbers.formatDecimal(reservas.estanciaPromedioNoches,1,'COMMA',1,'POINT')}">0</span> noches</td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(reservas.ingresosPerdidosCancelaciones,1,'COMMA',2,'POINT')}">0.00</span></td>
+    </tr>
+</table>
+
+<table class="layout" th:if="${!reservas.porEstado.isEmpty()}">
+    <tr>
+        <td class="tablecell">
+            <table class="data">
+                <tr><th>Estado</th><th>Cantidad</th><th>Porcentaje</th></tr>
+                <tr th:each="s : ${reservas.porEstado}">
+                    <td th:text="${s.estado}">Estado</td>
+                    <td class="num" th:text="${#numbers.formatInteger(s.cantidad,1,'COMMA')}">0</td>
+                    <td class="num"><span th:text="${#numbers.formatDecimal(s.porcentaje,1,'COMMA',1,'POINT')}">0</span>%</td>
+                </tr>
+            </table>
+        </td>
+        <td class="chartcell">
+            <img class="chart" th:if="${chartReservasEstado}" th:src="${chartReservasEstado}" alt="Reservas por estado" />
+        </td>
+    </tr>
+</table>
+
+<table class="layout" th:if="${!reservas.porCanal.isEmpty()}">
+    <tr>
+        <td class="tablecell">
+            <table class="data">
+                <tr><th>Canal</th><th>Reservas</th><th>Ingresos</th><th>Canceladas</th><th>Tasa cancel.</th></tr>
+                <tr th:each="c : ${reservas.porCanal}">
+                    <td th:text="${c.canal}">Canal</td>
+                    <td class="num" th:text="${#numbers.formatInteger(c.reservas,1,'COMMA')}">0</td>
+                    <td class="num">S/ <span th:text="${#numbers.formatDecimal(c.ingresos,1,'COMMA',2,'POINT')}">0.00</span></td>
+                    <td class="num" th:text="${#numbers.formatInteger(c.canceladas,1,'COMMA')}">0</td>
+                    <td class="num"><span th:text="${#numbers.formatDecimal(c.tasaCancelacion,1,'COMMA',1,'POINT')}">0</span>%</td>
+                </tr>
+            </table>
+        </td>
+        <td class="chartcell">
+            <img class="chart" th:if="${chartCanal}" th:src="${chartCanal}" alt="Ingresos por canal de venta" />
+        </td>
+    </tr>
+</table>
+
+<!-- ============ Ocupación ============ -->
+<h2>Ocupación del mes</h2>
+<table class="data">
+    <tr><th>Ocupación promedio</th><th>ADR promedio</th><th>RevPAR promedio</th></tr>
+    <tr>
+        <td class="num"><span th:text="${#numbers.formatDecimal(ocupacion.ocupacionPromedio,1,'COMMA',1,'POINT')}">0</span>%</td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ocupacion.adrPromedio,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ocupacion.revparPromedio,1,'COMMA',2,'POINT')}">0.00</span></td>
+    </tr>
+</table>
+
+<img class="chart-wide" th:if="${chartOcupacionDiaria}" th:src="${chartOcupacionDiaria}" alt="Curva de ocupación diaria" />
+
+<table class="layout" th:if="${!ocupacion.porTipoHabitacion.isEmpty()}">
+    <tr>
+        <td class="tablecell">
+            <table class="data">
+                <tr><th>Tipo</th><th>Hab.</th><th>Noches</th><th>% Ocup.</th><th>ADR</th><th>RevPAR</th></tr>
+                <tr th:each="t : ${ocupacion.porTipoHabitacion}">
+                    <td th:text="${t.tipoHabitacion}">Tipo</td>
+                    <td class="num" th:text="${#numbers.formatInteger(t.habitacionesTotal,1,'COMMA')}">0</td>
+                    <td class="num" th:text="${#numbers.formatInteger(t.nochesOcupadas,1,'COMMA')}">0</td>
+                    <td class="num"><span th:text="${#numbers.formatDecimal(t.porcentajeOcupacion,1,'COMMA',1,'POINT')}">0</span>%</td>
+                    <td class="num">S/ <span th:text="${#numbers.formatDecimal(t.adr,1,'COMMA',2,'POINT')}">0.00</span></td>
+                    <td class="num">S/ <span th:text="${#numbers.formatDecimal(t.revpar,1,'COMMA',2,'POINT')}">0.00</span></td>
+                </tr>
+            </table>
+        </td>
+        <td class="chartcell">
+            <img class="chart" th:if="${chartOcupacionPct}" th:src="${chartOcupacionPct}" alt="% Ocupación por tipo" />
+            <img class="chart" th:if="${chartTarifas}" th:src="${chartTarifas}" alt="ADR y RevPAR por tipo" style="margin-top:8px;" />
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

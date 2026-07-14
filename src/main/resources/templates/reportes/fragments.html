@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+
+<style th:fragment="estilos">
+    @page {
+        size: A4;
+        margin: 1.8cm 1.6cm;
+        @bottom-center { content: "Hotel San Francisco"; font-size: 8px; color: #999; }
+        @bottom-right { content: "Página " counter(page) " de " counter(pages); font-size: 8px; color: #999; }
+    }
+    * { box-sizing: border-box; }
+    body { font-family: Helvetica, Arial, sans-serif; color: #2b2b2b; font-size: 11px; margin: 0; }
+    .header { border-bottom: 2px solid #a67c3d; padding-bottom: 10px; margin-bottom: 16px; }
+    .header .brand { font-size: 18px; font-weight: bold; color: #a67c3d; }
+    .header .subtitle { font-size: 13px; font-weight: bold; margin-top: 2px; }
+    .header .meta { font-size: 9px; color: #777; margin-top: 4px; }
+    h2 { font-size: 12px; color: #a67c3d; border-bottom: 1px solid #e3d9c6; padding-bottom: 3px; margin: 18px 0 8px 0; }
+    .kpi-grid { width: 100%; border-collapse: collapse; }
+    .kpi-grid td { width: 25%; border: 1px solid #e3d9c6; padding: 8px; vertical-align: top; }
+    .kpi-label { font-size: 8px; color: #888; text-transform: uppercase; letter-spacing: .5px; }
+    .kpi-value { font-size: 15px; font-weight: bold; margin-top: 3px; }
+    .kpi-delta { font-size: 8px; margin-top: 2px; color: #777; }
+    table.data { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    table.data th { background: #f3ede1; text-align: center; font-size: 9px; text-transform: uppercase; color: #7a6a4a; padding: 5px 7px; border-bottom: 1px solid #e3d9c6; }
+    table.data td { padding: 4px 7px; border-bottom: 1px solid #efe9dd; text-align: center; }
+    table.data td.num { text-align: center; }
+    .muted { color: #999; font-style: italic; }
+    table.layout { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    table.layout td { vertical-align: top; }
+    td.tablecell { width: 320px; padding-right: 12px; }
+    td.chartcell { width: 260px; text-align: center; }
+    img.chart { width: 250px; height: 183px; }
+    img.chart-wide { width: 100%; max-width: 520px; margin-top: 8px; }
+</style>
+
+</head>
+<body>
+
+<div th:fragment="header(titulo)" class="header">
+    <table style="width:100%; border-collapse:collapse;">
+        <tr>
+            <td style="width:64px; vertical-align:middle;">
+                <img th:if="${logo}" th:src="${logo}" alt="Logo Hotel San Francisco"
+                     style="width:52px; height:52px;" />
+            </td>
+            <td style="vertical-align:middle;">
+                <div class="brand">Hotel San Francisco</div>
+                <div class="subtitle" th:text="${titulo}">Reporte</div>
+                <div class="meta">
+                    Generado el <span th:text="${generadoEn}">--</span>
+                    &#160;·&#160; por <span th:text="${generadoPor}">--</span>
+                </div>
+            </td>
+        </tr>
+    </table>
+</div>
+
+</body>
+</html>

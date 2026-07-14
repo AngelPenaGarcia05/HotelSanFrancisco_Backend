@@ -11,8 +11,16 @@ public record RevenueReportResponse(
         BigDecimal totalReembolsos,
         BigDecimal ingresoPromedioDiario,
         List<RevenuePoint> serie,
-        List<RevenueByMethod> porMetodoPago
+        List<RevenueByMethod> porMetodoPago,
+        List<RevenueBySource> porFuente
 ) {
+
+    public record RevenueBySource(
+            String fuente,
+            BigDecimal monto,
+            BigDecimal porcentaje
+    ) {
+    }
 
     public record RevenuePoint(
             LocalDate fecha,

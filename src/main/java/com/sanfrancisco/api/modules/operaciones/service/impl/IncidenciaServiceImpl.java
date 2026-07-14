@@ -7,6 +7,7 @@ import com.sanfrancisco.api.modules.operaciones.dto.request.CambiarEstadoInciden
 import com.sanfrancisco.api.modules.operaciones.dto.request.CreateIncidenciaRequest;
 import com.sanfrancisco.api.modules.operaciones.dto.request.IncidenciaFilterRequest;
 import com.sanfrancisco.api.modules.operaciones.dto.request.UpdateIncidenciaRequest;
+import com.sanfrancisco.api.modules.operaciones.dto.response.HabitacionIncidenciaResponse;
 import com.sanfrancisco.api.modules.operaciones.dto.response.IncidenciaResponse;
 import com.sanfrancisco.api.modules.operaciones.entity.Incidencia;
 import com.sanfrancisco.api.modules.operaciones.enums.EstadoIncidencia;
@@ -18,6 +19,8 @@ import com.sanfrancisco.api.modules.operaciones.websocket.IncidenciaEventPublish
 import com.sanfrancisco.api.modules.recepcion.entity.Habitacion;
 import com.sanfrancisco.api.modules.recepcion.entity.ReservaHabitacion;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoHabitacion;
+import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
+import com.sanfrancisco.api.modules.recepcion.enums.EstadoReservaHabitacion;
 import com.sanfrancisco.api.modules.recepcion.repository.HabitacionRepository;
 import com.sanfrancisco.api.modules.recepcion.repository.ReservaHabitacionRepository;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
@@ -29,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -64,6 +68,23 @@ public class IncidenciaServiceImpl implements IncidenciaService {
         this.habitacionRepository = habitacionRepository;
         this.incidenciaMapper = incidenciaMapper;
         this.eventPublisher = eventPublisher;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<HabitacionIncidenciaResponse> findHabitacionesSeleccionables() {
+        // Habitaciones con huésped alojado (reserva en CHECK_IN y asignación no liberada):
+        // son las únicas contra las que tiene sentido registrar una incidencia de habitación.
+        return reservaHabitacionRepository
+                .findByReservaEstadoAndEstadoNot(EstadoReserva.CHECK_IN, EstadoReservaHabitacion.LIBERADA)
+                .stream()
+                .map(rh -> new HabitacionIncidenciaResponse(
+                        rh.getReservaHabitacionId(),
+                        rh.getHabitacion().getHabitacionId(),
+                        rh.getHabitacion().getNumero(),
+                        rh.getHabitacion().getPiso(),
+                        rh.getReserva().getCodReserva()))
+                .toList();
     }
 
     @Override

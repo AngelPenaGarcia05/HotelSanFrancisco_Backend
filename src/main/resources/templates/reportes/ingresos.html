@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+    <meta charset="utf-8" />
+    <style th:replace="~{reportes/fragments :: estilos}"></style>
+</head>
+<body>
+
+<div th:replace="~{reportes/fragments :: header('Reporte de ingresos')}"></div>
+
+<table class="data">
+    <tr><th>Total ingresos</th><th>Anticipos</th><th>Saldos</th><th>Reembolsos</th><th>Prom. diario</th></tr>
+    <tr>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ingresos.totalIngresos,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ingresos.totalAnticipos,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ingresos.totalSaldos,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ingresos.totalReembolsos,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ingresos.ingresoPromedioDiario,1,'COMMA',2,'POINT')}">0.00</span></td>
+    </tr>
+</table>
+
+<h2>Por método de pago</h2>
+<table class="layout" th:if="${!ingresos.porMetodoPago.isEmpty()}">
+    <tr>
+        <td class="tablecell">
+            <table class="data">
+                <tr><th>Método de pago</th><th>Monto</th><th>Porcentaje</th></tr>
+                <tr th:each="m : ${ingresos.porMetodoPago}">
+                    <td th:text="${m.metodoPago}">Método</td>
+                    <td class="num">S/ <span th:text="${#numbers.formatDecimal(m.monto,1,'COMMA',2,'POINT')}">0.00</span></td>
+                    <td class="num"><span th:text="${#numbers.formatDecimal(m.porcentaje,1,'COMMA',1,'POINT')}">0</span>%</td>
+                </tr>
+            </table>
+        </td>
+        <td class="chartcell">
+            <img class="chart" th:if="${chartMetodoPago}" th:src="${chartMetodoPago}" alt="Ingresos por método de pago" />
+        </td>
+    </tr>
+</table>
+
+<h2>Por fuente</h2>
+<table class="layout" th:if="${!ingresos.porFuente.isEmpty()}">
+    <tr>
+        <td class="tablecell">
+            <table class="data">
+                <tr><th>Fuente</th><th>Monto</th><th>Porcentaje</th></tr>
+                <tr th:each="f : ${ingresos.porFuente}">
+                    <td th:text="${f.fuente}">Fuente</td>
+                    <td class="num">S/ <span th:text="${#numbers.formatDecimal(f.monto,1,'COMMA',2,'POINT')}">0.00</span></td>
+                    <td class="num"><span th:text="${#numbers.formatDecimal(f.porcentaje,1,'COMMA',1,'POINT')}">0</span>%</td>
+                </tr>
+            </table>
+        </td>
+        <td class="chartcell">
+            <img class="chart" th:if="${chartFuente}" th:src="${chartFuente}" alt="Ingresos por fuente" />
+        </td>
+    </tr>
+</table>
+
+<h2>Ingresos diarios</h2>
+<img class="chart-wide" th:if="${chartIngresosDiarios}" th:src="${chartIngresosDiarios}" alt="Ingresos diarios" />
+<p class="muted" th:if="${ingresos.serie.isEmpty()}">Sin ingresos en el período.</p>
+
+</body>
+</html>

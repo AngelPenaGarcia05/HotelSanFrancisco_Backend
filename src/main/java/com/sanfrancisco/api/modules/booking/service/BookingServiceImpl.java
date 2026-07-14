@@ -15,7 +15,9 @@ import com.sanfrancisco.api.modules.recepcion.entity.*;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReservaHabitacion;
 import com.sanfrancisco.api.modules.recepcion.repository.*;
+import com.sanfrancisco.api.modules.recepcion.websocket.ReservaEventPublisher;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
+import com.sanfrancisco.api.shared.exception.ValidationException;
 import com.sanfrancisco.api.modules.seguridad.repository.UsuarioRepository;
 import com.sanfrancisco.api.shared.enums.EstadoActivo;
 import org.springframework.http.HttpStatus;
@@ -49,6 +51,7 @@ public class BookingServiceImpl implements BookingService {
     private final MetodoPagoRepository metodoPagoRepository;
     private final PagoRepository pagoRepository;
     private final UsuarioRepository usuarioRepository;
+    private final ReservaEventPublisher reservaEventPublisher;
 
     public BookingServiceImpl(
             HabitacionRepository habitacionRepository,
@@ -59,7 +62,8 @@ public class BookingServiceImpl implements BookingService {
             CanalRepository canalRepository,
             MetodoPagoRepository metodoPagoRepository,
             PagoRepository pagoRepository,
-            UsuarioRepository usuarioRepository) {
+            UsuarioRepository usuarioRepository,
+            ReservaEventPublisher reservaEventPublisher) {
         this.habitacionRepository = habitacionRepository;
         this.huespedRepository = huespedRepository;
         this.reservaRepository = reservaRepository;
@@ -69,6 +73,7 @@ public class BookingServiceImpl implements BookingService {
         this.metodoPagoRepository = metodoPagoRepository;
         this.pagoRepository = pagoRepository;
         this.usuarioRepository = usuarioRepository;
+        this.reservaEventPublisher = reservaEventPublisher;
     }
 
     @Override
@@ -118,6 +123,8 @@ public class BookingServiceImpl implements BookingService {
         if (tipo == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La habitación no tiene tipo asignado");
         }
+
+        validarOcupacion(req.nroAdultos(), req.nroNinos(), tipo);
 
         boolean ocupada = reservaHabitacionRepository.existeSolapamiento(
                 habitacion.getHabitacionId(), req.fechaInicio(), req.fechaFin(),
@@ -218,6 +225,10 @@ public class BookingServiceImpl implements BookingService {
                 .build();
         pagoRepository.save(pago);
 
+        // Mismo evento/topic que el flujo de recepción: sin esto el panel admin
+        // no se entera en tiempo real de las reservas creadas desde la web pública.
+        reservaEventPublisher.publishCreated(reserva);
+
         return new BookingConfirmationResponse(
                 reserva.getReservaId(),
                 codReserva,
@@ -241,6 +252,24 @@ public class BookingServiceImpl implements BookingService {
                 montoPendiente,
                 metodoPago.getNombre()
         );
+    }
+
+    /**
+     * Valida la ocupación contra la capacidad del tipo de habitación:
+     * al menos 1 adulto y (adultos + niños) dentro de la capacidad máxima.
+     */
+    private void validarOcupacion(Integer nroAdultos, Integer nroNinos, TipoHabitacion tipo) {
+        int adultos = nroAdultos != null ? nroAdultos : 0;
+        int ninos = nroNinos != null ? nroNinos : 0;
+        if (adultos < 1) {
+            throw new ValidationException("La reserva debe incluir al menos un adulto");
+        }
+        Integer capacidad = tipo.getCapacidadMaxima();
+        if (capacidad != null && adultos + ninos > capacidad) {
+            throw new ValidationException("El número de huéspedes (" + (adultos + ninos)
+                    + ") excede la capacidad máxima de la habitación tipo "
+                    + tipo.getNombre() + " (" + capacidad + ")");
+        }
     }
 
     private Usuario getSistemaUser() {

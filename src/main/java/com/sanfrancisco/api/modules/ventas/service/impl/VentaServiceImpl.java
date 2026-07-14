@@ -21,6 +21,7 @@ import com.sanfrancisco.api.modules.ventas.dto.response.VentaResponse;
 import com.sanfrancisco.api.modules.ventas.entity.DetalleVenta;
 import com.sanfrancisco.api.modules.ventas.entity.Venta;
 import com.sanfrancisco.api.modules.ventas.enums.EstadoVenta;
+import com.sanfrancisco.api.modules.ventas.enums.TipoVenta;
 import com.sanfrancisco.api.modules.ventas.mapper.DetalleVentaMapper;
 import com.sanfrancisco.api.modules.ventas.mapper.VentaMapper;
 import com.sanfrancisco.api.modules.ventas.repository.DetalleVentaRepository;
@@ -28,8 +29,8 @@ import com.sanfrancisco.api.modules.ventas.repository.VentaRepository;
 import com.sanfrancisco.api.modules.ventas.service.interfaces.VentaService;
 import com.sanfrancisco.api.modules.ventas.specification.VentaSpecification;
 import com.sanfrancisco.api.modules.ventas.websocket.VentaEventPublisher;
-import com.sanfrancisco.api.shared.exception.ConflictException;
 import com.sanfrancisco.api.shared.exception.ValidationException;
+import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -50,6 +51,7 @@ import java.util.Set;
 public class VentaServiceImpl implements VentaService {
 
     private static final Map<EstadoVenta, Set<EstadoVenta>> TRANSICIONES = new EnumMap<>(EstadoVenta.class);
+    private static final java.util.Random RNG = new java.util.Random();
 
     static {
         TRANSICIONES.put(EstadoVenta.PENDIENTE, Set.of(EstadoVenta.COMPLETADA, EstadoVenta.ANULADA));
@@ -92,10 +94,6 @@ public class VentaServiceImpl implements VentaService {
 
     @Override
     public VentaResponse create(CreateVentaRequest request) {
-        if (ventaRepository.existsByCodigoVenta(request.codigoVenta())) {
-            throw new ConflictException("Ya existe una venta con código " + request.codigoVenta());
-        }
-
         Usuario usuario = usuarioRepository.findById(request.usuarioId())
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado: " + request.usuarioId()));
 
@@ -104,6 +102,8 @@ public class VentaServiceImpl implements VentaService {
             estancia = estanciaRepository.findById(request.estanciaId())
                     .orElseThrow(() -> new ResourceNotFoundException("Estancia no encontrada: " + request.estanciaId()));
         }
+
+        validarCargoHabitacion(request.tipoVenta(), estancia);
 
         Huesped huesped = null;
         if (request.huespedId() != null) {
@@ -122,7 +122,8 @@ public class VentaServiceImpl implements VentaService {
         }
         BigDecimal montoTotal = calcularMontoTotal(request.detalles(), productos);
 
-        Venta venta = ventaMapper.toEntity(request, usuario, estancia, huesped, montoTotal);
+        String codigoVenta = generarCodigoVentaUnico();
+        Venta venta = ventaMapper.toEntity(request, codigoVenta, usuario, estancia, huesped, montoTotal);
         Venta saved = ventaRepository.save(venta);
 
         List<DetalleVenta> detalles = new ArrayList<>();
@@ -131,8 +132,44 @@ public class VentaServiceImpl implements VentaService {
         }
         detalleVentaRepository.saveAll(detalles);
 
+        // La venta nace COMPLETADA (venta de mostrador confirmada): el stock se
+        // descuenta aquí, en la misma transacción; si algún producto no alcanza,
+        // la venta completa se revierte.
+        descontarStock(saved);
+
         eventPublisher.publishCreated(saved);
         return buildResponse(saved, detalles);
+    }
+
+    /**
+     * Un cargo a habitación solo es válido con una estancia en curso
+     * (check-in hecho y sin check-out).
+     */
+    private void validarCargoHabitacion(TipoVenta tipoVenta, Estancia estancia) {
+        if (tipoVenta != TipoVenta.CARGO_HABITACION) {
+            return;
+        }
+        if (estancia == null) {
+            throw new BusinessException("Un cargo a habitación requiere una estancia asociada");
+        }
+        if (estancia.getFechaCheckout() != null) {
+            throw new BusinessException("La estancia " + estancia.getEstanciaId()
+                    + " ya finalizó (check-out realizado); no se pueden registrar cargos a habitación");
+        }
+    }
+
+    /**
+     * Genera un código único con formato VEN-AAAA-NNNNNN, reintentando ante colisión
+     * (mismo patrón que el código de reserva del módulo booking).
+     */
+    private String generarCodigoVentaUnico() {
+        int anio = DateTimeUtils.today().getYear();
+        String cod;
+        do {
+            int n = 100000 + RNG.nextInt(900000);
+            cod = "VEN-" + anio + "-" + n;
+        } while (ventaRepository.existsByCodigoVenta(cod));
+        return cod;
     }
 
     @Override
@@ -148,6 +185,11 @@ public class VentaServiceImpl implements VentaService {
             estancia = estanciaRepository.findById(request.estanciaId())
                     .orElseThrow(() -> new ResourceNotFoundException("Estancia no encontrada: " + request.estanciaId()));
         }
+
+        // Validar contra el estado final de la venta (tipo y estancia efectivos tras el update)
+        TipoVenta tipoFinal = request.tipoVenta() != null ? request.tipoVenta() : venta.getTipoVenta();
+        Estancia estanciaFinal = estancia != null ? estancia : venta.getEstancia();
+        validarCargoHabitacion(tipoFinal, estanciaFinal);
 
         Huesped huesped = null;
         if (request.huespedId() != null) {

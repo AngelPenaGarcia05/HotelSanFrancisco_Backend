@@ -5,6 +5,8 @@ import com.sanfrancisco.api.modules.pagos.dto.request.CreatePagoRequest;
 import com.sanfrancisco.api.modules.pagos.dto.request.PagoFilterRequest;
 import com.sanfrancisco.api.modules.pagos.dto.request.UpdatePagoRequest;
 import com.sanfrancisco.api.modules.pagos.dto.response.PagoResponse;
+import com.sanfrancisco.api.modules.pagos.dto.response.ResumenPagosReservaResponse;
+import com.sanfrancisco.api.modules.pagos.enums.TipoPago;
 import com.sanfrancisco.api.modules.pagos.entity.MetodoPago;
 import com.sanfrancisco.api.modules.pagos.entity.Pago;
 import com.sanfrancisco.api.modules.pagos.mapper.PagoMapper;
@@ -165,6 +167,24 @@ public class PagoServiceImpl implements PagoService {
     public List<PagoResponse> findByReserva(Integer reservaId) {
         return pagoRepository.findByReservaReservaId(reservaId).stream()
                 .map(pagoMapper::toResponse).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ResumenPagosReservaResponse resumenByReserva(Integer reservaId) {
+        Reserva reserva = reservaRepository.findById(reservaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Reserva no encontrada: " + reservaId));
+
+        // Los REEMBOLSO restan del total pagado; el resto (ANTICIPO/SALDO/TOTAL) suma.
+        BigDecimal totalPagado = pagoRepository.findByReservaReservaId(reservaId).stream()
+                .map(p -> p.getTipoPago() == TipoPago.REEMBOLSO ? p.getMonto().negate() : p.getMonto())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal montoTotal = reserva.getMontoTotal() != null ? reserva.getMontoTotal() : BigDecimal.ZERO;
+        BigDecimal saldo = montoTotal.subtract(totalPagado).max(BigDecimal.ZERO);
+
+        return new ResumenPagosReservaResponse(
+                reservaId, montoTotal, reserva.getAdelanto(), totalPagado, saldo);
     }
 
     @Override

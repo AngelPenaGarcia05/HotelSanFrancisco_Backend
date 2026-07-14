@@ -274,4 +274,9 @@ public final class Permissions {
     public static final String SOLICITUD_CHANGE_STATUS = "solicitud:change-status";
     public static final String SOLICITUD_REPORT        = "solicitud:report";
     public static final String SOLICITUD_DELETE        = "solicitud:delete";
+
+    // =========================================================================
+    // REPORTES (ingresos, reservas, ocupación, dashboard gerencial)
+    // =========================================================================
+    public static final String REPORTE_READ = "reporte:read";
 }

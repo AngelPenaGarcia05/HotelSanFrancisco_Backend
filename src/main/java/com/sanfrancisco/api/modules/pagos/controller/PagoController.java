@@ -4,6 +4,7 @@ import com.sanfrancisco.api.modules.pagos.dto.request.CreatePagoRequest;
 import com.sanfrancisco.api.modules.pagos.dto.request.PagoFilterRequest;
 import com.sanfrancisco.api.modules.pagos.dto.request.UpdatePagoRequest;
 import com.sanfrancisco.api.modules.pagos.dto.response.PagoResponse;
+import com.sanfrancisco.api.modules.pagos.dto.response.ResumenPagosReservaResponse;
 import com.sanfrancisco.api.modules.pagos.service.interfaces.PagoService;
 import com.sanfrancisco.api.shared.api.ApiResponse;
 import com.sanfrancisco.api.shared.api.PageResponse;
@@ -51,6 +52,12 @@ public class PagoController {
     @GetMapping("/reserva/{reservaId}")
     public ApiResponse<List<PagoResponse>> findByReserva(@PathVariable Integer reservaId) {
         return ApiResponse.ok(pagoService.findByReserva(reservaId));
+    }
+
+    /** Resumen agregado para el detalle de la reserva: total pagado y saldo pendiente. */
+    @GetMapping("/reserva/{reservaId}/resumen")
+    public ApiResponse<ResumenPagosReservaResponse> resumenByReserva(@PathVariable Integer reservaId) {
+        return ApiResponse.ok(pagoService.resumenByReserva(reservaId));
     }
 
     @GetMapping("/venta/{ventaId}")

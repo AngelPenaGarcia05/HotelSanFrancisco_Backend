@@ -130,7 +130,13 @@ public class RolServiceImpl implements RolService {
     @Override
     @Transactional(readOnly = true)
     public Page<RolResponse> search(RolFilterRequest filter, Pageable pageable) {
-        return rolRepository.findAll(RolSpecification.build(filter), pageable)
+        // Con la eliminación lógica de roles, el listado por defecto solo muestra
+        // ACTIVO; los INACTIVO se consultan pasando estado=INACTIVO explícito.
+        org.springframework.data.jpa.domain.Specification<Rol> spec = RolSpecification.build(filter);
+        if (filter == null || filter.estado() == null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("estado"), EstadoActivo.ACTIVO));
+        }
+        return rolRepository.findAll(spec, pageable)
                 .map(rol -> rolMapper.toResponse(rol, findPermisosByRolId(rol.getRolId())));
     }
 
@@ -186,10 +192,11 @@ public class RolServiceImpl implements RolService {
     public void deleteById(Integer id) {
         Rol rol = rolRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Rol no encontrado: " + id));
-        
-        List<DetalleRol> detalles = detalleRolRepository.findByRolRolId(id);
-        detalleRolRepository.deleteAll(detalles);
-        rolRepository.delete(rol);
+
+        // Eliminación lógica: los usuarios existentes referencian roles por FK, así que
+        // el rol se desactiva (y conserva sus permisos) en lugar de borrarse físicamente.
+        rol.setEstado(EstadoActivo.INACTIVO);
+        rolRepository.save(rol);
         eventPublisher.publishDeleted(id, rol.getNombre());
     }
 

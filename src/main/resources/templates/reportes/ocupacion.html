@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+    <meta charset="utf-8" />
+    <style th:replace="~{reportes/fragments :: estilos}"></style>
+    <!-- Estilos propios de este reporte (no afectan a los demás) -->
+    <style>
+        table.charts-row { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        table.charts-row td { width: 50%; text-align: center; vertical-align: top; }
+        img.chart-half { width: 300px; height: 220px; }
+    </style>
+</head>
+<body>
+
+<div th:replace="~{reportes/fragments :: header('Reporte de ocupación')}"></div>
+
+<table class="data">
+    <tr><th>Ocupación promedio</th><th>ADR promedio</th><th>RevPAR promedio</th></tr>
+    <tr>
+        <td class="num"><span th:text="${#numbers.formatDecimal(ocupacion.ocupacionPromedio,1,'COMMA',1,'POINT')}">0</span>%</td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ocupacion.adrPromedio,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(ocupacion.revparPromedio,1,'COMMA',2,'POINT')}">0.00</span></td>
+    </tr>
+</table>
+
+<h2>Ocupación diaria</h2>
+<img class="chart-wide" th:if="${chartOcupacionDiaria}" th:src="${chartOcupacionDiaria}" alt="Curva de ocupación diaria" />
+
+<h2>Por tipo de habitación</h2>
+<table class="data" th:if="${!ocupacion.porTipoHabitacion.isEmpty()}">
+    <tr><th>Tipo</th><th>Hab.</th><th>Noches disp.</th><th>Noches ocup.</th><th>% Ocup.</th><th>ADR</th><th>RevPAR</th></tr>
+    <tr th:each="t : ${ocupacion.porTipoHabitacion}">
+        <td th:text="${t.tipoHabitacion}">Tipo</td>
+        <td class="num" th:text="${#numbers.formatInteger(t.habitacionesTotal,1,'COMMA')}">0</td>
+        <td class="num" th:text="${#numbers.formatInteger(t.nochesDisponibles,1,'COMMA')}">0</td>
+        <td class="num" th:text="${#numbers.formatInteger(t.nochesOcupadas,1,'COMMA')}">0</td>
+        <td class="num"><span th:text="${#numbers.formatDecimal(t.porcentajeOcupacion,1,'COMMA',1,'POINT')}">0</span>%</td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(t.adr,1,'COMMA',2,'POINT')}">0.00</span></td>
+        <td class="num">S/ <span th:text="${#numbers.formatDecimal(t.revpar,1,'COMMA',2,'POINT')}">0.00</span></td>
+    </tr>
+</table>
+
+<table class="charts-row" th:if="${!ocupacion.porTipoHabitacion.isEmpty()}">
+    <tr>
+        <td>
+            <img class="chart-half" th:if="${chartOcupacionPct}" th:src="${chartOcupacionPct}" alt="% Ocupación por tipo" />
+        </td>
+        <td>
+            <img class="chart-half" th:if="${chartTarifas}" th:src="${chartTarifas}" alt="ADR y RevPAR por tipo" />
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

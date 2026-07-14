@@ -8,10 +8,21 @@ public record ReservationsReportResponse(
         long totalCanceladas,
         BigDecimal tasaCancelacion,
         BigDecimal estanciaPromedioNoches,
+        BigDecimal ingresosPerdidosCancelaciones,
         List<ReservationsByStatus> porEstado,
         List<ReservationsByRoomType> porTipoHabitacion,
+        List<ReservationsByChannel> porCanal,
         List<ReservationsPoint> serie
 ) {
+
+    public record ReservationsByChannel(
+            String canal,
+            long reservas,
+            BigDecimal ingresos,
+            long canceladas,
+            BigDecimal tasaCancelacion
+    ) {
+    }
 
     public record ReservationsByStatus(
             String estado,

@@ -25,6 +25,10 @@ public interface ReservaHabitacionRepository extends JpaRepository<ReservaHabita
 
     List<ReservaHabitacion> findByEstado(EstadoReservaHabitacion estado);
 
+    /** Asignaciones vigentes de reservas en un estado dado (p.ej. CHECK_IN), excluyendo las liberadas. */
+    List<ReservaHabitacion> findByReservaEstadoAndEstadoNot(EstadoReserva reservaEstado,
+                                                            EstadoReservaHabitacion estadoExcluido);
+
     /** IDs de habitaciones que se solapan con el rango dado (para buscar disponibles). */
     @Query("""
             SELECT rh.habitacion.habitacionId FROM ReservaHabitacion rh
@@ -56,13 +60,17 @@ public interface ReservaHabitacionRepository extends JpaRepository<ReservaHabita
             @Param("excluirReservaId") Integer excluirReservaId);
 
     /**
-     * Asignaciones cuya estancia se solapa con el rango dado, sin filtrar por
-     * estado (mismas semánticas que el filtro en memoria del reporte de
-     * ocupación: fechaFin >= desde y fechaInicio <= hasta).
+     * Asignaciones cuya estancia se solapa con el rango dado, contando solo
+     * habitaciones efectivamente vendidas/ocupadas (estándar STR/USALI): se
+     * excluyen reservas CANCELADA y NO_SHOW, que no representan room-nights
+     * vendidas. Semántica de solapamiento: fechaFin >= desde y fechaInicio <= hasta.
      */
     @Query("""
             SELECT rh FROM ReservaHabitacion rh
-            WHERE rh.reserva.fechaFin    >= :desde
+            WHERE rh.reserva.estado NOT IN (
+                    com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva.CANCELADA,
+                    com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva.NO_SHOW)
+              AND rh.reserva.fechaFin    >= :desde
               AND rh.reserva.fechaInicio <= :hasta
             """)
     List<ReservaHabitacion> findSolapadasConRango(
