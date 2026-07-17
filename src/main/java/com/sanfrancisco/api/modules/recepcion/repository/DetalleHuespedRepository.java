@@ -22,5 +22,14 @@ public interface DetalleHuespedRepository extends JpaRepository<DetalleHuesped, 
 
     Optional<DetalleHuesped> findByIdReservaIdAndEsPrincipalTrue(Integer reservaId);
 
+    /** Huésped principal con la entidad Huesped inicializada (para lectores fuera de transacción). */
+    @org.springframework.data.jpa.repository.Query("""
+            SELECT dh FROM DetalleHuesped dh
+            JOIN FETCH dh.huesped
+            WHERE dh.id.reservaId = :reservaId AND dh.esPrincipal = true
+            """)
+    Optional<DetalleHuesped> findPrincipalConHuesped(
+            @org.springframework.data.repository.query.Param("reservaId") Integer reservaId);
+
     void deleteByIdReservaId(Integer reservaId);
 }

@@ -1,6 +1,7 @@
 package com.sanfrancisco.api.modules.booking.dto;
 
 import com.sanfrancisco.api.modules.pagos.enums.TipoPago;
+import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -31,5 +32,6 @@ public record BookingConfirmationResponse(
         BigDecimal adelanto,
         BigDecimal montoPendiente,
 
-        String metodoPagoNombre
+        // PENDIENTE al crear la pre-reserva; CONFIRMADA tras autorizar el pago.
+        EstadoReserva estadoReserva
 ) {}

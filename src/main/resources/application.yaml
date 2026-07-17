@@ -143,6 +143,29 @@ app:
       usuario-sistema-id: ${RESERVA_ONLINE_USUARIO_ID:1}
       canal-nombre: ${RESERVA_ONLINE_CANAL_NOMBRE:ONLINE}
 
+  # Pasarela Niubiz (Botón de Pago Web). Los defaults son las credenciales
+  # PÚBLICAS del ambiente de integración de Niubiz (documentación oficial),
+  # aptas para este proyecto académico. En producción se sobreescriben por
+  # variables de entorno con las credenciales reales del comercio.
+  niubiz:
+    enabled: ${NIUBIZ_ENABLED:true}
+    base-url: ${NIUBIZ_BASE_URL:https://apisandbox.vnforappstest.com}
+    merchant-id: ${NIUBIZ_MERCHANT_ID:456879852}
+    user: ${NIUBIZ_USER:integraciones@niubiz.com.pe}
+    password: ${NIUBIZ_PASSWORD:_7z3@8fF}
+    # v2: soporta el callback `complete` en JS (SPA). La variante env/sandbox
+    # solo hace POST de formulario al `action` (rompe una SPA con "Cannot POST").
+    checkout-script-url: ${NIUBIZ_CHECKOUT_SCRIPT_URL:https://static-content-qas.vnforapps.com/v2/js/checkout.js?qa=true}
+    session-expiration-minutes: ${NIUBIZ_SESSION_EXPIRATION_MINUTES:15}
+
+  # Expiración de pre-reservas web con pago online no completado: el job las
+  # cancela y libera la habitación. Ventana en minutos.
+  booking:
+    expiracion:
+      enabled: ${BOOKING_EXPIRACION_ENABLED:true}
+      minutos: ${BOOKING_EXPIRACION_MINUTOS:30}
+      cron: ${BOOKING_EXPIRACION_CRON:0 */5 * * * *}
+
 server:
   # Railway (y otros PaaS) inyectan el puerto a usar vía la variable PORT.
   port: ${PORT:8080}

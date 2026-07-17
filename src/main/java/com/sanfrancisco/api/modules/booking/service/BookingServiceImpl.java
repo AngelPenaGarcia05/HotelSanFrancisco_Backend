@@ -1,25 +1,21 @@
 package com.sanfrancisco.api.modules.booking.service;
 
-import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.modules.booking.dto.BookingConfirmationResponse;
 import com.sanfrancisco.api.modules.booking.dto.CreateBookingRequest;
 import com.sanfrancisco.api.modules.booking.dto.HabitacionDisponibleResponse;
 import com.sanfrancisco.api.modules.booking.dto.MetodoPagoPublicoResponse;
-import com.sanfrancisco.api.modules.pagos.entity.MetodoPago;
-import com.sanfrancisco.api.modules.pagos.entity.Pago;
 import com.sanfrancisco.api.modules.pagos.enums.TipoPago;
-import com.sanfrancisco.api.modules.recepcion.enums.ModalidadPago;
 import com.sanfrancisco.api.modules.pagos.repository.MetodoPagoRepository;
-import com.sanfrancisco.api.modules.pagos.repository.PagoRepository;
 import com.sanfrancisco.api.modules.recepcion.entity.*;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReservaHabitacion;
+import com.sanfrancisco.api.modules.recepcion.enums.ModalidadPago;
 import com.sanfrancisco.api.modules.recepcion.repository.*;
 import com.sanfrancisco.api.modules.recepcion.websocket.ReservaEventPublisher;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
-import com.sanfrancisco.api.shared.exception.ValidationException;
 import com.sanfrancisco.api.modules.seguridad.repository.UsuarioRepository;
 import com.sanfrancisco.api.shared.enums.EstadoActivo;
+import com.sanfrancisco.api.shared.exception.ValidationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +25,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.security.SecureRandom;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 
@@ -49,9 +44,9 @@ public class BookingServiceImpl implements BookingService {
     private final DetalleHuespedRepository detalleHuespedRepository;
     private final CanalRepository canalRepository;
     private final MetodoPagoRepository metodoPagoRepository;
-    private final PagoRepository pagoRepository;
     private final UsuarioRepository usuarioRepository;
     private final ReservaEventPublisher reservaEventPublisher;
+    private final BookingConfirmationFactory confirmationFactory;
 
     public BookingServiceImpl(
             HabitacionRepository habitacionRepository,
@@ -61,9 +56,9 @@ public class BookingServiceImpl implements BookingService {
             DetalleHuespedRepository detalleHuespedRepository,
             CanalRepository canalRepository,
             MetodoPagoRepository metodoPagoRepository,
-            PagoRepository pagoRepository,
             UsuarioRepository usuarioRepository,
-            ReservaEventPublisher reservaEventPublisher) {
+            ReservaEventPublisher reservaEventPublisher,
+            BookingConfirmationFactory confirmationFactory) {
         this.habitacionRepository = habitacionRepository;
         this.huespedRepository = huespedRepository;
         this.reservaRepository = reservaRepository;
@@ -71,9 +66,9 @@ public class BookingServiceImpl implements BookingService {
         this.detalleHuespedRepository = detalleHuespedRepository;
         this.canalRepository = canalRepository;
         this.metodoPagoRepository = metodoPagoRepository;
-        this.pagoRepository = pagoRepository;
         this.usuarioRepository = usuarioRepository;
         this.reservaEventPublisher = reservaEventPublisher;
+        this.confirmationFactory = confirmationFactory;
     }
 
     @Override
@@ -105,6 +100,14 @@ public class BookingServiceImpl implements BookingService {
                 .toList();
     }
 
+    /**
+     * Crea la pre-reserva del flujo público. Este flujo solo admite pago online
+     * (regla de negocio: el huésped web siempre deja adelanto o paga el total);
+     * el pago presencial/efectivo es exclusivo de recepción. La reserva nace
+     * PENDIENTE sin registrar ningún pago y se confirma únicamente cuando
+     * Niubiz autoriza el cobro (BookingPaymentService). Si no se paga, el job
+     * de expiración la cancela y libera la habitación.
+     */
     @Override
     @Transactional
     public BookingConfirmationResponse crearReserva(CreateBookingRequest req) {
@@ -134,9 +137,6 @@ public class BookingServiceImpl implements BookingService {
                     "La habitación ya no está disponible para las fechas seleccionadas");
         }
 
-        MetodoPago metodoPago = metodoPagoRepository.findById(req.metodoPagoId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Método de pago no encontrado"));
-
         Usuario sistemaUser = getSistemaUser();
         Canal canal = canalRepository.findByEstado(EstadoActivo.ACTIVO).stream()
                 .filter(c -> CANAL_WEB.equalsIgnoreCase(c.getNombre()))
@@ -165,10 +165,10 @@ public class BookingServiceImpl implements BookingService {
         BigDecimal subtotal = precioNoche.multiply(BigDecimal.valueOf(noches)).setScale(2, RoundingMode.HALF_UP);
         BigDecimal impuesto = subtotal.multiply(IGV).setScale(2, RoundingMode.HALF_UP);
         BigDecimal montoTotal = subtotal.add(impuesto).setScale(2, RoundingMode.HALF_UP);
+
         BigDecimal adelanto = req.tipoPago() == TipoPago.TOTAL
                 ? montoTotal
                 : montoTotal.multiply(new BigDecimal("0.50")).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal montoPendiente = montoTotal.subtract(adelanto).setScale(2, RoundingMode.HALF_UP);
 
         // Crear reserva
         String codReserva = generarCodReservaUnico();
@@ -183,10 +183,10 @@ public class BookingServiceImpl implements BookingService {
                 .impuesto(impuesto)
                 .montoTotal(montoTotal)
                 .adelanto(adelanto)
-                // Derivada del tipo de pago público: TOTAL paga todo, el resto es 50% (PARCIAL).
-                // Columna NOT NULL desde los montos server-side; sin esto el INSERT falla (409).
-                .modalidadPago(req.tipoPago() == TipoPago.TOTAL ? ModalidadPago.TOTAL : ModalidadPago.PARCIAL)
-                .estado(EstadoReserva.CONFIRMADA)
+                .modalidadPago(req.tipoPago() == TipoPago.ANTICIPO
+                        ? ModalidadPago.PARCIAL : ModalidadPago.TOTAL)
+                // PENDIENTE bloquea la habitación hasta que Niubiz autorice el cobro.
+                .estado(EstadoReserva.PENDIENTE)
                 .observaciones(req.serviciosAdicionales())
                 .usuario(sistemaUser)
                 .canal(canal)
@@ -215,43 +215,11 @@ public class BookingServiceImpl implements BookingService {
                 .build();
         detalleHuespedRepository.save(dh);
 
-        // Pago inicial
-        Pago pago = Pago.builder()
-                .reserva(reserva)
-                .metodoPago(metodoPago)
-                .tipoPago(req.tipoPago())
-                .monto(adelanto)
-                .fecha(DateTimeUtils.now())
-                .build();
-        pagoRepository.save(pago);
-
         // Mismo evento/topic que el flujo de recepción: sin esto el panel admin
         // no se entera en tiempo real de las reservas creadas desde la web pública.
         reservaEventPublisher.publishCreated(reserva);
 
-        return new BookingConfirmationResponse(
-                reserva.getReservaId(),
-                codReserva,
-                req.fechaInicio(),
-                req.fechaFin(),
-                (int) noches,
-                habitacion.getNumero(),
-                habitacion.getPiso(),
-                tipo.getNombre(),
-                req.nombres(),
-                req.apellidos(),
-                req.numeroDocumento(),
-                req.correo(),
-                req.telefono(),
-                precioNoche,
-                subtotal,
-                impuesto,
-                montoTotal,
-                req.tipoPago(),
-                adelanto,
-                montoPendiente,
-                metodoPago.getNombre()
-        );
+        return confirmationFactory.build(reserva, rh, huesped, req.tipoPago());
     }
 
     /**

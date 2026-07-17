@@ -19,6 +19,15 @@ public interface ReservaHabitacionRepository extends JpaRepository<ReservaHabita
 
     List<ReservaHabitacion> findByReservaReservaId(Integer reservaId);
 
+    /** Asignaciones con habitación y tipo inicializados (para lectores fuera de transacción). */
+    @Query("""
+            SELECT rh FROM ReservaHabitacion rh
+            JOIN FETCH rh.habitacion
+            JOIN FETCH rh.tipoHabitacion
+            WHERE rh.reserva.reservaId = :reservaId
+            """)
+    List<ReservaHabitacion> findByReservaIdFetchHabitacion(@Param("reservaId") Integer reservaId);
+
     List<ReservaHabitacion> findByReservaReservaIdIn(Collection<Integer> reservaIds);
 
     List<ReservaHabitacion> findByHabitacionHabitacionId(Integer habitacionId);
