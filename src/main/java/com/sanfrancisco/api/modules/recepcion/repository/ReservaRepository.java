@@ -68,4 +68,20 @@ public interface ReservaRepository extends JpaRepository<Reserva, Integer>,
             @Param("fechaInicio") LocalDate fechaInicio,
             @Param("fechaFin") LocalDate fechaFin,
             @Param("estadosLibera") Collection<EstadoReserva> estadosLibera);
+
+    /**
+     * Pre-reservas web con pago online no completado: PENDIENTE, de un canal
+     * dado, creadas antes del límite y sin ningún pago registrado. Son las
+     * candidatas a expirar para liberar la habitación.
+     */
+    @Query("""
+            SELECT r FROM Reserva r
+            WHERE r.estado = com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva.PENDIENTE
+              AND r.canal.nombre = :canalNombre
+              AND r.fechaCreacion < :limite
+              AND NOT EXISTS (SELECT 1 FROM Pago p WHERE p.reserva = r)
+            """)
+    List<Reserva> findPendientesWebExpiradas(
+            @Param("canalNombre") String canalNombre,
+            @Param("limite") LocalDateTime limite);
 }

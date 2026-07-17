@@ -203,7 +203,7 @@ class ApiSmokeTest {
                 {"fechaInicio":"%s","fechaFin":"%s","habitacionId":2,"tipoHabitacionId":1,
                  "numeroDocumento":"%08d","nombres":"Smoke","apellidos":"Test",
                  "correo":"smoke.booking.%d@test.local","nroAdultos":1,"nroNinos":0,
-                 "tipoPago":"TOTAL","metodoPagoId":2}"""
+                 "tipoPago":"TOTAL"}"""
                 .formatted(inicio, inicio.plusDays(2), RUN, RUN);
         ResponseEntity<String> res = rest.exchange(RequestEntity.post(URI.create(url("/api/v1/booking")))
                 .contentType(MediaType.APPLICATION_JSON).body(body), String.class);

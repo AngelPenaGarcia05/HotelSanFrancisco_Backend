@@ -48,9 +48,8 @@ public record CreateBookingRequest(
         @Size(max = 2000)
         String serviciosAdicionales,
 
+        // El flujo público solo admite pago online: TOTAL = 100 %, ANTICIPO = 50 %.
+        // El pago presencial/efectivo es exclusivo del módulo de recepción.
         @NotNull(message = "El tipo de pago es obligatorio")
-        TipoPago tipoPago,
-
-        @NotNull(message = "El método de pago es obligatorio")
-        Integer metodoPagoId
+        TipoPago tipoPago
 ) {}
