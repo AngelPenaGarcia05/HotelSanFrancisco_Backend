@@ -71,8 +71,24 @@ public class SecurityConfig {
                 .accessDeniedHandler(accessDeniedHandler)
             )
             .headers(headers -> headers
-                .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
-                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; frame-ancestors 'none'; object-src 'none';"))
+                    .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
+                    .contentSecurityPolicy(csp -> csp.policyDirectives(
+                            "default-src 'self'; " +
+                                    // Permite scripts de tu servidor, en línea (inline) y tipo BLOB para SockJS
+                                    "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; " +
+                                    // Permite estilos de tu servidor, en línea y las fuentes de Google
+                                    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+                                    "font-src 'self' https://fonts.gstatic.com; " +
+                                    "img-src 'self' https: data:; " +
+                                    // Permite la conexión HTTP y WebSocket hacia tu backend en Railway
+                                    "connect-src 'self' " +
+                                    "https://hotelsanfranciscobackend-production.up.railway.app " +
+                                    "wss://hotelsanfranciscobackend-production.up.railway.app " +
+                                    "https://fonts.googleapis.com " +
+                                    "https://fonts.gstatic.com; " +
+                                    "frame-ancestors 'none'; " +
+                                    "object-src 'none';"
+                    ))
             )
             .authorizeHttpRequests(auth -> auth
 

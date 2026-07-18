@@ -158,6 +158,7 @@ class ReservaServiceTest {
 
         huespedPrincipal = new HuespedReservaRequest(20, true);
         habRequest       = new ReservaHabitacionRequest(10, 3, null);
+        lenient().when(tipoHabitacionRepository.findById(3)).thenReturn(Optional.of(tipo));
     }
 
     // =========================================================================
