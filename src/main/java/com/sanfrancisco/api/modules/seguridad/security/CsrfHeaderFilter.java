@@ -62,6 +62,12 @@ public class CsrfHeaderFilter extends OncePerRequestFilter {
             return;
         }
 
+        // Excepción para el callback de Niubiz (form POST de un tercero)
+        if (request.getRequestURI().startsWith("/api/v1/booking/pago/retorno/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         boolean autenticaPorCookie = tieneCookie(request, JwtService.ACCESS_TOKEN_COOKIE)
                 && noUsaBearer(request);
 

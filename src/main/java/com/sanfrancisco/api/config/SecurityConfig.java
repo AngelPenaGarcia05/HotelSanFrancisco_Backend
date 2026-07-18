@@ -230,6 +230,8 @@ public class SecurityConfig {
                     .hasAuthority(Permissions.PAGO_READ)
                 .requestMatchers(HttpMethod.POST, EndpointPaths.PAGO_BASE)
                     .hasAuthority(Permissions.PAGO_CREATE)
+                .requestMatchers(HttpMethod.POST, EndpointPaths.PAGO_BASE + "/reservas/*/inicial-efectivo")
+                    .hasAuthority(Permissions.PAGO_CREATE)
                 .requestMatchers(HttpMethod.PUT, EndpointPaths.PAGO_BASE + "/**")
                     .hasAuthority(Permissions.PAGO_UPDATE)
                 .requestMatchers(HttpMethod.DELETE, EndpointPaths.PAGO_BASE + "/**")

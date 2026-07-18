@@ -6,6 +6,8 @@ import com.sanfrancisco.api.modules.booking.dto.HabitacionDisponibleResponse;
 import com.sanfrancisco.api.modules.booking.dto.MetodoPagoPublicoResponse;
 import com.sanfrancisco.api.modules.pagos.enums.TipoPago;
 import com.sanfrancisco.api.modules.pagos.repository.MetodoPagoRepository;
+import com.sanfrancisco.api.modules.recepcion.dto.request.AcompananteRequest;
+import com.sanfrancisco.api.modules.recepcion.service.AcompananteResolver;
 import com.sanfrancisco.api.modules.recepcion.entity.*;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReservaHabitacion;
@@ -25,11 +27,16 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.security.SecureRandom;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 @Service
 public class BookingServiceImpl implements BookingService {
+
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(BookingServiceImpl.class);
 
     private static final String SYSTEM_USER_EMAIL = "sistema.web@hotel-sf.com";
     private static final String CANAL_WEB = "Web";
@@ -47,6 +54,7 @@ public class BookingServiceImpl implements BookingService {
     private final UsuarioRepository usuarioRepository;
     private final ReservaEventPublisher reservaEventPublisher;
     private final BookingConfirmationFactory confirmationFactory;
+    private final AcompananteResolver acompananteResolver;
 
     public BookingServiceImpl(
             HabitacionRepository habitacionRepository,
@@ -58,7 +66,8 @@ public class BookingServiceImpl implements BookingService {
             MetodoPagoRepository metodoPagoRepository,
             UsuarioRepository usuarioRepository,
             ReservaEventPublisher reservaEventPublisher,
-            BookingConfirmationFactory confirmationFactory) {
+            BookingConfirmationFactory confirmationFactory,
+            AcompananteResolver acompananteResolver) {
         this.habitacionRepository = habitacionRepository;
         this.huespedRepository = huespedRepository;
         this.reservaRepository = reservaRepository;
@@ -69,6 +78,7 @@ public class BookingServiceImpl implements BookingService {
         this.usuarioRepository = usuarioRepository;
         this.reservaEventPublisher = reservaEventPublisher;
         this.confirmationFactory = confirmationFactory;
+        this.acompananteResolver = acompananteResolver;
     }
 
     @Override
@@ -116,25 +126,44 @@ public class BookingServiceImpl implements BookingService {
                     "La fecha de salida debe ser posterior a la fecha de entrada");
         }
 
-        // Lock pesimista: serializa reservas concurrentes sobre la misma habitación para
-        // que la validación de solapamiento siguiente sea fiable hasta el commit.
-        Habitacion habitacion = habitacionRepository.findAllByIdForUpdate(List.of(req.habitacionId())).stream()
-                .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Habitación no encontrada"));
-
-        TipoHabitacion tipo = habitacion.getTipoHabitacion();
-        if (tipo == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La habitación no tiene tipo asignado");
+        // Selección de habitaciones: lista nueva (multi) o campo legado (una sola).
+        List<Integer> habitacionIds = (req.habitacionesIds() != null && !req.habitacionesIds().isEmpty())
+                ? req.habitacionesIds().stream().distinct().toList()
+                : (req.habitacionId() != null ? List.of(req.habitacionId()) : List.of());
+        if (habitacionIds.isEmpty()) {
+            throw new ValidationException("Debe seleccionar al menos una habitación");
+        }
+        // Regla de negocio: la selección múltiple se habilita recién con 2+ adultos.
+        int adultos = req.nroAdultos() != null ? req.nroAdultos() : 0;
+        if (adultos <= 1 && habitacionIds.size() > 1) {
+            throw new ValidationException(
+                    "Con un solo adulto la reserva admite una única habitación");
         }
 
-        validarOcupacion(req.nroAdultos(), req.nroNinos(), tipo);
+        // Lock pesimista: serializa reservas concurrentes sobre las mismas habitaciones
+        // para que la validación de solapamiento siguiente sea fiable hasta el commit.
+        List<Habitacion> habitaciones = habitacionRepository.findAllByIdForUpdate(habitacionIds);
+        if (habitaciones.size() != habitacionIds.size()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Alguna habitación no fue encontrada");
+        }
+        for (Habitacion h : habitaciones) {
+            if (h.getTipoHabitacion() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "La habitación " + h.getNumero() + " no tiene tipo asignado");
+            }
+        }
 
-        boolean ocupada = reservaHabitacionRepository.existeSolapamiento(
-                habitacion.getHabitacionId(), req.fechaInicio(), req.fechaFin(),
-                Set.of(EstadoReserva.CANCELADA, EstadoReserva.NO_SHOW), null);
-        if (ocupada) {
-            throw new com.sanfrancisco.api.shared.exception.ConflictException(
-                    "La habitación ya no está disponible para las fechas seleccionadas");
+        validarOcupacion(req.nroAdultos(), req.nroNinos(), habitaciones);
+
+        for (Habitacion h : habitaciones) {
+            boolean ocupada = reservaHabitacionRepository.existeSolapamiento(
+                    h.getHabitacionId(), req.fechaInicio(), req.fechaFin(),
+                    Set.of(EstadoReserva.CANCELADA, EstadoReserva.NO_SHOW), null);
+            if (ocupada) {
+                throw new com.sanfrancisco.api.shared.exception.ConflictException(
+                        "La habitación " + h.getNumero()
+                                + " ya no está disponible para las fechas seleccionadas");
+            }
         }
 
         Usuario sistemaUser = getSistemaUser();
@@ -157,12 +186,16 @@ public class BookingServiceImpl implements BookingService {
                     return huespedRepository.save(nuevo);
                 });
 
-        // Calcular montos
+        // Calcular montos: suma del precio base de cada habitación seleccionada.
         long noches = req.fechaInicio().until(req.fechaFin()).getDays();
         if (noches <= 0) noches = 1;
+        final long nochesFinal = noches;
 
-        BigDecimal precioNoche = tipo.getPrecioBase();
-        BigDecimal subtotal = precioNoche.multiply(BigDecimal.valueOf(noches)).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal subtotal = habitaciones.stream()
+                .map(h -> h.getTipoHabitacion().getPrecioBase()
+                        .multiply(BigDecimal.valueOf(nochesFinal)))
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
         BigDecimal impuesto = subtotal.multiply(IGV).setScale(2, RoundingMode.HALF_UP);
         BigDecimal montoTotal = subtotal.add(impuesto).setScale(2, RoundingMode.HALF_UP);
 
@@ -193,50 +226,95 @@ public class BookingServiceImpl implements BookingService {
                 .build();
         reserva = reservaRepository.save(reserva);
 
-        // ReservaHabitacion
-        ReservaHabitacion rh = ReservaHabitacion.builder()
-                .reserva(reserva)
-                .habitacion(habitacion)
-                .tipoHabitacion(tipo)
-                .tarifaPactada(precioNoche)
-                .noches((int) noches)
-                .subtotal(subtotal)
-                .estado(EstadoReservaHabitacion.RESERVADA)
-                .build();
-        reservaHabitacionRepository.save(rh);
+        // ReservaHabitacion por cada habitación seleccionada
+        List<ReservaHabitacion> rhs = new ArrayList<>();
+        for (Habitacion h : habitaciones) {
+            BigDecimal precioNoche = h.getTipoHabitacion().getPrecioBase();
+            ReservaHabitacion rh = ReservaHabitacion.builder()
+                    .reserva(reserva)
+                    .habitacion(h)
+                    .tipoHabitacion(h.getTipoHabitacion())
+                    .tarifaPactada(precioNoche)
+                    .noches((int) nochesFinal)
+                    .subtotal(precioNoche.multiply(BigDecimal.valueOf(nochesFinal))
+                            .setScale(2, RoundingMode.HALF_UP))
+                    .estado(EstadoReservaHabitacion.RESERVADA)
+                    .build();
+            rhs.add(reservaHabitacionRepository.save(rh));
+        }
 
-        // DetalleHuesped
-        DetalleHuespedPK pk = new DetalleHuespedPK(huesped.getHuespedId(), reserva.getReservaId());
-        DetalleHuesped dh = DetalleHuesped.builder()
-                .id(pk)
-                .huesped(huesped)
-                .reserva(reserva)
-                .esPrincipal(true)
-                .build();
-        detalleHuespedRepository.save(dh);
+        // DetalleHuesped: titular principal + acompañantes (deduplicados por huésped).
+        persistirHuespedes(reserva, huesped, req.acompanantes(), req.nroAdultos(), req.nroNinos());
 
         // Mismo evento/topic que el flujo de recepción: sin esto el panel admin
         // no se entera en tiempo real de las reservas creadas desde la web pública.
         reservaEventPublisher.publishCreated(reserva);
+        log.info("Pre-reserva web {} creada: {} hab, {} adultos + {} niños, total S/ {}, adelanto S/ {}",
+                codReserva, habitaciones.size(), req.nroAdultos(),
+                req.nroNinos() != null ? req.nroNinos() : 0, montoTotal, adelanto);
 
-        return confirmationFactory.build(reserva, rh, huesped, req.tipoPago());
+        return confirmationFactory.build(reserva, rhs, huesped, req.tipoPago());
     }
 
     /**
-     * Valida la ocupación contra la capacidad del tipo de habitación:
-     * al menos 1 adulto y (adultos + niños) dentro de la capacidad máxima.
+     * Titular (principal) + acompañantes de la reserva web. Los acompañantes se
+     * crean/reutilizan por documento vía {@link AcompananteResolver} — la misma
+     * lógica del flujo de recepción — y nunca pueden exceder, junto al titular,
+     * la ocupación declarada.
      */
-    private void validarOcupacion(Integer nroAdultos, Integer nroNinos, TipoHabitacion tipo) {
+    private void persistirHuespedes(Reserva reserva, Huesped titular,
+                                    List<AcompananteRequest> acompanantes,
+                                    Integer nroAdultos, Integer nroNinos) {
+        int pax = (nroAdultos != null ? nroAdultos : 0) + (nroNinos != null ? nroNinos : 0);
+        int declarados = 1 + (acompanantes != null ? acompanantes.size() : 0);
+        if (declarados > pax) {
+            throw new ValidationException("El titular más los acompañantes (" + declarados
+                    + ") exceden la ocupación declarada de la reserva (" + pax + ")");
+        }
+
+        Set<Integer> agregados = new HashSet<>();
+        guardarDetalle(reserva, titular, true);
+        agregados.add(titular.getHuespedId());
+
+        if (acompanantes != null) {
+            for (AcompananteRequest acomp : acompanantes) {
+                Huesped h = acompananteResolver.obtenerOCrear(acomp);
+                if (agregados.add(h.getHuespedId())) {
+                    guardarDetalle(reserva, h, false);
+                }
+            }
+        }
+    }
+
+    private void guardarDetalle(Reserva reserva, Huesped huesped, boolean esPrincipal) {
+        DetalleHuespedPK pk = new DetalleHuespedPK(huesped.getHuespedId(), reserva.getReservaId());
+        detalleHuespedRepository.save(DetalleHuesped.builder()
+                .id(pk)
+                .huesped(huesped)
+                .reserva(reserva)
+                .esPrincipal(esPrincipal)
+                .build());
+    }
+
+    /**
+     * Valida la ocupación de la reserva web: al menos 1 adulto y que la capacidad
+     * total de las habitaciones seleccionadas alcance para adultos + niños.
+     */
+    private void validarOcupacion(Integer nroAdultos, Integer nroNinos, List<Habitacion> habitaciones) {
         int adultos = nroAdultos != null ? nroAdultos : 0;
         int ninos = nroNinos != null ? nroNinos : 0;
         if (adultos < 1) {
             throw new ValidationException("La reserva debe incluir al menos un adulto");
         }
-        Integer capacidad = tipo.getCapacidadMaxima();
-        if (capacidad != null && adultos + ninos > capacidad) {
+        int capacidadTotal = habitaciones.stream()
+                .map(h -> h.getTipoHabitacion().getCapacidadMaxima())
+                .filter(java.util.Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
+        if (capacidadTotal > 0 && adultos + ninos > capacidadTotal) {
             throw new ValidationException("El número de huéspedes (" + (adultos + ninos)
-                    + ") excede la capacidad máxima de la habitación tipo "
-                    + tipo.getNombre() + " (" + capacidad + ")");
+                    + ") excede la capacidad total de las habitaciones seleccionadas ("
+                    + capacidadTotal + ")");
         }
     }
 

@@ -14,6 +14,13 @@ public interface PagoService {
 
     PagoResponse create(CreatePagoRequest request);
 
+    /**
+     * Cobro inicial en efectivo de una reserva PENDIENTE (recepción/admin):
+     * registra el pago por el adelanto derivado de la modalidad y confirma la
+     * reserva. Es el equivalente presencial de la autorización Niubiz.
+     */
+    PagoResponse registrarPagoInicialEfectivo(Integer reservaId);
+
     PagoResponse update(Integer pagoId, UpdatePagoRequest request);
 
     PagoResponse findById(Integer pagoId);
