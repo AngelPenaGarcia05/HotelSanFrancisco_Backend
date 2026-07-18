@@ -5,6 +5,7 @@ import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 public record BookingConfirmationResponse(
         Integer reservaId,
@@ -13,9 +14,13 @@ public record BookingConfirmationResponse(
         LocalDate fechaFin,
         Integer noches,
 
+        // Primera habitación (compatibilidad con vistas de una sola habitación).
         String habitacionNumero,
         Integer habitacionPiso,
         String tipoHabitacionNombre,
+
+        // Todas las habitaciones de la reserva (selección múltiple).
+        List<HabitacionReservadaResumen> habitaciones,
 
         String huespedNombres,
         String huespedApellidos,

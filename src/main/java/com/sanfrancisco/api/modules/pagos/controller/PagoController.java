@@ -33,6 +33,17 @@ public class PagoController {
                 .body(ApiResponse.ok(created, "Pago registrado exitosamente"));
     }
 
+    /**
+     * Cobro inicial en efectivo de una reserva PENDIENTE (staff): registra el
+     * pago por el adelanto y confirma la reserva en una sola operación.
+     */
+    @PostMapping("/reservas/{reservaId}/inicial-efectivo")
+    public ResponseEntity<ApiResponse<PagoResponse>> pagoInicialEfectivo(@PathVariable Integer reservaId) {
+        PagoResponse created = pagoService.registrarPagoInicialEfectivo(reservaId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok(created, "Pago en efectivo registrado y reserva confirmada"));
+    }
+
     @PutMapping("/{id}")
     public ApiResponse<PagoResponse> update(@PathVariable Integer id,
                                             @Valid @RequestBody UpdatePagoRequest request) {

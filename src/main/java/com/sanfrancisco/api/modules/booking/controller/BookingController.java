@@ -94,18 +94,22 @@ public class BookingController {
             consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public ResponseEntity<Void> retornoCheckout(
             @PathVariable String purchaseNumber,
-            @RequestParam("transactionToken") String transactionToken) {
+            @RequestParam("transactionToken") String transactionToken,
+            // El mismo checkout sirve al booking público y al dashboard de staff;
+            // origen decide a qué pantalla del frontend se vuelve con el resultado.
+            @RequestParam(value = "origen", required = false) String origen) {
+        String base = "dashboard".equalsIgnoreCase(origen) ? "/reservas" : "/booking";
         String destino;
         try {
             bookingPaymentService.confirmarPago(new ConfirmarPagoRequest(purchaseNumber, transactionToken));
-            destino = "/booking?pago=exito&purchase=" + encode(purchaseNumber);
+            destino = base + "?pago=exito&purchase=" + encode(purchaseNumber);
         } catch (ValidationException | ConflictException e) {
-            destino = "/booking?pago=rechazado&msg=" + encode(e.getMessage());
+            destino = base + "?pago=rechazado&msg=" + encode(e.getMessage());
         } catch (ResponseStatusException e) {
-            destino = "/booking?pago=error";
+            destino = base + "?pago=error";
         } catch (Exception e) {
             log.error("Error inesperado en el retorno del checkout {}: {}", purchaseNumber, e.getMessage(), e);
-            destino = "/booking?pago=error";
+            destino = base + "?pago=error";
         }
         // 303: el navegador convierte el POST del formulario en un GET al frontend.
         return ResponseEntity.status(HttpStatus.SEE_OTHER)

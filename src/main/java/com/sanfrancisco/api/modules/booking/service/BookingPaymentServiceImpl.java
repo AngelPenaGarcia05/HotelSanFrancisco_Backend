@@ -35,6 +35,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.security.SecureRandom;
+import java.util.List;
 
 /**
  * Orquestador del pago online del booking público. NO es transaccional a
@@ -208,10 +209,11 @@ public class BookingPaymentServiceImpl implements BookingPaymentService {
     }
 
     private BookingConfirmationResponse buildConfirmation(Reserva reserva) {
-        ReservaHabitacion rh = reservaHabitacionRepository.findByReservaIdFetchHabitacion(reserva.getReservaId()).stream()
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "Reserva sin habitación asignada: " + reserva.getReservaId()));
+        List<ReservaHabitacion> rhs =
+                reservaHabitacionRepository.findByReservaIdFetchHabitacion(reserva.getReservaId());
+        if (rhs.isEmpty()) {
+            throw new IllegalStateException("Reserva sin habitación asignada: " + reserva.getReservaId());
+        }
         Huesped huesped = detalleHuespedRepository.findPrincipalConHuesped(reserva.getReservaId())
                 .map(dh -> dh.getHuesped())
                 .orElseThrow(() -> new IllegalStateException(
@@ -219,7 +221,7 @@ public class BookingPaymentServiceImpl implements BookingPaymentService {
 
         TipoPago tipoPago = reserva.getModalidadPago() == ModalidadPago.PARCIAL
                 ? TipoPago.ANTICIPO : TipoPago.TOTAL;
-        return confirmationFactory.build(reserva, rh, huesped, tipoPago);
+        return confirmationFactory.build(reserva, rhs, huesped, tipoPago);
     }
 
     /** Número de compra Niubiz: numérico, único, máx. 12 dígitos. */

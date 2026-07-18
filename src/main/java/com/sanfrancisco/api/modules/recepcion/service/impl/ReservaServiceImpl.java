@@ -97,6 +97,7 @@ public class ReservaServiceImpl implements ReservaService {
     private final ReservaEventPublisher eventPublisher;
     private final NotificacionClienteService notificacionClienteService;
     private final NotificationService notificationService;
+    private final com.sanfrancisco.api.modules.recepcion.service.AcompananteResolver acompananteResolver;
 
     public ReservaServiceImpl(ReservaRepository reservaRepository,
                               UsuarioRepository usuarioRepository,
@@ -115,7 +116,8 @@ public class ReservaServiceImpl implements ReservaService {
                               DisponibilidadService disponibilidadService,
                               ReservaEventPublisher eventPublisher,
                               NotificacionClienteService notificacionClienteService,
-                              NotificationService notificationService) {
+                              NotificationService notificationService,
+                              com.sanfrancisco.api.modules.recepcion.service.AcompananteResolver acompananteResolver) {
         this.reservaRepository = reservaRepository;
         this.usuarioRepository = usuarioRepository;
         this.canalRepository = canalRepository;
@@ -134,6 +136,7 @@ public class ReservaServiceImpl implements ReservaService {
         this.eventPublisher = eventPublisher;
         this.notificacionClienteService = notificacionClienteService;
         this.notificationService = notificationService;
+        this.acompananteResolver = acompananteResolver;
     }
 
     @Override
@@ -145,6 +148,10 @@ public class ReservaServiceImpl implements ReservaService {
     private ReservaResponse crearInterno(CreateReservaRequest request, boolean esCliente) {
         validarFechas(request.fechaInicio(), request.fechaFin());
         validarUnSoloPrincipal(request.huespedes());
+        // Misma regla para staff y cliente: los huéspedes identificados nunca
+        // pueden exceder la capacidad declarada (antes solo se validaba al cliente).
+        validarCapacidadHuespedes(request.huespedes().size(), request.nroAdultos(), request.nroNinos());
+        validarReglasHabitaciones(request.nroAdultos(), request.nroNinos(), request.habitaciones());
 
         // El código lo genera el backend salvo que un llamador interno (p.ej. canal online)
         // provea uno explícito, en cuyo caso se valida unicidad. El wizard manda null.
@@ -189,6 +196,10 @@ public class ReservaServiceImpl implements ReservaService {
 
         registrarHistorial(saved, null, EstadoReserva.PENDIENTE, "Alta de reserva");
         eventPublisher.publishCreated(saved);
+        log.info("Reserva {} creada ({}): {} hab, {} huéspedes, {} adultos + {} niños, total S/ {}",
+                saved.getCodReserva(), esCliente ? "cliente" : "staff",
+                habNormalizadas.size(), request.huespedes().size(),
+                request.nroAdultos(), request.nroNinos(), saved.getMontoTotal());
 
         notificacionClienteService.registrar(
                 saved.getUsuario().getUsuarioId(),
@@ -276,28 +287,6 @@ public class ReservaServiceImpl implements ReservaService {
     }
 
     /**
-     * Devuelve el huésped acompañante por su número de documento; si no existe, lo crea
-     * como huésped SIN cuenta ({@code usuario_id = NULL}). Reutilizar por documento evita
-     * chocar con la restricción de unicidad {@code uk_huespedes_documento}.
-     */
-    private Huesped obtenerOCrearAcompanante(AcompananteRequest req) {
-        return huespedRepository.findByNumeroDocumento(req.numeroDocumento())
-                .orElseGet(() -> huespedRepository.save(
-                        Huesped.builder()
-                                .nombre(req.nombre())
-                                .apellidoPaterno(req.apellidoPaterno())
-                                .apellidoMaterno(req.apellidoMaterno())
-                                .numeroDocumento(req.numeroDocumento())
-                                .nacionalidad(req.nacionalidad())
-                                .correo(req.correo())
-                                .telefono(req.telefono())
-                                .estado(EstadoActivo.ACTIVO)
-                                .usuario(null)   // acompañante: no tiene cuenta de usuario
-                                .build()
-                ));
-    }
-
-    /**
      * Resuelve la lista de acompañantes (crear/reutilizar por documento) y los agrega
      * como huéspedes NO principales, deduplicando por huespedId contra {@code yaAgregados}.
      */
@@ -308,10 +297,48 @@ public class ReservaServiceImpl implements ReservaService {
             return;
         }
         for (AcompananteRequest acomp : acompanantes) {
-            Huesped huesped = obtenerOCrearAcompanante(acomp);
+            Huesped huesped = acompananteResolver.obtenerOCrear(acomp);
             if (yaAgregados.add(huesped.getHuespedId())) {
                 destino.add(new HuespedReservaRequest(huesped.getHuespedId(), false));
             }
+        }
+    }
+
+    /**
+     * Reglas de negocio sobre las habitaciones de la reserva:
+     * <ul>
+     *   <li>Con 1 solo adulto únicamente se permite 1 habitación (la selección
+     *       múltiple se habilita recién con 2+ adultos).</li>
+     *   <li>La capacidad total de las habitaciones seleccionadas debe alcanzar
+     *       para todos los huéspedes declarados (adultos + niños).</li>
+     * </ul>
+     * Se valida también en el frontend, pero el backend es la autoridad.
+     */
+    private void validarReglasHabitaciones(Integer nroAdultos, Integer nroNinos,
+                                           List<ReservaHabitacionRequest> habitaciones) {
+        if (habitaciones == null || habitaciones.isEmpty()) {
+            return; // @NotEmpty del DTO ya lo reporta con su propio mensaje
+        }
+        int adultos = nroAdultos == null ? 0 : nroAdultos;
+        int ninos = nroNinos == null ? 0 : nroNinos;
+
+        if (adultos <= 1 && habitaciones.size() > 1) {
+            throw new ValidationException(
+                    "Con un solo adulto la reserva admite una única habitación; "
+                            + "para reservar varias habitaciones debe haber al menos 2 adultos.");
+        }
+
+        int capacidadTotal = cargarTipos(habitaciones).stream()
+                .map(TipoHabitacion::getCapacidadMaxima)
+                .filter(java.util.Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
+        int pax = adultos + ninos;
+        if (capacidadTotal > 0 && pax > capacidadTotal) {
+            throw new ValidationException(
+                    "La capacidad total de las habitaciones seleccionadas (" + capacidadTotal
+                            + ") no alcanza para los " + pax + " huéspedes declarados ("
+                            + adultos + " adultos + " + ninos + " niños).");
         }
     }
 
