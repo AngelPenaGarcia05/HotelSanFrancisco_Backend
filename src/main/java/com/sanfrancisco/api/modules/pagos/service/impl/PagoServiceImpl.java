@@ -19,8 +19,12 @@ import com.sanfrancisco.api.modules.notificacionescliente.enums.TipoNotificacion
 import com.sanfrancisco.api.modules.notificacionescliente.service.interfaces.NotificacionClienteService;
 import com.sanfrancisco.api.modules.notificaciones.dto.request.SendPaymentConfirmationRequest;
 import com.sanfrancisco.api.modules.notificaciones.service.interfaces.NotificationService;
+import com.sanfrancisco.api.modules.recepcion.dto.request.CambiarEstadoReservaRequest;
 import com.sanfrancisco.api.modules.recepcion.entity.Reserva;
+import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
+import com.sanfrancisco.api.modules.recepcion.enums.ModalidadPago;
 import com.sanfrancisco.api.modules.recepcion.repository.ReservaRepository;
+import com.sanfrancisco.api.modules.recepcion.service.interfaces.ReservaService;
 import com.sanfrancisco.api.modules.ventas.entity.Venta;
 import com.sanfrancisco.api.modules.ventas.repository.VentaRepository;
 import com.sanfrancisco.api.shared.exception.ValidationException;
@@ -48,6 +52,7 @@ public class PagoServiceImpl implements PagoService {
     private final PagoEventPublisher eventPublisher;
     private final NotificacionClienteService notificacionClienteService;
     private final NotificationService notificationService;
+    private final ReservaService reservaService;
 
     public PagoServiceImpl(PagoRepository pagoRepository,
                            MetodoPagoRepository metodoPagoRepository,
@@ -56,7 +61,8 @@ public class PagoServiceImpl implements PagoService {
                            PagoMapper pagoMapper,
                            PagoEventPublisher eventPublisher,
                            NotificacionClienteService notificacionClienteService,
-                           NotificationService notificationService) {
+                           NotificationService notificationService,
+                           ReservaService reservaService) {
         this.pagoRepository = pagoRepository;
         this.metodoPagoRepository = metodoPagoRepository;
         this.ventaRepository = ventaRepository;
@@ -65,6 +71,7 @@ public class PagoServiceImpl implements PagoService {
         this.eventPublisher = eventPublisher;
         this.notificacionClienteService = notificacionClienteService;
         this.notificationService = notificationService;
+        this.reservaService = reservaService;
     }
 
     @Override
@@ -124,6 +131,41 @@ public class PagoServiceImpl implements PagoService {
         }
 
         return pagoMapper.toResponse(saved);
+    }
+
+    @Override
+    public PagoResponse registrarPagoInicialEfectivo(Integer reservaId) {
+        Reserva reserva = reservaRepository.findById(reservaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Reserva no encontrada: " + reservaId));
+
+        if (reserva.getEstado() != EstadoReserva.PENDIENTE) {
+            throw new ValidationException("El pago inicial solo aplica a reservas PENDIENTES (estado actual: "
+                    + reserva.getEstado() + ")");
+        }
+        BigDecimal monto = reserva.getAdelanto();
+        if (monto == null || monto.signum() <= 0) {
+            throw new ValidationException("La reserva no tiene un adelanto pendiente de cobro");
+        }
+
+        MetodoPago efectivo = metodoPagoRepository.findFirstByNombreIgnoreCase("Efectivo")
+                .orElseThrow(() -> new IllegalStateException(
+                        "No existe el método de pago 'Efectivo' en el catálogo (migración V47)"));
+
+        TipoPago tipoPago = reserva.getModalidadPago() == ModalidadPago.PARCIAL
+                ? TipoPago.ANTICIPO : TipoPago.TOTAL;
+
+        // Reutiliza create(): valida saldo, publica el evento, notifica y envía el correo.
+        PagoResponse pago = create(new CreatePagoRequest(
+                efectivo.getMetodoPagoId(), tipoPago, null, monto, null, null, reservaId));
+
+        // Igual que la autorización Niubiz: el cobro inicial confirma la reserva
+        // (transiciones, historial y notificaciones del flujo estándar).
+        reservaService.cambiarEstado(reservaId,
+                new CambiarEstadoReservaRequest(EstadoReserva.CONFIRMADA, "Pago inicial en efectivo"));
+
+        log.info("Pago inicial en efectivo registrado: reserva {} ({}), monto S/ {}",
+                reserva.getCodReserva(), tipoPago, monto);
+        return pago;
     }
 
     @Override

@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface MetodoPagoRepository extends JpaRepository<MetodoPago, Integer>,
@@ -15,4 +16,6 @@ public interface MetodoPagoRepository extends JpaRepository<MetodoPago, Integer>
     List<MetodoPago> findByEstado(EstadoActivo estado);
 
     List<MetodoPago> findByRequiereComprobanteTrue();
+
+    Optional<MetodoPago> findFirstByNombreIgnoreCase(String nombre);
 }

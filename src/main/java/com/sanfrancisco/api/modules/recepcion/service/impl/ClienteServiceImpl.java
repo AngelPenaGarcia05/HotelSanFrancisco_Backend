@@ -14,6 +14,8 @@ import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
 import com.sanfrancisco.api.modules.seguridad.repository.UsuarioRepository;
 import com.sanfrancisco.api.shared.enums.EstadoActivo;
 import com.sanfrancisco.api.shared.exception.ConflictException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional
 public class ClienteServiceImpl implements ClienteService {
+
+    private static final Logger log = LoggerFactory.getLogger(ClienteServiceImpl.class);
 
     private final HuespedRepository huespedRepository;
     private final UsuarioRepository usuarioRepository;
@@ -82,8 +86,16 @@ public class ClienteServiceImpl implements ClienteService {
     @Override
     @Transactional(readOnly = true)
     public Page<ClienteResponse> search(ClienteFilterRequest filter, Pageable pageable) {
-        return huespedRepository.findAll(ClienteSpecification.build(filter), pageable)
+        Page<ClienteResponse> page = huespedRepository.findAll(ClienteSpecification.build(filter), pageable)
                 .map(mapper::toResponse);
+        // Trazabilidad del autocomplete del modal de reservas: permite diagnosticar
+        // "sin coincidencias" distinguiendo filtro vacío vs. consulta sin resultados.
+        log.debug("Búsqueda de clientes [q='{}', nombre='{}', doc='{}'] -> {} resultados (página {}/{})",
+                filter != null ? filter.q() : null,
+                filter != null ? filter.nombre() : null,
+                filter != null ? filter.numeroDocumento() : null,
+                page.getNumberOfElements(), page.getNumber(), page.getTotalPages());
+        return page;
     }
 
     @Override

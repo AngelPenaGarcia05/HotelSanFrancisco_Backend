@@ -126,6 +126,10 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET,  EndpointPaths.BOOKING_BASE + "/disponibles").permitAll()
                 .requestMatchers(HttpMethod.GET,  EndpointPaths.BOOKING_BASE + "/metodos-pago").permitAll()
                 .requestMatchers(HttpMethod.POST, EndpointPaths.BOOKING_BASE).permitAll()
+                .requestMatchers(HttpMethod.POST, EndpointPaths.BOOKING_BASE + "/*/pago/session").permitAll()
+                .requestMatchers(HttpMethod.POST, EndpointPaths.BOOKING_BASE + "/pago/confirmar").permitAll()
+                .requestMatchers(HttpMethod.POST, EndpointPaths.BOOKING_BASE + "/pago/retorno/*").permitAll()
+                .requestMatchers(HttpMethod.GET,  EndpointPaths.BOOKING_BASE + "/pago/*/confirmacion").permitAll()
 
                 // =============================================================
                 // MIS RESERVAS — Panel del cliente autenticado
@@ -241,6 +245,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, EndpointPaths.PAGO_BASE + "/**")
                     .hasAuthority(Permissions.PAGO_READ)
                 .requestMatchers(HttpMethod.POST, EndpointPaths.PAGO_BASE)
+                    .hasAuthority(Permissions.PAGO_CREATE)
+                .requestMatchers(HttpMethod.POST, EndpointPaths.PAGO_BASE + "/reservas/*/inicial-efectivo")
                     .hasAuthority(Permissions.PAGO_CREATE)
                 .requestMatchers(HttpMethod.PUT, EndpointPaths.PAGO_BASE + "/**")
                     .hasAuthority(Permissions.PAGO_UPDATE)

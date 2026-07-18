@@ -1,25 +1,23 @@
 package com.sanfrancisco.api.modules.booking.service;
 
-import com.sanfrancisco.api.shared.utils.DateTimeUtils;
 import com.sanfrancisco.api.modules.booking.dto.BookingConfirmationResponse;
 import com.sanfrancisco.api.modules.booking.dto.CreateBookingRequest;
 import com.sanfrancisco.api.modules.booking.dto.HabitacionDisponibleResponse;
 import com.sanfrancisco.api.modules.booking.dto.MetodoPagoPublicoResponse;
-import com.sanfrancisco.api.modules.pagos.entity.MetodoPago;
-import com.sanfrancisco.api.modules.pagos.entity.Pago;
 import com.sanfrancisco.api.modules.pagos.enums.TipoPago;
-import com.sanfrancisco.api.modules.recepcion.enums.ModalidadPago;
 import com.sanfrancisco.api.modules.pagos.repository.MetodoPagoRepository;
-import com.sanfrancisco.api.modules.pagos.repository.PagoRepository;
+import com.sanfrancisco.api.modules.recepcion.dto.request.AcompananteRequest;
+import com.sanfrancisco.api.modules.recepcion.service.AcompananteResolver;
 import com.sanfrancisco.api.modules.recepcion.entity.*;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReserva;
 import com.sanfrancisco.api.modules.recepcion.enums.EstadoReservaHabitacion;
+import com.sanfrancisco.api.modules.recepcion.enums.ModalidadPago;
 import com.sanfrancisco.api.modules.recepcion.repository.*;
 import com.sanfrancisco.api.modules.recepcion.websocket.ReservaEventPublisher;
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
-import com.sanfrancisco.api.shared.exception.ValidationException;
 import com.sanfrancisco.api.modules.seguridad.repository.UsuarioRepository;
 import com.sanfrancisco.api.shared.enums.EstadoActivo;
+import com.sanfrancisco.api.shared.exception.ValidationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,12 +27,16 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.security.SecureRandom;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 @Service
 public class BookingServiceImpl implements BookingService {
+
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(BookingServiceImpl.class);
 
     private static final String SYSTEM_USER_EMAIL = "sistema.web@hotel-sf.com";
     private static final String CANAL_WEB = "Web";
@@ -49,9 +51,10 @@ public class BookingServiceImpl implements BookingService {
     private final DetalleHuespedRepository detalleHuespedRepository;
     private final CanalRepository canalRepository;
     private final MetodoPagoRepository metodoPagoRepository;
-    private final PagoRepository pagoRepository;
     private final UsuarioRepository usuarioRepository;
     private final ReservaEventPublisher reservaEventPublisher;
+    private final BookingConfirmationFactory confirmationFactory;
+    private final AcompananteResolver acompananteResolver;
 
     public BookingServiceImpl(
             HabitacionRepository habitacionRepository,
@@ -61,9 +64,10 @@ public class BookingServiceImpl implements BookingService {
             DetalleHuespedRepository detalleHuespedRepository,
             CanalRepository canalRepository,
             MetodoPagoRepository metodoPagoRepository,
-            PagoRepository pagoRepository,
             UsuarioRepository usuarioRepository,
-            ReservaEventPublisher reservaEventPublisher) {
+            ReservaEventPublisher reservaEventPublisher,
+            BookingConfirmationFactory confirmationFactory,
+            AcompananteResolver acompananteResolver) {
         this.habitacionRepository = habitacionRepository;
         this.huespedRepository = huespedRepository;
         this.reservaRepository = reservaRepository;
@@ -71,9 +75,10 @@ public class BookingServiceImpl implements BookingService {
         this.detalleHuespedRepository = detalleHuespedRepository;
         this.canalRepository = canalRepository;
         this.metodoPagoRepository = metodoPagoRepository;
-        this.pagoRepository = pagoRepository;
         this.usuarioRepository = usuarioRepository;
         this.reservaEventPublisher = reservaEventPublisher;
+        this.confirmationFactory = confirmationFactory;
+        this.acompananteResolver = acompananteResolver;
     }
 
     @Override
@@ -105,6 +110,14 @@ public class BookingServiceImpl implements BookingService {
                 .toList();
     }
 
+    /**
+     * Crea la pre-reserva del flujo público. Este flujo solo admite pago online
+     * (regla de negocio: el huésped web siempre deja adelanto o paga el total);
+     * el pago presencial/efectivo es exclusivo de recepción. La reserva nace
+     * PENDIENTE sin registrar ningún pago y se confirma únicamente cuando
+     * Niubiz autoriza el cobro (BookingPaymentService). Si no se paga, el job
+     * de expiración la cancela y libera la habitación.
+     */
     @Override
     @Transactional
     public BookingConfirmationResponse crearReserva(CreateBookingRequest req) {
@@ -113,29 +126,45 @@ public class BookingServiceImpl implements BookingService {
                     "La fecha de salida debe ser posterior a la fecha de entrada");
         }
 
-        // Lock pesimista: serializa reservas concurrentes sobre la misma habitación para
-        // que la validación de solapamiento siguiente sea fiable hasta el commit.
-        Habitacion habitacion = habitacionRepository.findAllByIdForUpdate(List.of(req.habitacionId())).stream()
-                .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Habitación no encontrada"));
-
-        TipoHabitacion tipo = habitacion.getTipoHabitacion();
-        if (tipo == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La habitación no tiene tipo asignado");
+        // Selección de habitaciones: lista nueva (multi) o campo legado (una sola).
+        List<Integer> habitacionIds = (req.habitacionesIds() != null && !req.habitacionesIds().isEmpty())
+                ? req.habitacionesIds().stream().distinct().toList()
+                : (req.habitacionId() != null ? List.of(req.habitacionId()) : List.of());
+        if (habitacionIds.isEmpty()) {
+            throw new ValidationException("Debe seleccionar al menos una habitación");
+        }
+        // Regla de negocio: la selección múltiple se habilita recién con 2+ adultos.
+        int adultos = req.nroAdultos() != null ? req.nroAdultos() : 0;
+        if (adultos <= 1 && habitacionIds.size() > 1) {
+            throw new ValidationException(
+                    "Con un solo adulto la reserva admite una única habitación");
         }
 
-        validarOcupacion(req.nroAdultos(), req.nroNinos(), tipo);
-
-        boolean ocupada = reservaHabitacionRepository.existeSolapamiento(
-                habitacion.getHabitacionId(), req.fechaInicio(), req.fechaFin(),
-                Set.of(EstadoReserva.CANCELADA, EstadoReserva.NO_SHOW), null);
-        if (ocupada) {
-            throw new com.sanfrancisco.api.shared.exception.ConflictException(
-                    "La habitación ya no está disponible para las fechas seleccionadas");
+        // Lock pesimista: serializa reservas concurrentes sobre las mismas habitaciones
+        // para que la validación de solapamiento siguiente sea fiable hasta el commit.
+        List<Habitacion> habitaciones = habitacionRepository.findAllByIdForUpdate(habitacionIds);
+        if (habitaciones.size() != habitacionIds.size()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Alguna habitación no fue encontrada");
+        }
+        for (Habitacion h : habitaciones) {
+            if (h.getTipoHabitacion() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "La habitación " + h.getNumero() + " no tiene tipo asignado");
+            }
         }
 
-        MetodoPago metodoPago = metodoPagoRepository.findById(req.metodoPagoId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Método de pago no encontrado"));
+        validarOcupacion(req.nroAdultos(), req.nroNinos(), habitaciones);
+
+        for (Habitacion h : habitaciones) {
+            boolean ocupada = reservaHabitacionRepository.existeSolapamiento(
+                    h.getHabitacionId(), req.fechaInicio(), req.fechaFin(),
+                    Set.of(EstadoReserva.CANCELADA, EstadoReserva.NO_SHOW), null);
+            if (ocupada) {
+                throw new com.sanfrancisco.api.shared.exception.ConflictException(
+                        "La habitación " + h.getNumero()
+                                + " ya no está disponible para las fechas seleccionadas");
+            }
+        }
 
         Usuario sistemaUser = getSistemaUser();
         Canal canal = canalRepository.findByEstado(EstadoActivo.ACTIVO).stream()
@@ -157,18 +186,22 @@ public class BookingServiceImpl implements BookingService {
                     return huespedRepository.save(nuevo);
                 });
 
-        // Calcular montos
+        // Calcular montos: suma del precio base de cada habitación seleccionada.
         long noches = req.fechaInicio().until(req.fechaFin()).getDays();
         if (noches <= 0) noches = 1;
+        final long nochesFinal = noches;
 
-        BigDecimal precioNoche = tipo.getPrecioBase();
-        BigDecimal subtotal = precioNoche.multiply(BigDecimal.valueOf(noches)).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal subtotal = habitaciones.stream()
+                .map(h -> h.getTipoHabitacion().getPrecioBase()
+                        .multiply(BigDecimal.valueOf(nochesFinal)))
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
         BigDecimal impuesto = subtotal.multiply(IGV).setScale(2, RoundingMode.HALF_UP);
         BigDecimal montoTotal = subtotal.add(impuesto).setScale(2, RoundingMode.HALF_UP);
+
         BigDecimal adelanto = req.tipoPago() == TipoPago.TOTAL
                 ? montoTotal
                 : montoTotal.multiply(new BigDecimal("0.50")).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal montoPendiente = montoTotal.subtract(adelanto).setScale(2, RoundingMode.HALF_UP);
 
         // Crear reserva
         String codReserva = generarCodReservaUnico();
@@ -183,92 +216,105 @@ public class BookingServiceImpl implements BookingService {
                 .impuesto(impuesto)
                 .montoTotal(montoTotal)
                 .adelanto(adelanto)
-                // Derivada del tipo de pago público: TOTAL paga todo, el resto es 50% (PARCIAL).
-                // Columna NOT NULL desde los montos server-side; sin esto el INSERT falla (409).
-                .modalidadPago(req.tipoPago() == TipoPago.TOTAL ? ModalidadPago.TOTAL : ModalidadPago.PARCIAL)
-                .estado(EstadoReserva.CONFIRMADA)
+                .modalidadPago(req.tipoPago() == TipoPago.ANTICIPO
+                        ? ModalidadPago.PARCIAL : ModalidadPago.TOTAL)
+                // PENDIENTE bloquea la habitación hasta que Niubiz autorice el cobro.
+                .estado(EstadoReserva.PENDIENTE)
                 .observaciones(req.serviciosAdicionales())
                 .usuario(sistemaUser)
                 .canal(canal)
                 .build();
         reserva = reservaRepository.save(reserva);
 
-        // ReservaHabitacion
-        ReservaHabitacion rh = ReservaHabitacion.builder()
-                .reserva(reserva)
-                .habitacion(habitacion)
-                .tipoHabitacion(tipo)
-                .tarifaPactada(precioNoche)
-                .noches((int) noches)
-                .subtotal(subtotal)
-                .estado(EstadoReservaHabitacion.RESERVADA)
-                .build();
-        reservaHabitacionRepository.save(rh);
+        // ReservaHabitacion por cada habitación seleccionada
+        List<ReservaHabitacion> rhs = new ArrayList<>();
+        for (Habitacion h : habitaciones) {
+            BigDecimal precioNoche = h.getTipoHabitacion().getPrecioBase();
+            ReservaHabitacion rh = ReservaHabitacion.builder()
+                    .reserva(reserva)
+                    .habitacion(h)
+                    .tipoHabitacion(h.getTipoHabitacion())
+                    .tarifaPactada(precioNoche)
+                    .noches((int) nochesFinal)
+                    .subtotal(precioNoche.multiply(BigDecimal.valueOf(nochesFinal))
+                            .setScale(2, RoundingMode.HALF_UP))
+                    .estado(EstadoReservaHabitacion.RESERVADA)
+                    .build();
+            rhs.add(reservaHabitacionRepository.save(rh));
+        }
 
-        // DetalleHuesped
-        DetalleHuespedPK pk = new DetalleHuespedPK(huesped.getHuespedId(), reserva.getReservaId());
-        DetalleHuesped dh = DetalleHuesped.builder()
-                .id(pk)
-                .huesped(huesped)
-                .reserva(reserva)
-                .esPrincipal(true)
-                .build();
-        detalleHuespedRepository.save(dh);
-
-        // Pago inicial
-        Pago pago = Pago.builder()
-                .reserva(reserva)
-                .metodoPago(metodoPago)
-                .tipoPago(req.tipoPago())
-                .monto(adelanto)
-                .fecha(DateTimeUtils.now())
-                .build();
-        pagoRepository.save(pago);
+        // DetalleHuesped: titular principal + acompañantes (deduplicados por huésped).
+        persistirHuespedes(reserva, huesped, req.acompanantes(), req.nroAdultos(), req.nroNinos());
 
         // Mismo evento/topic que el flujo de recepción: sin esto el panel admin
         // no se entera en tiempo real de las reservas creadas desde la web pública.
         reservaEventPublisher.publishCreated(reserva);
+        log.info("Pre-reserva web {} creada: {} hab, {} adultos + {} niños, total S/ {}, adelanto S/ {}",
+                codReserva, habitaciones.size(), req.nroAdultos(),
+                req.nroNinos() != null ? req.nroNinos() : 0, montoTotal, adelanto);
 
-        return new BookingConfirmationResponse(
-                reserva.getReservaId(),
-                codReserva,
-                req.fechaInicio(),
-                req.fechaFin(),
-                (int) noches,
-                habitacion.getNumero(),
-                habitacion.getPiso(),
-                tipo.getNombre(),
-                req.nombres(),
-                req.apellidos(),
-                req.numeroDocumento(),
-                req.correo(),
-                req.telefono(),
-                precioNoche,
-                subtotal,
-                impuesto,
-                montoTotal,
-                req.tipoPago(),
-                adelanto,
-                montoPendiente,
-                metodoPago.getNombre()
-        );
+        return confirmationFactory.build(reserva, rhs, huesped, req.tipoPago());
     }
 
     /**
-     * Valida la ocupación contra la capacidad del tipo de habitación:
-     * al menos 1 adulto y (adultos + niños) dentro de la capacidad máxima.
+     * Titular (principal) + acompañantes de la reserva web. Los acompañantes se
+     * crean/reutilizan por documento vía {@link AcompananteResolver} — la misma
+     * lógica del flujo de recepción — y nunca pueden exceder, junto al titular,
+     * la ocupación declarada.
      */
-    private void validarOcupacion(Integer nroAdultos, Integer nroNinos, TipoHabitacion tipo) {
+    private void persistirHuespedes(Reserva reserva, Huesped titular,
+                                    List<AcompananteRequest> acompanantes,
+                                    Integer nroAdultos, Integer nroNinos) {
+        int pax = (nroAdultos != null ? nroAdultos : 0) + (nroNinos != null ? nroNinos : 0);
+        int declarados = 1 + (acompanantes != null ? acompanantes.size() : 0);
+        if (declarados > pax) {
+            throw new ValidationException("El titular más los acompañantes (" + declarados
+                    + ") exceden la ocupación declarada de la reserva (" + pax + ")");
+        }
+
+        Set<Integer> agregados = new HashSet<>();
+        guardarDetalle(reserva, titular, true);
+        agregados.add(titular.getHuespedId());
+
+        if (acompanantes != null) {
+            for (AcompananteRequest acomp : acompanantes) {
+                Huesped h = acompananteResolver.obtenerOCrear(acomp);
+                if (agregados.add(h.getHuespedId())) {
+                    guardarDetalle(reserva, h, false);
+                }
+            }
+        }
+    }
+
+    private void guardarDetalle(Reserva reserva, Huesped huesped, boolean esPrincipal) {
+        DetalleHuespedPK pk = new DetalleHuespedPK(huesped.getHuespedId(), reserva.getReservaId());
+        detalleHuespedRepository.save(DetalleHuesped.builder()
+                .id(pk)
+                .huesped(huesped)
+                .reserva(reserva)
+                .esPrincipal(esPrincipal)
+                .build());
+    }
+
+    /**
+     * Valida la ocupación de la reserva web: al menos 1 adulto y que la capacidad
+     * total de las habitaciones seleccionadas alcance para adultos + niños.
+     */
+    private void validarOcupacion(Integer nroAdultos, Integer nroNinos, List<Habitacion> habitaciones) {
         int adultos = nroAdultos != null ? nroAdultos : 0;
         int ninos = nroNinos != null ? nroNinos : 0;
         if (adultos < 1) {
             throw new ValidationException("La reserva debe incluir al menos un adulto");
         }
-        Integer capacidad = tipo.getCapacidadMaxima();
-        if (capacidad != null && adultos + ninos > capacidad) {
+        int capacidadTotal = habitaciones.stream()
+                .map(h -> h.getTipoHabitacion().getCapacidadMaxima())
+                .filter(java.util.Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
+        if (capacidadTotal > 0 && adultos + ninos > capacidadTotal) {
             throw new ValidationException("El número de huéspedes (" + (adultos + ninos)
-                    + ") excede la capacidad máxima de la habitación tipo "
-                    + tipo.getNombre() + " (" + capacidad + ")");
+                    + ") excede la capacidad total de las habitaciones seleccionadas ("
+                    + capacidadTotal + ")");
         }
     }
 
