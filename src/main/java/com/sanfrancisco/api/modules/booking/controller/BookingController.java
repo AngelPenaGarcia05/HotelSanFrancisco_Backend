@@ -98,7 +98,12 @@ public class BookingController {
             // El mismo checkout sirve al booking público y al dashboard de staff;
             // origen decide a qué pantalla del frontend se vuelve con el resultado.
             @RequestParam(value = "origen", required = false) String origen) {
-        String base = "dashboard".equalsIgnoreCase(origen) ? "/reservas" : "/booking";
+        String base;
+        if ("dashboard".equalsIgnoreCase(origen)) {
+            base = "/reservations/mis-reservas";  // <-- ruta correcta del dashboard
+        } else {
+            base = "/booking";
+        }
         String destino;
         try {
             bookingPaymentService.confirmarPago(new ConfirmarPagoRequest(purchaseNumber, transactionToken));
