@@ -30,4 +30,7 @@ EXPOSE 8080
 
 # JAVA_TOOL_OPTIONS es leído automáticamente por la JVM (p.ej. límites de memoria
 # en contenedor). Railway lo puede definir como variable de entorno.
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", \
+    "-Djava.net.preferIPv4Stack=true", \
+    "-Dsun.net.inetaddr.ttl=60", \
+    "-jar", "app.jar"]

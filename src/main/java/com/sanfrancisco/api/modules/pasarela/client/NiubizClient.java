@@ -48,8 +48,8 @@ public class NiubizClient {
         this.objectMapper = objectMapper;
 
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofSeconds(10));
-        factory.setReadTimeout(Duration.ofSeconds(30));
+        factory.setConnectTimeout(Duration.ofSeconds(15));
+        factory.setReadTimeout(Duration.ofSeconds(60));
 
         this.restClient = RestClient.builder()
                 .baseUrl(props.getBaseUrl())
