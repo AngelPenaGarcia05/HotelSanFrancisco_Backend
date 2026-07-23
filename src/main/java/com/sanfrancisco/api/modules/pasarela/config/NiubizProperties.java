@@ -5,7 +5,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Credenciales y endpoints de Niubiz. Todo se inyecta por variables de entorno;
- * los defaults apuntan al ambiente sandbox. Las credenciales nunca se loguean.
+ * los defaults apuntan al ambiente de test (apitestenv). Las credenciales nunca se loguean.
  */
 @Component
 public class NiubizProperties {
@@ -21,7 +21,7 @@ public class NiubizProperties {
 
     public NiubizProperties(
             @Value("${app.niubiz.enabled:false}") boolean enabled,
-            @Value("${app.niubiz.base-url:https://apisandbox.vnforappstest.com}") String baseUrl,
+            @Value("${app.niubiz.base-url:https://apitestenv.vnforapps.com}") String baseUrl,
             @Value("${app.niubiz.merchant-id:}") String merchantId,
             @Value("${app.niubiz.user:}") String user,
             @Value("${app.niubiz.password:}") String password,

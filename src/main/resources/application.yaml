@@ -144,12 +144,12 @@ app:
       canal-nombre: ${RESERVA_ONLINE_CANAL_NOMBRE:ONLINE}
 
   # Pasarela Niubiz (Botón de Pago Web). Los defaults son las credenciales
-  # PÚBLICAS del ambiente de integración de Niubiz (documentación oficial),
+  # PÚBLICAS del ambiente de test de Niubiz (documentación oficial),
   # aptas para este proyecto académico. En producción se sobreescriben por
   # variables de entorno con las credenciales reales del comercio.
   niubiz:
     enabled: ${NIUBIZ_ENABLED:true}
-    base-url: ${NIUBIZ_BASE_URL:https://apisandbox.vnforappstest.com}
+    base-url: ${NIUBIZ_BASE_URL:https://apitestenv.vnforapps.com}
     merchant-id: ${NIUBIZ_MERCHANT_ID:456879852}
     user: ${NIUBIZ_USER:integraciones@niubiz.com.pe}
     password: ${NIUBIZ_PASSWORD:_7z3@8fF}
