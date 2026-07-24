@@ -22,5 +22,6 @@ public record MiPagoResponse(
         String fecha,
         String metodoPago,
         BigDecimal monto,
-        String facturaUrl
+        String facturaUrl,
+        String tipoPago
 ) {}

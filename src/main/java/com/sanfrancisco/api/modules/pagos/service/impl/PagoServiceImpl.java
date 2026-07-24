@@ -248,6 +248,7 @@ public class PagoServiceImpl implements PagoService {
             return;
         }
         BigDecimal pagado = pagosPrevios.stream()
+                .filter(p -> p.getTipoPago() != TipoPago.REEMBOLSO)
                 .map(Pago::getMonto)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal saldo = montoTotal.subtract(pagado);

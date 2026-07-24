@@ -88,7 +88,8 @@ public class MisPagosServiceImpl implements MisPagosService {
                     pago.getFecha().toLocalDate().toString(),
                     pago.getMetodoPago() != null ? pago.getMetodoPago().getNombre() : null,
                     pago.getMonto(),
-                    "/api/v1/mis-facturas/" + pago.getPagoId()
+                    "/api/v1/mis-facturas/" + pago.getPagoId(),
+                    pago.getTipoPago() != null ? pago.getTipoPago().name() : null
             ));
         }
 
@@ -110,6 +111,7 @@ public class MisPagosServiceImpl implements MisPagosService {
                         reserva.getFechaInicio().toString(),
                         null,
                         saldo,
+                        null,
                         null
                 ));
             }

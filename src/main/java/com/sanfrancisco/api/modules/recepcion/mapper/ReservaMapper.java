@@ -1,5 +1,8 @@
 package com.sanfrancisco.api.modules.recepcion.mapper;
 
+import com.sanfrancisco.api.modules.pagos.entity.Pago;
+import com.sanfrancisco.api.modules.pagos.enums.TipoPago;
+import com.sanfrancisco.api.modules.pagos.repository.PagoRepository;
 import com.sanfrancisco.api.modules.recepcion.dto.ReservaMontos;
 import com.sanfrancisco.api.modules.recepcion.dto.request.CreateReservaRequest;
 import com.sanfrancisco.api.modules.recepcion.dto.request.UpdateReservaRequest;
@@ -18,6 +21,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -30,10 +34,13 @@ public class ReservaMapper {
 
     private final ReservaHabitacionMapper habitacionMapper;
     private final DetalleHuespedMapper huespedMapper;
+    private final PagoRepository pagoRepository;
 
-    public ReservaMapper(ReservaHabitacionMapper habitacionMapper, DetalleHuespedMapper huespedMapper) {
+    public ReservaMapper(ReservaHabitacionMapper habitacionMapper, DetalleHuespedMapper huespedMapper,
+                         PagoRepository pagoRepository) {
         this.habitacionMapper = habitacionMapper;
         this.huespedMapper = huespedMapper;
+        this.pagoRepository = pagoRepository;
     }
 
     public Reserva toEntity(CreateReservaRequest request, Usuario usuario, Canal canal,
@@ -107,7 +114,7 @@ public class ReservaMapper {
                 entity.getDescuento(),
                 entity.getAdelanto(),
                 entity.getImpuesto(),
-                calcularSaldoPendiente(entity.getMontoTotal(), entity.getAdelanto()),
+                calcularSaldoPendiente(entity.getReservaId(), entity.getMontoTotal()),
                 entity.getModalidadPago(),
                 entity.getObservaciones(),
                 u != null ? u.getUsuarioId() : null,
@@ -135,10 +142,21 @@ public class ReservaMapper {
         return toResponse(entity, null, null, null);
     }
 
-    private BigDecimal calcularSaldoPendiente(BigDecimal montoTotal, BigDecimal adelanto) {
+    /**
+     * Calcula el saldo pendiente real de una reserva: montoTotal − totalPagado,
+     * donde totalPagado es la suma de pagos registrados (excluyendo REEMBOLSOS).
+     * Esto reemplaza el cálculo anterior que usaba el adelanto nominal.
+     */
+    private BigDecimal calcularSaldoPendiente(Integer reservaId, BigDecimal montoTotal) {
         BigDecimal t = Optional.ofNullable(montoTotal).orElse(BigDecimal.ZERO);
-        BigDecimal a = Optional.ofNullable(adelanto).orElse(BigDecimal.ZERO);
-        return t.subtract(a);
+        if (reservaId == null) {
+            return t;
+        }
+        BigDecimal totalPagado = pagoRepository.findByReservaReservaId(reservaId).stream()
+                .filter(p -> p.getTipoPago() != TipoPago.REEMBOLSO)
+                .map(Pago::getMonto)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return t.subtract(totalPagado).max(BigDecimal.ZERO);
     }
 
     private String buildNombreCompleto(Usuario u) {

@@ -9,6 +9,9 @@ import com.sanfrancisco.api.modules.recepcion.dto.request.UpdateHabitacionReques
 import com.sanfrancisco.api.modules.notificacionescliente.enums.TipoNotificacionHuesped;
 import com.sanfrancisco.api.modules.notificacionescliente.service.interfaces.NotificacionClienteService;
 import com.sanfrancisco.api.modules.recepcion.dto.response.CalendarioHabitacionResponse;
+import com.sanfrancisco.api.modules.pagos.entity.Pago;
+import com.sanfrancisco.api.modules.pagos.enums.TipoPago;
+import com.sanfrancisco.api.modules.pagos.repository.PagoRepository;
 import com.sanfrancisco.api.modules.recepcion.dto.response.CheckOutLiquidacionResponse;
 import com.sanfrancisco.api.modules.recepcion.dto.response.HabitacionResponse;
 import com.sanfrancisco.api.modules.recepcion.entity.Estancia;
@@ -61,6 +64,7 @@ public class HabitacionServiceImpl implements HabitacionService {
     private final HistorialReservaRepository historialReservaRepository;
     private final HistorialReservaMapper historialReservaMapper;
     private final NotificacionClienteService notificacionClienteService;
+    private final PagoRepository pagoRepository;
 
     public HabitacionServiceImpl(HabitacionRepository habitacionRepository,
                                  TipoHabitacionRepository tipoHabitacionRepository,
@@ -72,7 +76,8 @@ public class HabitacionServiceImpl implements HabitacionService {
                                  WebSocketPublisher wsPublisher,
                                  HistorialReservaRepository historialReservaRepository,
                                  HistorialReservaMapper historialReservaMapper,
-                                 NotificacionClienteService notificacionClienteService) {
+                                 NotificacionClienteService notificacionClienteService,
+                                 PagoRepository pagoRepository) {
         this.habitacionRepository = habitacionRepository;
         this.tipoHabitacionRepository = tipoHabitacionRepository;
         this.reservaRepository = reservaRepository;
@@ -84,6 +89,7 @@ public class HabitacionServiceImpl implements HabitacionService {
         this.historialReservaRepository = historialReservaRepository;
         this.historialReservaMapper = historialReservaMapper;
         this.notificacionClienteService = notificacionClienteService;
+        this.pagoRepository = pagoRepository;
     }
 
     // =========================================================================
@@ -358,7 +364,7 @@ public class HabitacionServiceImpl implements HabitacionService {
                 consumos,
                 montoFinal,
                 reserva.getAdelanto(),
-                montoFinal.subtract(reserva.getAdelanto()),
+                montoFinal.subtract(totalPagado(reserva.getReservaId())).max(BigDecimal.ZERO),
                 estancia.getFechaCheckin(),
                 ahora,
                 (int) noches
@@ -438,6 +444,14 @@ public class HabitacionServiceImpl implements HabitacionService {
                     );
                 })
                 .toList();
+    }
+
+    /** Suma de pagos reales (excluyendo reembolsos) para una reserva. */
+    private BigDecimal totalPagado(Integer reservaId) {
+        return pagoRepository.findByReservaReservaId(reservaId).stream()
+                .filter(p -> p.getTipoPago() != TipoPago.REEMBOLSO)
+                .map(Pago::getMonto)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private String anexarObservacion(String existente, String nueva) {
