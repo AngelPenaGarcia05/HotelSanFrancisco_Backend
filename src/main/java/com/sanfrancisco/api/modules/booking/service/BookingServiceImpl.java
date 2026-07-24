@@ -203,6 +203,8 @@ public class BookingServiceImpl implements BookingService {
                 ? montoTotal
                 : montoTotal.multiply(new BigDecimal("0.50")).setScale(2, RoundingMode.HALF_UP);
 
+        Usuario reservaUsuario = huesped.getUsuario() != null ? huesped.getUsuario() : sistemaUser;
+
         // Crear reserva
         String codReserva = generarCodReservaUnico();
         Reserva reserva = Reserva.builder()
@@ -221,7 +223,7 @@ public class BookingServiceImpl implements BookingService {
                 // PENDIENTE bloquea la habitación hasta que Niubiz autorice el cobro.
                 .estado(EstadoReserva.PENDIENTE)
                 .observaciones(req.serviciosAdicionales())
-                .usuario(sistemaUser)
+                .usuario(reservaUsuario)
                 .canal(canal)
                 .build();
         reserva = reservaRepository.save(reserva);
