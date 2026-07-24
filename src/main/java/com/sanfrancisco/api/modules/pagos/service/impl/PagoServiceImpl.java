@@ -222,6 +222,13 @@ public class PagoServiceImpl implements PagoService {
                 .map(p -> p.getTipoPago() == TipoPago.REEMBOLSO ? p.getMonto().negate() : p.getMonto())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        if (totalPagado.compareTo(BigDecimal.ZERO) == 0
+                && reserva.getEstado() != EstadoReserva.PENDIENTE
+                && reserva.getEstado() != EstadoReserva.CANCELADA
+                && reserva.getAdelanto() != null) {
+            totalPagado = reserva.getAdelanto();
+        }
+
         BigDecimal montoTotal = reserva.getMontoTotal() != null ? reserva.getMontoTotal() : BigDecimal.ZERO;
         BigDecimal saldo = montoTotal.subtract(totalPagado).max(BigDecimal.ZERO);
 

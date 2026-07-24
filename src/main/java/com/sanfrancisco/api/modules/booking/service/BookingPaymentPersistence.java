@@ -101,8 +101,13 @@ public class BookingPaymentPersistence {
         String nombre = marca != null && marca.toLowerCase().contains("yape") ? METODO_YAPE : METODO_TARJETA;
         return metodoPagoRepository.findFirstByNombreIgnoreCase(nombre)
                 .or(() -> metodoPagoRepository.findFirstByNombreIgnoreCase(METODO_TARJETA))
-                .orElseThrow(() -> new IllegalStateException(
-                        "No existe el método de pago '" + nombre + "' en el catálogo"));
+                .or(() -> metodoPagoRepository.findAll().stream()
+                        .filter(m -> m.getNombre() != null && m.getNombre().toLowerCase().contains("tarjeta"))
+                        .findFirst())
+                .or(() -> metodoPagoRepository.findAll().stream()
+                        .filter(m -> m.getEstado() == com.sanfrancisco.api.shared.enums.EstadoActivo.ACTIVO)
+                        .findFirst())
+                .orElseThrow(() -> new IllegalStateException("No existe ningún método de pago activo en el catálogo"));
     }
 
     private String comprobante(TransaccionPasarela trx, NiubizAuthorizationResult result) {

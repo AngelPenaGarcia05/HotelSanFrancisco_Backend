@@ -765,7 +765,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         BigDecimal montoDeuda = BigDecimal.ZERO;
         for (Reserva r : reservasActivas) {
             BigDecimal pagado = pagadoPorReserva.getOrDefault(r.getReservaId(), BigDecimal.ZERO);
-            BigDecimal saldo = r.getMontoTotal().subtract(pagado);
+            if (pagado.compareTo(BigDecimal.ZERO) == 0
+                    && r.getEstado() != EstadoReserva.PENDIENTE
+                    && r.getEstado() != EstadoReserva.CANCELADA
+                    && r.getAdelanto() != null) {
+                pagado = r.getAdelanto();
+            }
+            BigDecimal saldo = r.getMontoTotal().subtract(pagado).max(BigDecimal.ZERO);
             if (saldo.compareTo(BigDecimal.ZERO) > 0) {
                 pagosPendientes++;
                 montoDeuda = montoDeuda.add(saldo);

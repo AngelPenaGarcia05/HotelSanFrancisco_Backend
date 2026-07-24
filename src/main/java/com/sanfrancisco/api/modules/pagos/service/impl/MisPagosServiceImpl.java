@@ -77,20 +77,38 @@ public class MisPagosServiceImpl implements MisPagosService {
         String habitacion = describirHabitacion(reserva.getReservaId());
         List<Pago> pagos = pagoRepository.findByReservaReservaId(reserva.getReservaId());
 
-        // Filas PAGADO: un registro por cada pago real
-        for (Pago pago : pagos) {
+        // Filas PAGADO: un registro por cada pago real (o sintético si la reserva fue confirmada sin fila de Pago)
+        if (pagos.isEmpty() && reserva.getEstado() != EstadoReserva.PENDIENTE
+                && reserva.getEstado() != EstadoReserva.CANCELADA
+                && reserva.getAdelanto() != null
+                && reserva.getAdelanto().compareTo(BigDecimal.ZERO) > 0) {
             filas.add(new MiPagoResponse(
-                    pago.getPagoId(),
+                    null,
                     reserva.getReservaId(),
                     reserva.getCodReserva(),
                     habitacion,
                     "PAGADO",
-                    pago.getFecha().toLocalDate().toString(),
-                    pago.getMetodoPago() != null ? pago.getMetodoPago().getNombre() : null,
-                    pago.getMonto(),
-                    "/api/v1/mis-facturas/" + pago.getPagoId(),
-                    pago.getTipoPago() != null ? pago.getTipoPago().name() : null
+                    reserva.getFechaInicio().toString(),
+                    "Adelanto (Reserva Confirmada)",
+                    reserva.getAdelanto(),
+                    null,
+                    "ANTICIPO"
             ));
+        } else {
+            for (Pago pago : pagos) {
+                filas.add(new MiPagoResponse(
+                        pago.getPagoId(),
+                        reserva.getReservaId(),
+                        reserva.getCodReserva(),
+                        habitacion,
+                        "PAGADO",
+                        pago.getFecha().toLocalDate().toString(),
+                        pago.getMetodoPago() != null ? pago.getMetodoPago().getNombre() : null,
+                        pago.getMonto(),
+                        "/api/v1/mis-facturas/" + pago.getPagoId(),
+                        pago.getTipoPago() != null ? pago.getTipoPago().name() : null
+                ));
+            }
         }
 
         // Fila PENDIENTE: saldo restante de reservas activas
@@ -100,6 +118,13 @@ public class MisPagosServiceImpl implements MisPagosService {
                     .filter(p -> p.getTipoPago() != TipoPago.REEMBOLSO)
                     .map(Pago::getMonto)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            if (totalPagado.compareTo(BigDecimal.ZERO) == 0
+                    && reserva.getEstado() != EstadoReserva.PENDIENTE
+                    && reserva.getAdelanto() != null) {
+                totalPagado = reserva.getAdelanto();
+            }
+
             BigDecimal saldo = reserva.getMontoTotal().subtract(totalPagado);
             if (saldo.compareTo(BigDecimal.ZERO) > 0) {
                 filas.add(new MiPagoResponse(

@@ -114,7 +114,7 @@ public class ReservaMapper {
                 entity.getDescuento(),
                 entity.getAdelanto(),
                 entity.getImpuesto(),
-                calcularSaldoPendiente(entity.getReservaId(), entity.getMontoTotal()),
+                calcularSaldoPendiente(entity),
                 entity.getModalidadPago(),
                 entity.getObservaciones(),
                 u != null ? u.getUsuarioId() : null,
@@ -145,17 +145,27 @@ public class ReservaMapper {
     /**
      * Calcula el saldo pendiente real de una reserva: montoTotal − totalPagado,
      * donde totalPagado es la suma de pagos registrados (excluyendo REEMBOLSOS).
-     * Esto reemplaza el cálculo anterior que usaba el adelanto nominal.
+     * Si la reserva ya está confirmada o activa y no posee filas de pago en la BD,
+     * se asume el adelanto nominal como mínimo pagado.
      */
-    private BigDecimal calcularSaldoPendiente(Integer reservaId, BigDecimal montoTotal) {
-        BigDecimal t = Optional.ofNullable(montoTotal).orElse(BigDecimal.ZERO);
-        if (reservaId == null) {
+    private BigDecimal calcularSaldoPendiente(Reserva entity) {
+        if (entity == null) return BigDecimal.ZERO;
+        BigDecimal t = Optional.ofNullable(entity.getMontoTotal()).orElse(BigDecimal.ZERO);
+        if (entity.getReservaId() == null) {
             return t;
         }
-        BigDecimal totalPagado = pagoRepository.findByReservaReservaId(reservaId).stream()
+        BigDecimal totalPagado = pagoRepository.findByReservaReservaId(entity.getReservaId()).stream()
                 .filter(p -> p.getTipoPago() != TipoPago.REEMBOLSO)
                 .map(Pago::getMonto)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        if (totalPagado.compareTo(BigDecimal.ZERO) == 0
+                && entity.getEstado() != EstadoReserva.PENDIENTE
+                && entity.getEstado() != EstadoReserva.CANCELADA
+                && entity.getAdelanto() != null) {
+            totalPagado = entity.getAdelanto();
+        }
+
         return t.subtract(totalPagado).max(BigDecimal.ZERO);
     }
 
