@@ -108,8 +108,12 @@ public class BookingController {
 
         log.info("======================================");
         String base;
-        if ("dashboard".equalsIgnoreCase(origen)) {
-            base = "/reservations/mis-reservas";  // <-- ruta correcta del dashboard
+        if ("mis-reservas".equalsIgnoreCase(origen)) {
+            base = "/reservations/mis-reservas";
+        } else if ("reservations".equalsIgnoreCase(origen)) {
+            base = "/reservations";
+        } else if ("mis-pagos".equalsIgnoreCase(origen)) {
+            base = "/mis-pagos";
         } else {
             base = "/booking";
         }
