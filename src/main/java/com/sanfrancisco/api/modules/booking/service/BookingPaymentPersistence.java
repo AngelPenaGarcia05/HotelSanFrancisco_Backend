@@ -47,18 +47,26 @@ public class BookingPaymentPersistence {
 
     /** Cobro aprobado: transacción AUTORIZADA + reserva CONFIRMADA + Pago, en una sola transacción. */
     @Transactional
-    public Pago registrarAprobacion(TransaccionPasarela trx, NiubizAuthorizationResult result) {
+    public Pago registrarAprobacion(TransaccionPasarela trx, NiubizAuthorizationResult result,
+                                    boolean esSaldoPendiente) {
         aplicarResultado(trx, result, EstadoTransaccionPasarela.AUTORIZADA);
         transaccionRepository.save(trx);
 
         Reserva reserva = trx.getReserva();
-        reserva.setEstado(EstadoReserva.CONFIRMADA);
-        reservaRepository.save(reserva);
+
+        if (!esSaldoPendiente) {
+            reserva.setEstado(EstadoReserva.CONFIRMADA);
+            reservaRepository.save(reserva);
+        }
+
+        TipoPago tipoPago = esSaldoPendiente
+                ? TipoPago.SALDO
+                : (reserva.getModalidadPago() == ModalidadPago.PARCIAL ? TipoPago.ANTICIPO : TipoPago.TOTAL);
 
         Pago pago = Pago.builder()
                 .reserva(reserva)
                 .metodoPago(resolverMetodoPago(result.marcaTarjeta()))
-                .tipoPago(reserva.getModalidadPago() == ModalidadPago.PARCIAL ? TipoPago.ANTICIPO : TipoPago.TOTAL)
+                .tipoPago(tipoPago)
                 .monto(trx.getMonto())
                 .fecha(DateTimeUtils.now())
                 .comprobante(comprobante(trx, result))

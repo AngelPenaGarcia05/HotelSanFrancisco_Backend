@@ -37,6 +37,11 @@ import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.util.List;
 
+import com.sanfrancisco.api.modules.pagos.repository.PagoRepository;
+import com.sanfrancisco.api.modules.seguridad.security.UserPrincipal;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+
 /**
  * Orquestador del pago online del booking público. NO es transaccional a
  * propósito: la llamada HTTP a Niubiz no debe ocurrir dentro de una
@@ -55,6 +60,7 @@ public class BookingPaymentServiceImpl implements BookingPaymentService {
     private final ReservaRepository reservaRepository;
     private final ReservaHabitacionRepository reservaHabitacionRepository;
     private final DetalleHuespedRepository detalleHuespedRepository;
+    private final PagoRepository pagoRepository;
     private final BookingPaymentPersistence persistence;
     private final BookingConfirmationFactory confirmationFactory;
     private final ReservaEventPublisher reservaEventPublisher;
@@ -67,6 +73,7 @@ public class BookingPaymentServiceImpl implements BookingPaymentService {
                                      ReservaRepository reservaRepository,
                                      ReservaHabitacionRepository reservaHabitacionRepository,
                                      DetalleHuespedRepository detalleHuespedRepository,
+                                     PagoRepository pagoRepository,
                                      BookingPaymentPersistence persistence,
                                      BookingConfirmationFactory confirmationFactory,
                                      ReservaEventPublisher reservaEventPublisher,
@@ -78,6 +85,7 @@ public class BookingPaymentServiceImpl implements BookingPaymentService {
         this.reservaRepository = reservaRepository;
         this.reservaHabitacionRepository = reservaHabitacionRepository;
         this.detalleHuespedRepository = detalleHuespedRepository;
+        this.pagoRepository = pagoRepository;
         this.persistence = persistence;
         this.confirmationFactory = confirmationFactory;
         this.reservaEventPublisher = reservaEventPublisher;
@@ -95,13 +103,35 @@ public class BookingPaymentServiceImpl implements BookingPaymentService {
         Reserva reserva = reservaRepository.findById(reservaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reserva no encontrada"));
 
-        if (reserva.getEstado() != EstadoReserva.PENDIENTE) {
+        boolean esPagoInicial = reserva.getEstado() == EstadoReserva.PENDIENTE;
+        boolean esSaldoPendiente = reserva.getEstado() == EstadoReserva.CONFIRMADA;
+
+        if (!esPagoInicial && !esSaldoPendiente) {
             throw new ConflictException("La reserva no admite pago online (estado " + reserva.getEstado() + ")");
         }
 
-        BigDecimal monto = reserva.getAdelanto();
-        if (monto == null || monto.signum() <= 0) {
-            throw new ValidationException("La reserva no tiene un monto de pago online pendiente");
+        // Para pagos de saldo, verificar ownership del cliente autenticado
+        if (esSaldoPendiente) {
+            Integer currentUserId = currentUserIdOrNull();
+            if (currentUserId == null) {
+                throw new ConflictException("Debe iniciar sesión para pagar el saldo pendiente");
+            }
+            if (reserva.getUsuario() == null || !currentUserId.equals(reserva.getUsuario().getUsuarioId())) {
+                throw new ConflictException("La reserva no pertenece al usuario autenticado");
+            }
+        }
+
+        BigDecimal monto;
+        if (esSaldoPendiente) {
+            monto = calcularSaldoPendiente(reserva);
+            if (monto == null || monto.signum() <= 0) {
+                throw new ValidationException("La reserva no tiene saldo pendiente de pago");
+            }
+        } else {
+            monto = reserva.getAdelanto();
+            if (monto == null || monto.signum() <= 0) {
+                throw new ValidationException("La reserva no tiene un monto de pago online pendiente");
+            }
         }
 
         String correo = detalleHuespedRepository.findPrincipalConHuesped(reservaId)
@@ -112,7 +142,6 @@ public class BookingPaymentServiceImpl implements BookingPaymentService {
         try {
             session = niubizClient.crearSesion(monto, clientIp, correo);
         } catch (NiubizClientException e) {
-            // Aquí aún no hay cobro en juego: fallar la sesión es seguro y reintentable.
             log.error("No se pudo crear la sesión Niubiz para la reserva {}: {}", reservaId, e.getMessage());
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "No se pudo iniciar el pago con la pasarela. Intente nuevamente en unos minutos.");
@@ -155,7 +184,8 @@ public class BookingPaymentServiceImpl implements BookingPaymentService {
             throw new ConflictException("La transacción ya fue procesada (estado " + trx.getEstado()
                     + "). Genere una nueva sesión de pago.");
         }
-        if (reserva.getEstado() != EstadoReserva.PENDIENTE) {
+        if (reserva.getEstado() != EstadoReserva.PENDIENTE
+                && reserva.getEstado() != EstadoReserva.CONFIRMADA) {
             throw new ConflictException("La reserva ya no admite confirmación de pago (estado "
                     + reserva.getEstado() + ")");
         }
@@ -165,8 +195,6 @@ public class BookingPaymentServiceImpl implements BookingPaymentService {
             result = niubizClient.autorizar(request.transactionToken(),
                     trx.getPurchaseNumber(), trx.getMonto(), trx.getMoneda());
         } catch (NiubizClientException e) {
-            // Sin respuesta concluyente: el cobro pudo o no haberse realizado.
-            // Se marca ERROR (no RECHAZADA) para reconciliar contra el panel Niubiz.
             log.error("Autorización Niubiz indeterminada para purchaseNumber {}: {}",
                     trx.getPurchaseNumber(), e.getMessage());
             persistence.registrarError(trx, e.getMessage());
@@ -182,9 +210,13 @@ public class BookingPaymentServiceImpl implements BookingPaymentService {
                     + ". Puede intentar nuevamente con otro medio de pago.");
         }
 
-        Pago pago = persistence.registrarAprobacion(trx, result);
+        boolean esSaldoPendiente = reserva.getEstado() == EstadoReserva.CONFIRMADA;
+        TipoPago tipoPago = esSaldoPendiente
+                ? TipoPago.SALDO
+                : (reserva.getModalidadPago() == ModalidadPago.PARCIAL ? TipoPago.ANTICIPO : TipoPago.TOTAL);
 
-        // Eventos y correo fuera de la transacción: si fallan no deben deshacer el cobro.
+        Pago pago = persistence.registrarAprobacion(trx, result, esSaldoPendiente);
+
         reservaEventPublisher.publishStateChanged(reserva);
         pagoEventPublisher.publishCreated(pago);
         try {
@@ -219,9 +251,35 @@ public class BookingPaymentServiceImpl implements BookingPaymentService {
                 .orElseThrow(() -> new IllegalStateException(
                         "Reserva sin huésped principal: " + reserva.getReservaId()));
 
-        TipoPago tipoPago = reserva.getModalidadPago() == ModalidadPago.PARCIAL
-                ? TipoPago.ANTICIPO : TipoPago.TOTAL;
+        boolean tienePagoSaldo = pagoRepository.findByReservaReservaId(reserva.getReservaId()).stream()
+                .anyMatch(p -> p.getTipoPago() == TipoPago.SALDO);
+        TipoPago tipoPago;
+        if (tienePagoSaldo) {
+            tipoPago = TipoPago.SALDO;
+        } else {
+            tipoPago = reserva.getModalidadPago() == ModalidadPago.PARCIAL
+                    ? TipoPago.ANTICIPO : TipoPago.TOTAL;
+        }
         return confirmationFactory.build(reserva, rhs, huesped, tipoPago);
+    }
+
+    /** Calcula el saldo pendiente de una reserva restando pagos y reembolsos existentes. */
+    private BigDecimal calcularSaldoPendiente(Reserva reserva) {
+        BigDecimal totalPagado = pagoRepository.findByReservaReservaId(reserva.getReservaId()).stream()
+                .filter(p -> p.getTipoPago() != com.sanfrancisco.api.modules.pagos.enums.TipoPago.REEMBOLSO)
+                .map(Pago::getMonto)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal montoTotal = reserva.getMontoTotal() != null ? reserva.getMontoTotal() : BigDecimal.ZERO;
+        return montoTotal.subtract(totalPagado).max(BigDecimal.ZERO);
+    }
+
+    /** Devuelve el ID del usuario autenticado o null si no hay sesión. */
+    private Integer currentUserIdOrNull() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof UserPrincipal principal) {
+            return principal.userId();
+        }
+        return null;
     }
 
     /** Número de compra Niubiz: numérico, único, máx. 12 dígitos. */
