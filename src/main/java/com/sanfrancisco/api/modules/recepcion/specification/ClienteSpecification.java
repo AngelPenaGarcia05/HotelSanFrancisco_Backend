@@ -5,6 +5,8 @@ import com.sanfrancisco.api.modules.recepcion.entity.Huesped;
 import com.sanfrancisco.api.shared.specification.SpecificationUtils;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.util.Objects;
+
 public final class ClienteSpecification {
 
     private ClienteSpecification() {
@@ -14,7 +16,7 @@ public final class ClienteSpecification {
         if (filter == null) return Specification.unrestricted();
 
         return Specification.allOf(
-                termino(filter.q()),
+                Objects.requireNonNullElse(termino(filter.q()), Specification.unrestricted()),
                 SpecificationUtils.<Huesped>likeIfPresent("nombre", filter.nombre()),
                 SpecificationUtils.<Huesped>likeIfPresent("apellidoPaterno", filter.apellidoPaterno()),
                 SpecificationUtils.<Huesped>likeIfPresent("numeroDocumento", filter.numeroDocumento()),
