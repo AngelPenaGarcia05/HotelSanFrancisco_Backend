@@ -145,6 +145,12 @@ public class NiubizClient {
         body.set("antifraud", antifraud);
 
         try {
+            log.info("Authorization URL: {}/api.authorization/v3/authorization/ecommerce/{}",
+                    props.getBaseUrl(), props.getMerchantId());
+
+            log.info("Authorization body:\n{}", body.toPrettyString());
+            log.info("Authorization request:");
+            log.info(body.toPrettyString());
             JsonNode resp = restClient.post()
                     .uri("/api.ecommerce/v2/ecommerce/token/session/{merchantId}", props.getMerchantId())
                     .header("Authorization", securityToken)
@@ -197,16 +203,20 @@ public class NiubizClient {
         ObjectNode order = objectMapper.createObjectNode();
         order.put("tokenId", transactionToken);
         order.put("purchaseNumber", purchaseNumber);
-        order.put("amount", monto);
+        order.put("amount", monto.toPlainString());
         order.put("currency", moneda);
 
         ObjectNode body = objectMapper.createObjectNode();
         body.put("channel", "web");
         body.put("captureType", "manual");
-        body.put("countable", true);
+        body.put("contable", true);
         body.set("order", order);
+        body.putNull("antifraud");
+        body.put("terminalId", "1");
+        body.put("terminalUnattended", false);
 
         try {
+            log.info("Authorization body:\n{}", body.toPrettyString());
             return restClient.post()
                     .uri("/api.authorization/v3/authorization/ecommerce/{merchantId}", props.getMerchantId())
                     .header("Authorization", securityToken)
@@ -216,11 +226,19 @@ public class NiubizClient {
                     .body(String.class);
         } catch (HttpStatusCodeException e) {
             // Rechazo de negocio: Niubiz responde 4xx con el detalle en el body.
+            log.error("==============================================");
+            log.error("HTTP STATUS: {}", e.getStatusCode());
+            log.error("RESPONSE HEADERS:\n{}", e.getResponseHeaders());
+            log.error("RESPONSE BODY:\n{}", e.getResponseBodyAsString());
+            log.error("==============================================");
+
             String raw = e.getResponseBodyAsString();
+
             if (raw == null || raw.isBlank()) {
-                throw new NiubizClientException("Niubiz devolvió HTTP "
-                        + e.getStatusCode().value() + " sin detalle en la autorización", e);
+                throw new NiubizClientException(
+                        "Niubiz devolvió HTTP " + e.getStatusCode().value() + " sin detalle", e);
             }
+
             return raw;
         } catch (RestClientException e) {
             throw new NiubizClientException("Fallo de comunicación con Niubiz (authorize): " + e.getMessage(), e);

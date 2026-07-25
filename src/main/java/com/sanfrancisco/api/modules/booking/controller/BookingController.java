@@ -97,7 +97,16 @@ public class BookingController {
             @RequestParam("transactionToken") String transactionToken,
             // El mismo checkout sirve al booking público y al dashboard de staff;
             // origen decide a qué pantalla del frontend se vuelve con el resultado.
-            @RequestParam(value = "origen", required = false) String origen) {
+            @RequestParam(value = "origen", required = false) String origen, HttpServletRequest request) {
+        log.info("=========== RETORNO NIUBIZ ===========");
+        log.info("purchaseNumber: {}", purchaseNumber);
+        log.info("transactionToken: {}", transactionToken);
+        log.info("transactionToken length: {}", transactionToken.length());
+
+        request.getParameterMap().forEach((k, v) ->
+                log.info("{} = {}", k, java.util.Arrays.toString(v)));
+
+        log.info("======================================");
         String base;
         if ("dashboard".equalsIgnoreCase(origen)) {
             base = "/reservations/mis-reservas";  // <-- ruta correcta del dashboard
