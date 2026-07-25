@@ -110,7 +110,14 @@ public class SecurityConfig {
                 .requestMatchers(EndpointPaths.WS_BASE + "/**").permitAll()
 
                 // Healthcheck público (Railway / monitoreo)
-                .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                .requestMatchers(
+                    "/actuator",
+                    "/actuator/**",
+                    "/actuator/prometheus",
+                    "/actuator/prometheus/**",
+                    "/actuator/health",
+                    "/actuator/health/**"
+                ).permitAll()
 
                 // Documentación OpenAPI / Swagger UI
                 .requestMatchers(

@@ -193,7 +193,8 @@ management:
   endpoints:
     web:
       exposure:
-        include: ${ACTUATOR_EXPOSE:health}
+        # Mantiene 'health' e incluye 'prometheus' por defecto si no existe la variable de entorno
+        include: ${ACTUATOR_EXPOSE:health,prometheus}
   endpoint:
     health:
       probes:
@@ -205,6 +206,14 @@ management:
     # de Railway aunque la API esté perfectamente operativa.
     mail:
       enabled: false
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http:
+          server:
+            requests: true
+    tags:
+      application: backend-spring-boot
 
 logging:
   level:
