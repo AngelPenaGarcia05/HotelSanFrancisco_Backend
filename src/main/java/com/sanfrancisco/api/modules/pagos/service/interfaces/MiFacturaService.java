@@ -7,4 +7,10 @@ public interface MiFacturaService {
      * Valida que el pago pertenezca al cliente antes de devolver el documento.
      */
     String generarFacturaHtml(Integer pagoId);
+
+    /**
+     * Genera el comprobante de pago en formato PDF (bytes).
+     * Valida que el pago pertenezca al cliente autenticado.
+     */
+    byte[] generarFacturaPdf(Integer pagoId);
 }

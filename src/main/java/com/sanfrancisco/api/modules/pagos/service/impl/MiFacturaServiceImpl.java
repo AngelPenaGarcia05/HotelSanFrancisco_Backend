@@ -1,5 +1,6 @@
 package com.sanfrancisco.api.modules.pagos.service.impl;
 
+import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.sanfrancisco.api.exception.ResourceNotFoundException;
 import com.sanfrancisco.api.modules.pagos.entity.Pago;
 import com.sanfrancisco.api.modules.pagos.repository.PagoRepository;
@@ -10,28 +11,45 @@ import com.sanfrancisco.api.modules.recepcion.repository.ReservaHabitacionReposi
 import com.sanfrancisco.api.modules.seguridad.entity.Usuario;
 import com.sanfrancisco.api.modules.seguridad.security.UserPrincipal;
 import com.sanfrancisco.api.shared.exception.ValidationException;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 @Service
 public class MiFacturaServiceImpl implements MiFacturaService {
 
+    private static final Locale ES_PE = Locale.forLanguageTag("es-PE");
     private static final DateTimeFormatter FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter FECHA_HORA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final String LOGO_DATA_URI = cargarLogo();
 
     private final PagoRepository pagoRepository;
     private final ReservaHabitacionRepository reservaHabitacionRepository;
+    private final TemplateEngine reportesTemplateEngine;
 
     public MiFacturaServiceImpl(PagoRepository pagoRepository,
-                                ReservaHabitacionRepository reservaHabitacionRepository) {
+                                ReservaHabitacionRepository reservaHabitacionRepository,
+                                TemplateEngine reportesTemplateEngine) {
         this.pagoRepository = pagoRepository;
         this.reservaHabitacionRepository = reservaHabitacionRepository;
+        this.reportesTemplateEngine = reportesTemplateEngine;
     }
 
     @Override
@@ -45,7 +63,6 @@ public class MiFacturaServiceImpl implements MiFacturaService {
             throw new ValidationException("El pago no está asociado a una reserva");
         }
 
-        // Validación de propiedad: el pago debe ser de una reserva del cliente autenticado
         Integer usuarioId = currentUserId();
         if (reserva.getUsuario() == null || !reserva.getUsuario().getUsuarioId().equals(usuarioId)) {
             throw new ValidationException("No tienes acceso a este comprobante");
@@ -148,6 +165,65 @@ public class MiFacturaServiceImpl implements MiFacturaService {
                 );
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] generarFacturaPdf(Integer pagoId) {
+        Pago pago = pagoRepository.findById(pagoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pago no encontrado: " + pagoId));
+
+        Reserva reserva = pago.getReserva();
+        if (reserva == null) {
+            throw new ValidationException("El pago no está asociado a una reserva");
+        }
+
+        Integer usuarioId = currentUserId();
+        if (reserva.getUsuario() == null || !reserva.getUsuario().getUsuarioId().equals(usuarioId)) {
+            throw new ValidationException("No tienes acceso a este comprobante");
+        }
+
+        Usuario cliente = reserva.getUsuario();
+        String nombreCliente = (cliente.getNombre() + " "
+                + (cliente.getApellidoPaterno() != null ? cliente.getApellidoPaterno() : "")).trim();
+
+        List<ReservaHabitacion> habitaciones = reservaHabitacionRepository.findByReservaReservaId(reserva.getReservaId());
+
+        List<Map<String, String>> habitacionesData = new ArrayList<>();
+        for (ReservaHabitacion rh : habitaciones) {
+            String tipo = rh.getTipoHabitacion() != null ? rh.getTipoHabitacion().getNombre() : "Habitación";
+            String numero = rh.getHabitacion() != null ? rh.getHabitacion().getNumero() : "";
+            habitacionesData.add(Map.of(
+                    "concepto", tipo + (numero.isBlank() ? "" : " - " + numero),
+                    "noches", String.valueOf(rh.getNoches()),
+                    "tarifa", rh.getTarifaPactada().toPlainString(),
+                    "subtotal", rh.getSubtotal().toPlainString()
+            ));
+        }
+
+        Context ctx = new Context(ES_PE);
+        ctx.setVariable("logo", LOGO_DATA_URI);
+        ctx.setVariable("fechaGeneracion", java.time.LocalDateTime.now().format(FECHA_HORA));
+        ctx.setVariable("nombreCliente", nombreCliente);
+        ctx.setVariable("numeroDocumento", cliente.getNumeroDocumento() != null ? cliente.getNumeroDocumento() : "-");
+        ctx.setVariable("codReserva", reserva.getCodReserva());
+        ctx.setVariable("fechaInicio", reserva.getFechaInicio().format(FECHA));
+        ctx.setVariable("fechaFin", reserva.getFechaFin().format(FECHA));
+        ctx.setVariable("habitaciones", habitacionesData);
+        ctx.setVariable("subtotal", reserva.getSubtotal().toPlainString());
+        ctx.setVariable("descuento", reserva.getDescuento().toPlainString());
+        ctx.setVariable("impuesto", reserva.getImpuesto().toPlainString());
+        ctx.setVariable("montoTotal", reserva.getMontoTotal().toPlainString());
+        ctx.setVariable("pagoId", pago.getPagoId());
+        ctx.setVariable("pagoFecha", pago.getFecha().format(FECHA_HORA));
+        ctx.setVariable("metodoPago", pago.getMetodoPago() != null ? pago.getMetodoPago().getNombre() : "-");
+        ctx.setVariable("tipoPago", pago.getTipoPago() != null ? pago.getTipoPago().name() : "-");
+        ctx.setVariable("montoPagado", pago.getMonto().toPlainString());
+
+        String html = reportesTemplateEngine.process("pagos/comprobante", ctx);
+        return renderPdf(html);
+    }
+
+    // ---------------------------------------------------------------
+
     private String esc(String value) {
         if (value == null) return "";
         return value.replace("&", "&amp;")
@@ -163,5 +239,26 @@ public class MiFacturaServiceImpl implements MiFacturaService {
             throw new BadCredentialsException("No autenticado");
         }
         return principal.userId();
+    }
+
+    private byte[] renderPdf(String html) {
+        try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
+            PdfRendererBuilder builder = new PdfRendererBuilder();
+            builder.useFastMode();
+            builder.withHtmlContent(html, null);
+            builder.toStream(os);
+            builder.run();
+            return os.toByteArray();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Error generando el PDF del comprobante", e);
+        }
+    }
+
+    private static String cargarLogo() {
+        try (InputStream in = new ClassPathResource("reportes/logo.png").getInputStream()) {
+            return "data:image/png;base64," + Base64.getEncoder().encodeToString(in.readAllBytes());
+        } catch (IOException e) {
+            return null;
+        }
     }
 }

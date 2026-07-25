@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8"/>
+<style>
+    @page { size: A4; margin: 1.8cm 1.6cm; }
+    * { box-sizing: border-box; }
+    body { font-family: Helvetica, Arial, sans-serif; color: #2b2b2b; font-size: 11px; margin: 0; }
+
+    .header { border-bottom: 2px solid #a67c3d; padding-bottom: 10px; margin-bottom: 16px; }
+    .header .brand { font-size: 18px; font-weight: bold; color: #a67c3d; }
+    .header .subtitle { font-size: 13px; font-weight: bold; margin-top: 2px; }
+    .header .meta { font-size: 9px; color: #777; margin-top: 4px; }
+
+    .box { border: 1px solid #e3d9c6; border-radius: 6px; padding: 12px; margin-top: 14px; }
+    .box-label { font-size: 9px; text-transform: uppercase; letter-spacing: .5px; color: #a67c3d; font-weight: bold; margin-bottom: 6px; }
+
+    table.data { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    table.data th { background: #f3ede1; text-align: center; font-size: 9px; text-transform: uppercase; color: #7a6a4a; padding: 5px 7px; border-bottom: 1px solid #e3d9c6; }
+    table.data td { padding: 5px 7px; border-bottom: 1px solid #efe9dd; text-align: left; font-size: 10px; }
+    table.data td.num { text-align: right; }
+
+    .totals { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    .totals td { padding: 4px 7px; font-size: 10px; }
+    .totals td.label { text-align: left; color: #555; }
+    .totals td.value { text-align: right; font-weight: bold; }
+    .totals tr.grand td { font-size: 13px; color: #a67c3d; border-top: 2px solid #a67c3d; padding-top: 6px; }
+
+    .payment-box { margin-top: 14px; }
+    .payment-box .paid-amount { font-size: 14px; font-weight: bold; color: #a67c3d; margin-top: 4px; }
+
+    .footer { margin-top: 20px; font-size: 8px; color: #999; font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <table style="width:100%; border-collapse:collapse;">
+        <tr>
+            <td style="width:64px; vertical-align:middle;">
+                <img th:if="${logo}" th:src="${logo}" alt="Logo Hotel San Francisco"
+                     style="width:52px; height:52px;" />
+            </td>
+            <td style="vertical-align:middle;">
+                <div class="brand">Hotel San Francisco</div>
+                <div class="subtitle">Comprobante de Pago</div>
+                <div class="meta">
+                    Generado el <span th:text="${fechaGeneracion}">--</span>
+                </div>
+            </td>
+        </tr>
+    </table>
+</div>
+
+<div class="box">
+    <div class="box-label">Datos del Cliente</div>
+    <table style="width:100%; border-collapse:collapse; font-size:10px;">
+        <tr>
+            <td style="width:50%; padding:2px 0;"><strong>Cliente:</strong> <span th:text="${nombreCliente}">--</span></td>
+            <td style="width:50%; padding:2px 0;"><strong>Documento:</strong> <span th:text="${numeroDocumento}">--</span></td>
+        </tr>
+        <tr>
+            <td style="padding:2px 0;"><strong>Reserva:</strong> <span th:text="${codReserva}">--</span></td>
+            <td style="padding:2px 0;"><strong>Estadía:</strong> <span th:text="${fechaInicio}">--</span> al <span th:text="${fechaFin}">--</span></td>
+        </tr>
+    </table>
+</div>
+
+<table class="data">
+    <thead>
+        <tr>
+            <th style="text-align:left;">Concepto</th>
+            <th style="text-align:center;">Noches</th>
+            <th style="text-align:right;">Tarifa</th>
+            <th style="text-align:right;">Subtotal</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr th:each="hab : ${habitaciones}">
+            <td th:text="${hab.concepto}">--</td>
+            <td class="num" th:text="${hab.noches}">--</td>
+            <td class="num" th:text="'S/ ' + ${hab.tarifa}">--</td>
+            <td class="num" th:text="'S/ ' + ${hab.subtotal}">--</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="box">
+    <div class="box-label">Resumen</div>
+    <table class="totals">
+        <tr>
+            <td class="label">Subtotal</td>
+            <td class="value" th:text="'S/ ' + ${subtotal}">S/ 0.00</td>
+        </tr>
+        <tr>
+            <td class="label">Descuento</td>
+            <td class="value" th:text="'S/ ' + ${descuento}">S/ 0.00</td>
+        </tr>
+        <tr>
+            <td class="label">IGV</td>
+            <td class="value" th:text="'S/ ' + ${impuesto}">S/ 0.00</td>
+        </tr>
+        <tr class="grand">
+            <td class="label"><strong>Total reserva</strong></td>
+            <td class="value" th:text="'S/ ' + ${montoTotal}">S/ 0.00</td>
+        </tr>
+    </table>
+</div>
+
+<div class="box payment-box">
+    <div class="box-label">Pago Registrado</div>
+    <table style="width:100%; border-collapse:collapse; font-size:10px;">
+        <tr>
+            <td style="padding:2px 0;"><strong>N.° de pago:</strong> <span th:text="${pagoId}">--</span></td>
+            <td style="padding:2px 0;"><strong>Fecha:</strong> <span th:text="${pagoFecha}">--</span></td>
+        </tr>
+        <tr>
+            <td style="padding:2px 0;"><strong>Método:</strong> <span th:text="${metodoPago}">--</span></td>
+            <td style="padding:2px 0;"><strong>Tipo:</strong> <span th:text="${tipoPago}">--</span></td>
+        </tr>
+    </table>
+    <div class="paid-amount" style="margin-top:8px;">
+        Monto pagado: <span th:text="'S/ ' + ${montoPagado}">S/ 0.00</span>
+    </div>
+</div>
+
+<p class="footer">
+    Documento generado automáticamente. No constituye comprobante electrónico SUNAT.
+</p>
+
+</body>
+</html>
